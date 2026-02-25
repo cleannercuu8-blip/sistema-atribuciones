@@ -208,4 +208,61 @@ const subirProductoFinal = async (req, res) => {
     }
 };
 
-module.exports = { listar, crear, listarObservaciones, crearObservacion, subsanarObservacion, cerrarRevision, aprobarProyecto, subirProductoFinal };
+const actualizar = async (req, res) => {
+    const { id } = req.params;
+    const { dias_habiles_plazo, notas } = req.body;
+    try {
+        // Verificar permisos: solo admin o el revisor original
+        const rRes = await pool.query('SELECT revisor_id, fecha_inicio FROM revisiones WHERE id = $1', [id]);
+        if (rRes.rows.length === 0) return res.status(404).json({ error: 'Revisión no encontrada' });
+
+        if (req.user.rol !== 'admin' && req.user.id !== rRes.rows[0].revisor_id) {
+            return res.status(403).json({ error: 'No tiene permisos para editar esta revisión' });
+        }
+
+        const diasPlazo = dias_habiles_plazo || 10;
+        const fechaLimite = agregarDiasHabiles(rRes.rows[0].fecha_inicio, diasPlazo);
+
+        const result = await pool.query(
+            `UPDATE revisiones SET dias_habiles_plazo = $1, fecha_limite = $2, notas = $3, updated_at = NOW() WHERE id = $4 RETURNING *`,
+            [diasPlazo, fechaLimite, notas, id]
+        );
+        res.json(result.rows[0]);
+    } catch (err) {
+        res.status(500).json({ error: 'Error al actualizar revisión' });
+    }
+};
+
+const eliminar = async (req, res) => {
+    const { id } = req.params;
+    try {
+        // Verificar permisos
+        const rRes = await pool.query('SELECT revisor_id, proyecto_id FROM revisiones WHERE id = $1', [id]);
+        if (rRes.rows.length === 0) return res.status(404).json({ error: 'Revisión no encontrada' });
+
+        if (req.user.rol !== 'admin' && req.user.id !== rRes.rows[0].revisor_id) {
+            return res.status(403).json({ error: 'No tiene permisos para eliminar esta revisión' });
+        }
+
+        const proyectoId = rRes.rows[0].proyecto_id;
+
+        // Eliminar revisión (las observaciones se borrarán en cascada por el FK con ON DELETE CASCADE)
+        await pool.query('DELETE FROM revisiones WHERE id = $1', [id]);
+
+        // Si ya no quedan revisiones abiertas, el proyecto vuelve a borrador
+        const abiertas = await pool.query(
+            'SELECT COUNT(*) as total FROM revisiones WHERE proyecto_id = $1 AND estado = \'abierta\'',
+            [proyectoId]
+        );
+        if (parseInt(abiertas.rows[0].total) === 0) {
+            await pool.query('UPDATE proyectos SET estado = \'borrador\' WHERE id = $1', [proyectoId]);
+        }
+
+        res.json({ mensaje: 'Revisión eliminada correctamente' });
+    } catch (err) {
+        console.error(err);
+        res.status(500).json({ error: 'Error al eliminar revisión' });
+    }
+};
+
+module.exports = { listar, crear, listarObservaciones, crearObservacion, subsanarObservacion, cerrarRevision, aprobarProyecto, subirProductoFinal, actualizar, eliminar };

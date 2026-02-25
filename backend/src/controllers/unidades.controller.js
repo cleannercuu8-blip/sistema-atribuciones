@@ -105,4 +105,44 @@ const eliminar = async (req, res) => {
     }
 };
 
-module.exports = { obtenerArbol, obtenerPlana, crear, actualizar, eliminar };
+const cargarMasivoUnidades = async (req, res) => {
+    const { proyectoId } = req.params;
+    const { items } = req.body; // [{nombre, siglas, nivel_numero, padre_siglas}]
+    if (!Array.isArray(items)) return res.status(400).json({ error: 'Formato inválido' });
+
+    const client = await pool.connect();
+    try {
+        await client.query('BEGIN');
+        for (const item of items) {
+            if (!item.nombre || !item.siglas) continue;
+
+            // Buscar padre por siglas si se proporciona
+            let padreId = null;
+            if (item.padre_siglas) {
+                const pRes = await client.query(
+                    'SELECT id FROM unidades_administrativas WHERE proyecto_id = $1 AND LOWER(siglas) = LOWER($2)',
+                    [proyectoId, item.padre_siglas]
+                );
+                padreId = pRes.rows[0]?.id || null;
+            }
+
+            // Insertar con ON CONFLICT (siglas ya es UNIQUE por proyecto)
+            await client.query(
+                `INSERT INTO unidades_administrativas (proyecto_id, nombre, siglas, nivel_numero, padre_id)
+                 VALUES ($1, $2, $3, $4, $5)
+                 ON CONFLICT (proyecto_id, siglas) DO UPDATE SET nombre = EXCLUDED.nombre, nivel_numero = EXCLUDED.nivel_numero, padre_id = EXCLUDED.padre_id`,
+                [proyectoId, item.nombre, item.siglas.toUpperCase(), item.nivel_numero || 1, padreId]
+            );
+        }
+        await client.query('COMMIT');
+        res.json({ mensaje: 'Carga masiva de estructura completada' });
+    } catch (err) {
+        await client.query('ROLLBACK');
+        console.error(err);
+        res.status(500).json({ error: 'Error en la carga masiva' });
+    } finally {
+        client.release();
+    }
+};
+
+module.exports = { obtenerArbol, obtenerPlana, crear, actualizar, eliminar, cargarMasivoUnidades };

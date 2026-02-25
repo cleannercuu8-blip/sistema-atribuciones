@@ -58,6 +58,11 @@ router.post('/:proyectoId/glosario', async (req, res) => {
     }
 });
 
+router.post('/:proyectoId/glosario/masivo', requireRole('admin', 'dependencia'), async (req, res) => {
+    const catalogosCtrl = require('../controllers/catalogos.controller');
+    return catalogosCtrl.cargarMasivoGlosario(req, res);
+});
+
 router.delete('/:proyectoId/glosario/:id', async (req, res) => {
     try {
         await pool.query('DELETE FROM glosario WHERE id = $1 AND proyecto_id = $2', [req.params.id, req.params.proyectoId]);
@@ -71,6 +76,7 @@ router.delete('/:proyectoId/glosario/:id', async (req, res) => {
 router.get('/:proyectoId/unidades', unidadesCtrl.obtenerArbol);
 router.get('/:proyectoId/unidades/plana', unidadesCtrl.obtenerPlana);
 router.post('/:proyectoId/unidades', unidadesCtrl.crear);
+router.post('/:proyectoId/unidades/masivo', unidadesCtrl.cargarMasivoUnidades);
 
 // === ATRIBUCIONES GENERALES ===
 router.get('/:proyectoId/atribuciones-generales', atribCtrl.listar);

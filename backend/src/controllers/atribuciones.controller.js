@@ -69,11 +69,14 @@ const listarEspecificas = async (req, res) => {
         let query = `
       SELECT ae.*, ua.nombre as unidad_nombre, ua.siglas as unidad_siglas, ua.nivel_numero,
              ag.clave as gen_clave, ag.texto as gen_texto,
-             ae2.clave as padre_clave, ae2.texto as padre_texto
+             ae2.clave as padre_clave, ae2.texto as padre_texto,
+             u.nombre as responsable_nombre,
+             (SELECT ARRAY_AGG(nombre) FROM usuarios WHERE id = ANY(ae.apoyo_ids)) as apoyo_nombres
       FROM atribuciones_especificas ae
       JOIN unidades_administrativas ua ON ae.unidad_id = ua.id
       LEFT JOIN atribuciones_generales ag ON ae.atribucion_general_id = ag.id
       LEFT JOIN atribuciones_especificas ae2 ON ae.padre_atribucion_id = ae2.id
+      LEFT JOIN usuarios u ON ae.responsable_id = u.id
       WHERE ae.proyecto_id = $1 AND ae.activo = true`;
         const params = [proyectoId];
         if (unidad_id) {
@@ -92,14 +95,14 @@ const listarEspecificas = async (req, res) => {
 // POST /api/proyectos/:proyectoId/atribuciones-especificas
 const crearEspecifica = async (req, res) => {
     const { proyectoId } = req.params;
-    const { unidad_id, clave, texto, tipo, padre_atribucion_id, atribucion_general_id, corresponsabilidad } = req.body;
+    const { unidad_id, clave, texto, tipo, padre_atribucion_id, atribucion_general_id, corresponsabilidad, responsable_id, apoyo_ids } = req.body;
     if (!unidad_id || !clave || !texto)
         return res.status(400).json({ error: 'Unidad, clave y texto son requeridos' });
     try {
         const result = await pool.query(
-            `INSERT INTO atribuciones_especificas (proyecto_id, unidad_id, clave, texto, tipo, padre_atribucion_id, atribucion_general_id, corresponsabilidad)
-       VALUES ($1,$2,$3,$4,$5,$6,$7,$8) RETURNING *`,
-            [proyectoId, unidad_id, clave, texto, tipo || 'normal', padre_atribucion_id || null, atribucion_general_id || null, corresponsabilidad || null]
+            `INSERT INTO atribuciones_especificas (proyecto_id, unidad_id, clave, texto, tipo, padre_atribucion_id, atribucion_general_id, corresponsabilidad, responsable_id, apoyo_ids)
+       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10) RETURNING *`,
+            [proyectoId, unidad_id, clave, texto, tipo || 'normal', padre_atribucion_id || null, atribucion_general_id || null, corresponsabilidad || null, responsable_id || null, apoyo_ids || null]
         );
         res.status(201).json(result.rows[0]);
     } catch (err) {
@@ -111,13 +114,13 @@ const crearEspecifica = async (req, res) => {
 // PUT /api/atribuciones-especificas/:id
 const actualizarEspecifica = async (req, res) => {
     const { id } = req.params;
-    const { clave, texto, tipo, padre_atribucion_id, atribucion_general_id, corresponsabilidad } = req.body;
+    const { clave, texto, tipo, padre_atribucion_id, atribucion_general_id, corresponsabilidad, responsable_id, apoyo_ids } = req.body;
     try {
         const result = await pool.query(
             `UPDATE atribuciones_especificas
-       SET clave=$1, texto=$2, tipo=$3, padre_atribucion_id=$4, atribucion_general_id=$5, corresponsabilidad=$6, updated_at=NOW()
-       WHERE id=$7 RETURNING *`,
-            [clave, texto, tipo || 'normal', padre_atribucion_id || null, atribucion_general_id || null, corresponsabilidad || null, id]
+       SET clave=$1, texto=$2, tipo=$3, padre_atribucion_id=$4, atribucion_general_id=$5, corresponsabilidad=$6, responsable_id=$7, apoyo_ids=$8, updated_at=NOW()
+       WHERE id=$9 RETURNING *`,
+            [clave, texto, tipo || 'normal', padre_atribucion_id || null, atribucion_general_id || null, corresponsabilidad || null, responsable_id || null, apoyo_ids || null, id]
         );
         res.json(result.rows[0]);
     } catch (err) {

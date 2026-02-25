@@ -255,6 +255,34 @@ const descargarPlantilla = async (req, res) => {
     res.end();
 };
 
+const cargarMasivoGlosario = async (req, res) => {
+    const { proyectoId } = req.params;
+    const { items } = req.body; // [{acronimo, significado}]
+    if (!Array.isArray(items)) return res.status(400).json({ error: 'Formato inválido' });
+
+    const client = await pool.connect();
+    try {
+        await client.query('BEGIN');
+        for (const item of items) {
+            if (!item.acronimo || !item.significado) continue;
+            await client.query(
+                `INSERT INTO glosario (proyecto_id, acronimo, significado)
+                 VALUES ($1, $2, $3)
+                 ON CONFLICT (proyecto_id, acronimo) DO UPDATE SET significado = EXCLUDED.significado`,
+                [proyectoId, item.acronimo.toUpperCase(), item.significado]
+            );
+        }
+        await client.query('COMMIT');
+        res.json({ mensaje: 'Carga masiva de glosario completada' });
+    } catch (err) {
+        await client.query('ROLLBACK');
+        console.error(err);
+        res.status(500).json({ error: 'Error en la carga masiva de glosario' });
+    } finally {
+        client.release();
+    }
+};
+
 module.exports = {
     listarResponsables,
     listarEnlaces,
@@ -264,6 +292,7 @@ module.exports = {
     cargarMasivoEnlaces,
     cargarMasivoAvances,
     cargarMasivoDependencias,
+    cargarMasivoGlosario,
     agregarResponsable,
     agregarEnlace,
     agregarAvance,

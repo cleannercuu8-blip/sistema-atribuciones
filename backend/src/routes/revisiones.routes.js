@@ -29,6 +29,8 @@ router.use(authMiddleware);
 
 router.get('/:id/observaciones', ctrl.listarObservaciones);
 router.post('/:id/observaciones', requireRole('revisor', 'admin'), ctrl.crearObservacion);
+router.put('/:id', requireRole('revisor', 'admin'), ctrl.actualizar);
+router.delete('/:id', requireRole('revisor', 'admin'), ctrl.eliminar);
 router.put('/:id/cerrar', requireRole('revisor', 'admin'), ctrl.cerrarRevision);
 router.put('/observaciones/:id/subsanar', ctrl.subsanarObservacion);
 router.post('/:id/producto-final', requireRole('revisor', 'admin'), upload.single('archivo'), ctrl.subirProductoFinal);

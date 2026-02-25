@@ -104,11 +104,30 @@ const initDB = async () => {
                 END IF;
             END $$;
         `);
-        // Añadir columna de corresponsabilidad
+        // Añadir columna de corresponsabilidad y responsables
         await pool.query(`
             ALTER TABLE atribuciones_especificas ADD COLUMN IF NOT EXISTS corresponsabilidad TEXT;
+            ALTER TABLE atribuciones_especificas ADD COLUMN IF NOT EXISTS responsable_id INTEGER REFERENCES usuarios(id);
+            ALTER TABLE atribuciones_especificas ADD COLUMN IF NOT EXISTS apoyo_ids INTEGER[];
         `);
-        console.log('🔹 Columna corresponsabilidad verificada');
+        console.log('🔹 Columnas de corresponsabilidad y responsables verificadas');
+
+        // Restricciones de unicidad para prevención de duplicados
+        await pool.query(`
+            DO $$ 
+            BEGIN 
+                -- Unicidad para Glosario (acronimo por proyecto)
+                IF NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conname = 'glosario_proyecto_acronimo_key') THEN
+                    ALTER TABLE glosario ADD CONSTRAINT glosario_proyecto_acronimo_key UNIQUE (proyecto_id, acronimo);
+                END IF;
+                
+                -- Unicidad para Atribuciones Generales (clave por proyecto)
+                IF NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conname = 'atribuciones_generales_proyecto_clave_key') THEN
+                    ALTER TABLE atribuciones_generales ADD CONSTRAINT atribuciones_generales_proyecto_clave_key UNIQUE (proyecto_id, clave);
+                END IF;
+            END $$;
+        `);
+        console.log('🔹 Restricciones de unicidad verificadas (Glosario y Ley Base)');
 
         console.log('🔹 Restricción UNIQUE en dependencias verificada (y limpieza de duplicados realizada)');
     } catch (err) {
