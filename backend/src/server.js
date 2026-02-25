@@ -86,6 +86,17 @@ const initDB = async () => {
             ALTER TABLE revisiones ADD COLUMN IF NOT EXISTS producto_word VARCHAR(255);
         `);
         console.log('🔹 Migración de soporte para Word completada');
+
+        // Asegurar UNIQUE en dependencias para permitir ON CONFLICT
+        await pool.query(`
+            DO $$ 
+            BEGIN 
+                IF NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conname = 'dependencias_nombre_key') THEN
+                    ALTER TABLE dependencias ADD CONSTRAINT dependencias_nombre_key UNIQUE (nombre);
+                END IF;
+            END $$;
+        `);
+        console.log('🔹 Restricción UNIQUE en dependencias verificada');
     } catch (err) {
         console.error('❌ Error al inicializar BD:', err.message);
     }
