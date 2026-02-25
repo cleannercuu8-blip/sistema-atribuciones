@@ -5,6 +5,7 @@ import { useAuth } from '../context/AuthContext';
 export default function Perfil() {
     const { usuario } = useAuth();
     const [form, setForm] = useState({ password_actual: '', password_nuevo: '', confirmar: '' });
+    const [verPassword, setVerPassword] = useState(false);
     const [msg, setMsg] = useState({ type: '', text: '' });
     const [cargando, setCargando] = useState(false);
 
@@ -35,8 +36,15 @@ export default function Perfil() {
             </div>
 
             <div className="card">
-                <div className="card-header">
-                    <span className="card-title">🔐 Seguridad: Cambiar Contraseña</span>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 20 }}>
+                    <span className="card-title" style={{ margin: 0 }}>🔐 Seguridad: Cambiar Contraseña</span>
+                    <button
+                        type="button"
+                        className="btn btn-outline btn-sm"
+                        onClick={() => setVerPassword(!verPassword)}
+                    >
+                        {verPassword ? '🙈 Ocultar' : '👁️ Mostrar'}
+                    </button>
                 </div>
 
                 {msg.text && (
@@ -49,7 +57,7 @@ export default function Perfil() {
                     <div className="form-group">
                         <label className="form-label">Contraseña actual</label>
                         <input
-                            type="password"
+                            type={verPassword ? 'text' : 'password'}
                             className="form-control"
                             value={form.password_actual}
                             onChange={e => setForm({ ...form, password_actual: e.target.value })}
@@ -62,7 +70,7 @@ export default function Perfil() {
                         <div className="form-group">
                             <label className="form-label">Nueva contraseña</label>
                             <input
-                                type="password"
+                                type={verPassword ? 'text' : 'password'}
                                 className="form-control"
                                 value={form.password_nuevo}
                                 onChange={e => setForm({ ...form, password_nuevo: e.target.value })}
@@ -73,7 +81,7 @@ export default function Perfil() {
                         <div className="form-group">
                             <label className="form-label">Confirmar nueva contraseña</label>
                             <input
-                                type="password"
+                                type={verPassword ? 'text' : 'password'}
                                 className="form-control"
                                 value={form.confirmar}
                                 onChange={e => setForm({ ...form, confirmar: e.target.value })}

@@ -695,11 +695,58 @@ const TabRevisiones = ({ proyectoId, usuario }) => {
                                     {esRevisor && seleccionada.estado === 'abierta' && (
                                         <>
                                             <button className="btn btn-primary btn-sm" onClick={() => { setFormObs({ texto_observacion: '' }); setMostrarFormObs(true); }}>➕ Observación</button>
-                                            <button className="btn btn-success btn-sm" onClick={cerrarRevision}>✅ Cerrar revisión</button>
+                                            <button className="btn btn-success btn-sm" onClick={cerrarRevision}>✅ Cerrar sin Word</button>
                                         </>
                                     )}
                                 </div>
                             </div>
+
+                            {esRevisor && seleccionada.estado === 'abierta' && (
+                                <div style={{ padding: '16px', background: '#f8fafc', borderRadius: '8px', border: '1px dashed #cbd5e1', marginBottom: '20px' }}>
+                                    <h4 style={{ fontSize: '13px', fontWeight: '700', marginBottom: '10px' }}>📤 Entregar Producto Final (.docx)</h4>
+                                    <div style={{ display: 'flex', gap: '10px', alignItems: 'center' }}>
+                                        <input
+                                            type="file"
+                                            accept=".docx"
+                                            className="form-control"
+                                            style={{ flex: 1 }}
+                                            onChange={async (e) => {
+                                                const file = e.target.files[0];
+                                                if (!file) return;
+                                                if (!window.confirm('¿Subir este archivo como producto final y CERRAR la revisión?')) return;
+
+                                                const fd = new FormData();
+                                                fd.append('archivo', file);
+                                                try {
+                                                    await api.post(`/revisiones/${seleccionada.id}/producto-final`, fd, {
+                                                        headers: { 'Content-Type': 'multipart/form-data' }
+                                                    });
+                                                    alert('✅ Producto final subido y revisión cerrada.');
+                                                    setSeleccionada(null);
+                                                    cargarRevisiones();
+                                                } catch (err) {
+                                                    alert(err.response?.data?.error || 'Error al subir producto');
+                                                }
+                                            }}
+                                        />
+                                    </div>
+                                    <p style={{ fontSize: '11px', color: '#64748b', marginTop: '6px' }}>Nota: Al subir el archivo, la revisión se marcará como <strong>cerrada</strong> automáticamente.</p>
+                                </div>
+                            )}
+
+                            {seleccionada.producto_word && (
+                                <div style={{ padding: '12px', background: '#f0fdf4', borderRadius: '8px', border: '1px solid #bbf7d0', marginBottom: '20px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                                    <span style={{ fontSize: '13px', color: '#166534' }}>📄 <strong>Producto Final:</strong> {seleccionada.producto_word}</span>
+                                    <a
+                                        href={`${import.meta.env.VITE_API_URL || ''}/uploads/productos/${seleccionada.producto_word}`}
+                                        className="btn btn-outline btn-sm"
+                                        target="_blank"
+                                        rel="noreferrer"
+                                    >
+                                        📥 Descargar
+                                    </a>
+                                </div>
+                            )}
 
                             {observaciones.length === 0 ? (
                                 <div className="empty-state"><div className="empty-icon">📋</div><h3>Sin observaciones</h3></div>

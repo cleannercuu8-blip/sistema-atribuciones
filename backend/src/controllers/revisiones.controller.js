@@ -193,4 +193,19 @@ const aprobarProyecto = async (req, res) => {
     }
 };
 
-module.exports = { listar, crear, listarObservaciones, crearObservacion, subsanarObservacion, cerrarRevision, aprobarProyecto };
+const subirProductoFinal = async (req, res) => {
+    const { id } = req.params;
+    if (!req.file) return res.status(400).json({ error: 'No se subió ningún archivo' });
+
+    try {
+        await pool.query(
+            `UPDATE revisiones SET producto_word = $1, status = 'cerrada', fecha_cierre = NOW() WHERE id = $2`,
+            [req.file.filename, id]
+        );
+        res.json({ mensaje: 'Producto final subido y revisión cerrada correctamente', archivo: req.file.filename });
+    } catch (err) {
+        res.status(500).json({ error: 'Error al subir producto final' });
+    }
+};
+
+module.exports = { listar, crear, listarObservaciones, crearObservacion, subsanarObservacion, cerrarRevision, aprobarProyecto, subirProductoFinal };

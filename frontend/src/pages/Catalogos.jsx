@@ -6,6 +6,8 @@ export default function Catalogos() {
     const [tab, setTab] = useState('responsables');
     const [responsables, setResponsables] = useState([]);
     const [enlaces, setEnlaces] = useState([]);
+    const [dependencias, setDependencias] = useState([]);
+    const [avances, setAvances] = useState([]);
     const [cargando, setCargando] = useState(true);
     const [archivo, setArchivo] = useState(null);
     const [preview, setPreview] = useState([]);
@@ -15,12 +17,16 @@ export default function Catalogos() {
     const cargarDatos = async () => {
         setCargando(true);
         try {
-            const [rRes, eRes] = await Promise.all([
+            const [rRes, eRes, dRes, aRes] = await Promise.all([
                 api.get('/catalogos/responsables'),
-                api.get('/catalogos/enlaces')
+                api.get('/catalogos/enlaces'),
+                api.get('/catalogos/dependencias'),
+                api.get('/catalogos/avances')
             ]);
             setResponsables(rRes.data);
             setEnlaces(eRes.data);
+            setDependencias(dRes.data);
+            setAvances(aRes.data);
         } catch (err) {
             console.error('Error al cargar catálogos', err);
         }
@@ -68,11 +74,18 @@ export default function Catalogos() {
             let payload = [];
             if (tab === 'responsables') {
                 payload = preview.map(row => row['Nombre del Responsable']).filter(n => n);
-            } else {
+            } else if (tab === 'enlaces') {
                 payload = preview.map(row => ({
                     nombre: row['Nombre del Enlace'],
                     email: row['Correo Electrónico']
                 })).filter(item => item.nombre && item.email);
+            } else if (tab === 'avances') {
+                payload = preview.map(row => row['Estado de Avance']).filter(n => n);
+            } else if (tab === 'dependencias') {
+                payload = preview.map(row => ({
+                    nombre: row['Nombre de Dependencia'],
+                    tipo: row['Tipo (centralizada, paraestatal, organismo_autonomo)']
+                })).filter(item => item.nombre && item.tipo);
             }
 
             await api.post(`/catalogos/${tab}/masivo`, { items: payload });
@@ -116,13 +129,18 @@ export default function Catalogos() {
 
             <div className="tabs">
                 <button className={`tab-btn ${tab === 'responsables' ? 'active' : ''}`} onClick={() => setTab('responsables')}>👨‍💼 Responsables</button>
-                <button className={`tab-btn ${tab === 'enlaces' ? 'active' : ''}`} onClick={() => setTab('enlaces')}>📧 Enlaces de Correo</button>
+                <button className={`tab-btn ${tab === 'enlaces' ? 'active' : ''}`} onClick={() => setTab('enlaces')}>📧 Enlaces</button>
+                <button className={`tab-btn ${tab === 'dependencias' ? 'active' : ''}`} onClick={() => setTab('dependencias')}>🏢 Dependencias</button>
+                <button className={`tab-btn ${tab === 'avances' ? 'active' : ''}`} onClick={() => setTab('avances')}>📊 Avances</button>
             </div>
 
             <div className="card">
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 20 }}>
                     <h2 className="card-title">
-                        {tab === 'responsables' ? `Lista de Responsables (${responsables.length})` : `Lista de Enlaces (${enlaces.length})`}
+                        {tab === 'responsables' ? `Responsables (${responsables.length})` :
+                            tab === 'enlaces' ? `Enlaces (${enlaces.length})` :
+                                tab === 'dependencias' ? `Dependencias (${dependencias.length})` :
+                                    `Estados de Avance (${avances.length})`}
                     </h2>
                     <button className="btn btn-danger btn-sm" onClick={limpiarCatalogo}>🗑️ Limpiar Catálogo</button>
                 </div>
@@ -130,24 +148,31 @@ export default function Catalogos() {
                 <div className="table-responsive">
                     <table>
                         <thead>
-                            {tab === 'responsables' ? (
-                                <tr><th>Nombre</th><th>Estado</th><th>Fecha de creación</th></tr>
+                            {tab === 'responsables' || tab === 'avances' ? (
+                                <tr><th>Nombre</th><th>Estado</th><th>Fecha</th></tr>
+                            ) : tab === 'enlaces' ? (
+                                <tr><th>Nombre</th><th>Email</th><th>Estado</th><th>Fecha</th></tr>
                             ) : (
-                                <tr><th>Nombre</th><th>Email</th><th>Estado</th><th>Fecha de creación</th></tr>
+                                <tr><th>Nombre</th><th>Tipo</th><th>Estado</th><th>Fecha</th></tr>
                             )}
                         </thead>
                         <tbody>
-                            {(tab === 'responsables' ? responsables : enlaces).map(item => (
-                                <tr key={item.id}>
-                                    <td><strong>{item.nombre}</strong></td>
-                                    {tab === 'enlaces' && <td>{item.email}</td>}
-                                    <td><span className="badge badge-aprobado">Activo</span></td>
-                                    <td>{new Date(item.created_at).toLocaleDateString()}</td>
-                                </tr>
-                            ))}
-                            {(tab === 'responsables' ? responsables : enlaces).length === 0 && (
-                                <tr><td colSpan={4} style={{ textAlign: 'center', padding: '40px', color: '#999' }}>No hay datos en este catálogo. Usa la carga masiva para agregar registros.</td></tr>
-                            )}
+                            {(tab === 'responsables' ? responsables :
+                                tab === 'enlaces' ? enlaces :
+                                    tab === 'dependencias' ? dependencias : avances).map(item => (
+                                        <tr key={item.id}>
+                                            <td><strong>{item.nombre}</strong></td>
+                                            {tab === 'enlaces' && <td>{item.email}</td>}
+                                            {tab === 'dependencias' && <td><span className="badge badge-normal">{item.tipo}</span></td>}
+                                            <td><span className="badge badge-aprobado">Activo</span></td>
+                                            <td>{new Date(item.created_at).toLocaleDateString()}</td>
+                                        </tr>
+                                    ))}
+                            {(tab === 'responsables' ? responsables :
+                                tab === 'enlaces' ? enlaces :
+                                    tab === 'dependencias' ? dependencias : avances).length === 0 && (
+                                    <tr><td colSpan={5} style={{ textAlign: 'center', padding: '40px', color: '#999' }}>No hay datos. Usa la carga masiva.</td></tr>
+                                )}
                         </tbody>
                     </table>
                 </div>
@@ -179,13 +204,19 @@ export default function Catalogos() {
                                     <table>
                                         <thead>
                                             <tr>
-                                                {tab === 'responsables' ? <th>Nombre del Responsable</th> : <><th >Nombre del Enlace</th><th>Correo Electrónico</th></>}
+                                                {tab === 'responsables' ? <th>Responsable</th> :
+                                                    tab === 'enlaces' ? <><th>Nombre</th><th>Email</th></> :
+                                                        tab === 'avances' ? <th>Estado de Avance</th> :
+                                                            <><th>Dependencia</th><th>Tipo</th></>}
                                             </tr>
                                         </thead>
                                         <tbody>
                                             {preview.slice(0, 5).map((row, idx) => (
                                                 <tr key={idx}>
-                                                    {tab === 'responsables' ? <td>{row['Nombre del Responsable']}</td> : <><td>{row['Nombre del Enlace']}</td><td>{row['Correo Electrónico']}</td></>}
+                                                    {tab === 'responsables' ? <td>{row['Nombre del Responsable']}</td> :
+                                                        tab === 'enlaces' ? <><td>{row['Nombre del Enlace']}</td><td>{row['Correo Electrónico']}</td></> :
+                                                            tab === 'avances' ? <td>{row['Estado de Avance']}</td> :
+                                                                <><td>{row['Nombre de Dependencia']}</td><td>{row['Tipo (centralizada, paraestatal, organismo_autonomo)']}</td></>}
                                                 </tr>
                                             ))}
                                             {preview.length > 5 && <tr><td colSpan={2} style={{ textAlign: 'center' }}>... y {preview.length - 5} registros más</td></tr>}

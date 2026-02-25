@@ -16,6 +16,7 @@ export default function Proyectos() {
     const [dependencias, setDependencias] = useState([]);
     const [catResponsables, setCatResponsables] = useState([]);
     const [catEnlaces, setCatEnlaces] = useState([]);
+    const [catAvances, setCatAvances] = useState([]);
     const [usuarios, setUsuarios] = useState([]);
     const [cargando, setCargando] = useState(true);
     const [mostrarModal, setMostrarModal] = useState(false);
@@ -26,22 +27,25 @@ export default function Proyectos() {
         dependencia_id: '',
         responsable: '',
         enlaces: '',
-        fecha_expediente: ''
+        fecha_expediente: '',
+        avance_id: ''
     });
     const [guardando, setGuardando] = useState(false);
 
     const cargarDatos = async () => {
         try {
-            const [pRes, dRes, rRes, eRes] = await Promise.all([
+            const [pRes, dRes, rRes, eRes, aRes] = await Promise.all([
                 api.get('/proyectos'),
-                api.get('/dependencias'),
+                api.get('/catalogos/dependencias'),
                 api.get('/catalogos/responsables'),
-                api.get('/catalogos/enlaces')
+                api.get('/catalogos/enlaces'),
+                api.get('/catalogos/avances')
             ]);
             setProyectos(pRes.data);
             setDependencias(dRes.data);
             setCatResponsables(rRes.data);
             setCatEnlaces(eRes.data);
+            setCatAvances(aRes.data);
             if (usuario.rol === 'admin') {
                 const uRes = await api.get('/usuarios');
                 setUsuarios(uRes.data.filter(u => u.activo && u.rol !== 'admin'));
@@ -79,7 +83,8 @@ export default function Proyectos() {
             dependencia_id: p.dependencia_id,
             responsable: p.responsable || '',
             enlaces: p.enlaces || '',
-            fecha_expediente: p.fecha_expediente ? p.fecha_expediente.split('T')[0] : ''
+            fecha_expediente: p.fecha_expediente ? p.fecha_expediente.split('T')[0] : '',
+            avance_id: p.avance_id || ''
         });
         setMostrarModal(true);
     };
@@ -108,7 +113,7 @@ export default function Proyectos() {
                 {usuario.rol === 'admin' && (
                     <button className="btn btn-primary" onClick={() => {
                         setProyectoEditar(null);
-                        setForm({ nombre: '', dependencia_id: '', responsable: '', enlaces: '', fecha_expediente: '' });
+                        setForm({ nombre: '', dependencia_id: '', responsable: '', enlaces: '', fecha_expediente: '', avance_id: '' });
                         setMostrarModal(true);
                     }}>
                         ➕ Nuevo proyecto
@@ -150,7 +155,8 @@ export default function Proyectos() {
                                         </div>
                                         <div style={{ fontSize: 13, color: 'var(--color-texto-suave)' }}>
                                             <div style={{ marginBottom: 4 }}><strong>Responsable:</strong> {p.responsable || 'No asignado'}</div>
-                                            <div><strong>Expediente:</strong> {p.fecha_expediente ? new Date(p.fecha_expediente).toLocaleDateString() : 'N/A'}</div>
+                                            <div style={{ marginBottom: 4 }}><strong>Expediente:</strong> {p.fecha_expediente ? new Date(p.fecha_expediente).toLocaleDateString() : 'N/A'}</div>
+                                            <div><strong>Avance:</strong> {p.avance_nombre || 'N/A'}</div>
                                         </div>
                                         <div style={{ marginTop: 15, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                                             <span style={{ fontSize: 12, color: '#999' }}>ID: {p.id.substring(0, 8)}</span>
@@ -173,7 +179,6 @@ export default function Proyectos() {
                             <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(320px, 1fr))', gap: 16 }}>
                                 {otros.map(p => (
                                     <div key={p.id} className="card project-card" onClick={() => navigate(`/proyectos/${p.id}`)}>
-                                        {/* Renderizado similar al anterior */}
                                         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 10 }}>
                                             <h3 style={{ fontSize: 15, fontWeight: 700, color: 'var(--color-primario)', flex: 1 }}>{p.nombre}</h3>
                                             <span className={`badge badge-${p.estado}`}>
@@ -182,7 +187,8 @@ export default function Proyectos() {
                                         </div>
                                         <div style={{ fontSize: 13, color: 'var(--color-texto-suave)' }}>
                                             <div style={{ marginBottom: 4 }}><strong>Responsable:</strong> {p.responsable || 'No asignado'}</div>
-                                            <div><strong>Expediente:</strong> {p.fecha_expediente ? new Date(p.fecha_expediente).toLocaleDateString() : 'N/A'}</div>
+                                            <div style={{ marginBottom: 4 }}><strong>Expediente:</strong> {p.fecha_expediente ? new Date(p.fecha_expediente).toLocaleDateString() : 'N/A'}</div>
+                                            <div><strong>Avance:</strong> {p.avance_nombre || 'N/A'}</div>
                                         </div>
                                         <div style={{ marginTop: 15, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                                             <span style={{ fontSize: 12, color: '#999' }}>ID: {p.id.substring(0, 8)}</span>
@@ -219,19 +225,34 @@ export default function Proyectos() {
                                     required
                                 />
                             </div>
-                            <div className="form-group">
-                                <label className="form-label">Dependencia/Entidad <span className="required">*</span></label>
-                                <select
-                                    className="form-control"
-                                    value={form.dependencia_id}
-                                    onChange={e => setForm({ ...form, dependencia_id: e.target.value })}
-                                    required
-                                >
-                                    <option value="">-- Seleccione --</option>
-                                    {dependencias.map(d => (
-                                        <option key={d.id} value={d.id}>{d.nombre}</option>
-                                    ))}
-                                </select>
+                            <div className="form-row">
+                                <div className="form-group">
+                                    <label className="form-label">Dependencia/Entidad <span className="required">*</span></label>
+                                    <select
+                                        className="form-control"
+                                        value={form.dependencia_id}
+                                        onChange={e => setForm({ ...form, dependencia_id: e.target.value })}
+                                        required
+                                    >
+                                        <option value="">-- Seleccione --</option>
+                                        {dependencias.map(d => (
+                                            <option key={d.id} value={d.id}>{d.nombre}</option>
+                                        ))}
+                                    </select>
+                                </div>
+                                <div className="form-group">
+                                    <label className="form-label">Estado de Avance</label>
+                                    <select
+                                        className="form-control"
+                                        value={form.avance_id}
+                                        onChange={e => setForm({ ...form, avance_id: e.target.value })}
+                                    >
+                                        <option value="">-- Seleccione --</option>
+                                        {catAvances.map(a => (
+                                            <option key={a.id} value={a.id}>{a.nombre}</option>
+                                        ))}
+                                    </select>
+                                </div>
                             </div>
                             <div className="form-group">
                                 <label className="form-label">Responsable del Proyecto</label>
@@ -255,11 +276,10 @@ export default function Proyectos() {
                                     onChange={e => setForm({ ...form, enlaces: e.target.value })}
                                     placeholder="Seleccione o separe con comas..."
                                     rows={2}
-                                    list="list-enlaces"
                                 />
-                                <datalist id="list-enlaces">
-                                    {catEnlaces.map(e => <option key={e.id} value={e.email}>{e.nombre}</option>)}
-                                </datalist>
+                                <div style={{ fontSize: 11, color: '#999', marginTop: 4 }}>
+                                    Sugerencias: {catEnlaces.slice(0, 3).map(e => e.email).join(', ')}...
+                                </div>
                             </div>
                             <div className="form-group">
                                 <label className="form-label">Fecha de Expediente</label>

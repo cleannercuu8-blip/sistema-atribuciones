@@ -24,9 +24,12 @@ app.use((req, res, next) => {
 
 // Crear directorio de uploads si no existe
 const uploadsDir = path.join(__dirname, '../uploads/organigramas');
-if (!fs.existsSync(uploadsDir)) {
-    fs.mkdirSync(uploadsDir, { recursive: true });
-}
+const productosDir = path.join(__dirname, '../uploads/productos');
+[uploadsDir, productosDir].forEach(dir => {
+    if (!fs.existsSync(dir)) {
+        fs.mkdirSync(dir, { recursive: true });
+    }
+});
 
 // Servir PDFs de organigramas
 app.use('/uploads', express.static(path.join(__dirname, '../uploads')));
@@ -48,6 +51,7 @@ const initDB = async () => {
             ALTER TABLE proyectos ADD COLUMN IF NOT EXISTS responsable VARCHAR(255);
             ALTER TABLE proyectos ADD COLUMN IF NOT EXISTS enlaces TEXT;
             ALTER TABLE proyectos ADD COLUMN IF NOT EXISTS fecha_expediente DATE;
+            ALTER TABLE proyectos ADD COLUMN IF NOT EXISTS avance_id INTEGER REFERENCES cat_avances(id);
         `);
 
         // Tablas de Catálogos
@@ -66,8 +70,21 @@ const initDB = async () => {
                 activo BOOLEAN DEFAULT true,
                 created_at TIMESTAMPTZ DEFAULT NOW()
             );
+
+            CREATE TABLE IF NOT EXISTS cat_avances (
+                id SERIAL PRIMARY KEY,
+                nombre VARCHAR(255) NOT NULL UNIQUE,
+                activo BOOLEAN DEFAULT true,
+                created_at TIMESTAMPTZ DEFAULT NOW()
+            );
         `);
         console.log('🔹 Migración de tablas de catálogos completada');
+
+        // Migración para documentos de Word en Revisiones
+        await pool.query(`
+            ALTER TABLE revisiones ADD COLUMN IF NOT EXISTS producto_word VARCHAR(255);
+        `);
+        console.log('🔹 Migración de soporte para Word completada');
     } catch (err) {
         console.error('❌ Error al inicializar BD:', err.message);
     }
