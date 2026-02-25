@@ -10,18 +10,29 @@ const login = async (req, res) => {
         return res.status(400).json({ error: 'Email y contraseña son requeridos' });
 
     try {
+        console.log(`🔍 Buscando usuario: ${email.toLowerCase()}`);
         const result = await pool.query(
             'SELECT * FROM usuarios WHERE email = $1 AND activo = true',
             [email.toLowerCase()]
         );
-        if (result.rows.length === 0)
+
+        console.log(`📊 Usuarios encontrados: ${result.rows.length}`);
+
+        if (result.rows.length === 0) {
+            console.log(`⚠️ Login fallido: Usuario no existe o no está activo.`);
             return res.status(401).json({ error: 'Credenciales inválidas' });
+        }
 
         const user = result.rows[0];
-        const valid = await bcrypt.compare(password, user.password_hash);
-        if (!valid)
-            return res.status(401).json({ error: 'Credenciales inválidas' });
+        console.log(`🔐 Comparando contraseña para ID: ${user.id}`);
 
+        const valid = await bcrypt.compare(password, user.password_hash);
+        if (!valid) {
+            console.log(`⚠️ Login fallido: Contraseña incorrecta.`);
+            return res.status(401).json({ error: 'Credenciales inválidas' });
+        }
+
+        console.log(`✅ Login exitoso para: ${user.email}`);
         const token = jwt.sign(
             { id: user.id, nombre: user.nombre, email: user.email, rol: user.rol },
             process.env.JWT_SECRET,
@@ -33,8 +44,8 @@ const login = async (req, res) => {
             usuario: { id: user.id, nombre: user.nombre, email: user.email, rol: user.rol }
         });
     } catch (err) {
-        console.error(err);
-        res.status(500).json({ error: 'Error del servidor' });
+        console.error('❌ ERROR FATAL en Login Controller:', err);
+        res.status(500).json({ error: 'Error del servidor', detalle: err.message });
     }
 };
 

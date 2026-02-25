@@ -47,7 +47,14 @@ const initDB = async () => {
     }
 };
 
-initDB();
+// La inicialización automática estaba causando reinicios lentos
+// Solo se ejecutará si se define la variable de entorno DB_INIT=true
+if (process.env.DB_INIT === 'true') {
+    console.log('🛠️ Iniciando limpieza y recreación de BD...');
+    initDB();
+} else {
+    console.log('✅ Saltando inicialización automática de BD (Ambiente estable)');
+}
 
 // ============================================
 // RUTAS API
