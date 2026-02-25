@@ -1,23 +1,35 @@
--- =============================================
--- SCHEMA: Sistema de Atribuciones Jerárquicas
--- =============================================
-
 -- EXTENSIONES
 CREATE EXTENSION IF NOT EXISTS "pgcrypto";
 
--- TIPOS ENUMERADOS
-CREATE TYPE rol_usuario AS ENUM ('admin', 'dependencia', 'revisor');
-CREATE TYPE tipo_dependencia AS ENUM ('centralizada', 'paraestatal', 'organismo_autonomo', 'otro');
-CREATE TYPE estado_proyecto AS ENUM ('borrador', 'en_revision', 'aprobado');
-CREATE TYPE estado_revision AS ENUM ('abierta', 'cerrada');
-CREATE TYPE estado_observacion AS ENUM ('pendiente', 'subsanada');
-CREATE TYPE tipo_atribucion AS ENUM ('normal', 'indelegable');
-CREATE TYPE rol_proyecto AS ENUM ('lider', 'ayudante');
+-- TIPOS ENUMERADOS (Idempotentes)
+DO $$ BEGIN
+    IF NOT EXISTS (SELECT 1 FROM pg_type WHERE typname = 'rol_usuario') THEN
+        CREATE TYPE rol_usuario AS ENUM ('admin', 'dependencia', 'revisor');
+    END IF;
+    IF NOT EXISTS (SELECT 1 FROM pg_type WHERE typname = 'tipo_dependencia') THEN
+        CREATE TYPE tipo_dependencia AS ENUM ('centralizada', 'paraestatal', 'organismo_autonomo', 'otro');
+    END IF;
+    IF NOT EXISTS (SELECT 1 FROM pg_type WHERE typname = 'estado_proyecto') THEN
+        CREATE TYPE estado_proyecto AS ENUM ('borrador', 'en_revision', 'aprobado');
+    END IF;
+    IF NOT EXISTS (SELECT 1 FROM pg_type WHERE typname = 'estado_revision') THEN
+        CREATE TYPE estado_revision AS ENUM ('abierta', 'cerrada');
+    END IF;
+    IF NOT EXISTS (SELECT 1 FROM pg_type WHERE typname = 'estado_observacion') THEN
+        CREATE TYPE estado_observacion AS ENUM ('pendiente', 'subsanada');
+    END IF;
+    IF NOT EXISTS (SELECT 1 FROM pg_type WHERE typname = 'tipo_atribucion') THEN
+        CREATE TYPE tipo_atribucion AS ENUM ('normal', 'indelegable');
+    END IF;
+    IF NOT EXISTS (SELECT 1 FROM pg_type WHERE typname = 'rol_proyecto') THEN
+        CREATE TYPE rol_proyecto AS ENUM ('lider', 'ayudante');
+    END IF;
+END $$;
 
 -- =============================================
 -- USUARIOS
 -- =============================================
-CREATE TABLE usuarios (
+CREATE TABLE IF NOT EXISTS usuarios (
   id SERIAL PRIMARY KEY,
   nombre VARCHAR(200) NOT NULL,
   email VARCHAR(200) UNIQUE NOT NULL,
@@ -31,7 +43,7 @@ CREATE TABLE usuarios (
 -- =============================================
 -- DEPENDENCIAS
 -- =============================================
-CREATE TABLE dependencias (
+CREATE TABLE IF NOT EXISTS dependencias (
   id SERIAL PRIMARY KEY,
   nombre VARCHAR(300) NOT NULL UNIQUE,
   siglas VARCHAR(50),
@@ -44,7 +56,7 @@ CREATE TABLE dependencias (
 -- =============================================
 -- PROYECTOS
 -- =============================================
-CREATE TABLE proyectos (
+CREATE TABLE IF NOT EXISTS proyectos (
   id SERIAL PRIMARY KEY,
   nombre VARCHAR(300) NOT NULL,
   dependencia_id INTEGER NOT NULL REFERENCES dependencias(id),
@@ -56,7 +68,7 @@ CREATE TABLE proyectos (
 );
 
 -- Usuarios de dependencia asignados a un proyecto
-CREATE TABLE proyecto_usuarios (
+CREATE TABLE IF NOT EXISTS proyecto_usuarios (
   id SERIAL PRIMARY KEY,
   proyecto_id INTEGER NOT NULL REFERENCES proyectos(id) ON DELETE CASCADE,
   usuario_id INTEGER NOT NULL REFERENCES usuarios(id) ON DELETE CASCADE,
@@ -65,7 +77,7 @@ CREATE TABLE proyecto_usuarios (
 );
 
 -- Revisores asignados a un proyecto
-CREATE TABLE proyecto_revisores (
+CREATE TABLE IF NOT EXISTS proyecto_revisores (
   id SERIAL PRIMARY KEY,
   proyecto_id INTEGER NOT NULL REFERENCES proyectos(id) ON DELETE CASCADE,
   usuario_id INTEGER NOT NULL REFERENCES usuarios(id) ON DELETE CASCADE,
@@ -76,7 +88,7 @@ CREATE TABLE proyecto_revisores (
 -- =============================================
 -- ORGANIGRAMA: Unidades Administrativas del árbol
 -- =============================================
-CREATE TABLE unidades_administrativas (
+CREATE TABLE IF NOT EXISTS unidades_administrativas (
   id SERIAL PRIMARY KEY,
   proyecto_id INTEGER NOT NULL REFERENCES proyectos(id) ON DELETE CASCADE,
   nombre VARCHAR(300) NOT NULL,
@@ -91,7 +103,7 @@ CREATE TABLE unidades_administrativas (
 -- =============================================
 -- ATRIBUCIONES GENERALES (Ley / Decreto base)
 -- =============================================
-CREATE TABLE atribuciones_generales (
+CREATE TABLE IF NOT EXISTS atribuciones_generales (
   id SERIAL PRIMARY KEY,
   proyecto_id INTEGER NOT NULL REFERENCES proyectos(id) ON DELETE CASCADE,
   clave VARCHAR(20) NOT NULL,  -- S01, S02, ...
@@ -106,7 +118,7 @@ CREATE TABLE atribuciones_generales (
 -- =============================================
 -- ATRIBUCIONES ESPECÍFICAS (por unidad/nivel)
 -- =============================================
-CREATE TABLE atribuciones_especificas (
+CREATE TABLE IF NOT EXISTS atribuciones_especificas (
   id SERIAL PRIMARY KEY,
   proyecto_id INTEGER NOT NULL REFERENCES proyectos(id) ON DELETE CASCADE,
   unidad_id INTEGER NOT NULL REFERENCES unidades_administrativas(id) ON DELETE CASCADE,
@@ -125,7 +137,7 @@ CREATE TABLE atribuciones_especificas (
 -- =============================================
 -- GLOSARIO
 -- =============================================
-CREATE TABLE glosario (
+CREATE TABLE IF NOT EXISTS glosario (
   id SERIAL PRIMARY KEY,
   proyecto_id INTEGER NOT NULL REFERENCES proyectos(id) ON DELETE CASCADE,
   acronimo VARCHAR(50) NOT NULL,
@@ -136,7 +148,7 @@ CREATE TABLE glosario (
 -- =============================================
 -- REVISIONES Y OBSERVACIONES
 -- =============================================
-CREATE TABLE revisiones (
+CREATE TABLE IF NOT EXISTS revisiones (
   id SERIAL PRIMARY KEY,
   proyecto_id INTEGER NOT NULL REFERENCES proyectos(id) ON DELETE CASCADE,
   numero_revision INTEGER NOT NULL,
@@ -150,7 +162,7 @@ CREATE TABLE revisiones (
   created_at TIMESTAMPTZ DEFAULT NOW()
 );
 
-CREATE TABLE observaciones (
+CREATE TABLE IF NOT EXISTS observaciones (
   id SERIAL PRIMARY KEY,
   revision_id INTEGER NOT NULL REFERENCES revisiones(id) ON DELETE CASCADE,
   atribucion_especifica_id INTEGER REFERENCES atribuciones_especificas(id),
@@ -165,7 +177,7 @@ CREATE TABLE observaciones (
 -- =============================================
 -- CONFIGURACIÓN EMAIL (admin)
 -- =============================================
-CREATE TABLE configuracion_email (
+CREATE TABLE IF NOT EXISTS configuracion_email (
   id SERIAL PRIMARY KEY,
   smtp_host VARCHAR(200),
   smtp_port INTEGER DEFAULT 587,
@@ -179,14 +191,14 @@ CREATE TABLE configuracion_email (
 -- =============================================
 -- ÍNDICES
 -- =============================================
-CREATE INDEX idx_proyectos_dependencia ON proyectos(dependencia_id);
-CREATE INDEX idx_unidades_proyecto ON unidades_administrativas(proyecto_id);
-CREATE INDEX idx_unidades_padre ON unidades_administrativas(padre_id);
-CREATE INDEX idx_atr_esp_proyecto ON atribuciones_especificas(proyecto_id);
-CREATE INDEX idx_atr_esp_unidad ON atribuciones_especificas(unidad_id);
-CREATE INDEX idx_atr_esp_padre ON atribuciones_especificas(padre_atribucion_id);
-CREATE INDEX idx_revisiones_proyecto ON revisiones(proyecto_id);
-CREATE INDEX idx_observaciones_revision ON observaciones(revision_id);
+CREATE INDEX IF NOT EXISTS idx_proyectos_dependencia ON proyectos(dependencia_id);
+CREATE INDEX IF NOT EXISTS idx_unidades_proyecto ON unidades_administrativas(proyecto_id);
+CREATE INDEX IF NOT EXISTS idx_unidades_padre ON unidades_administrativas(padre_id);
+CREATE INDEX IF NOT EXISTS idx_atr_esp_proyecto ON atribuciones_especificas(proyecto_id);
+CREATE INDEX IF NOT EXISTS idx_atr_esp_unidad ON atribuciones_especificas(unidad_id);
+CREATE INDEX IF NOT EXISTS idx_atr_esp_padre ON atribuciones_especificas(padre_atribucion_id);
+CREATE INDEX IF NOT EXISTS idx_revisiones_proyecto ON revisiones(proyecto_id);
+CREATE INDEX IF NOT EXISTS idx_observaciones_revision ON observaciones(revision_id);
 
 INSERT INTO usuarios (nombre, email, password_hash, rol)
 VALUES (
@@ -194,4 +206,4 @@ VALUES (
   'admin@atribuciones.gob',
   '$2a$10$hFAJig5vwXGk/yzTUAnwpeJhWVQPDv.0Abi6je12CFF9JRgiGTOm.',
   'admin'
-);
+) ON CONFLICT (email) DO NOTHING;

@@ -91,12 +91,20 @@ const initDB = async () => {
         await pool.query(`
             DO $$ 
             BEGIN 
+                -- 1. Eliminar duplicados si los hay (deja el ID más bajo)
+                DELETE FROM dependencias d
+                WHERE d.id > (
+                    SELECT MIN(id) FROM dependencias d2 
+                    WHERE d2.nombre = d.nombre
+                );
+
+                -- 2. Añadir la restricción si no existe
                 IF NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conname = 'dependencias_nombre_key') THEN
                     ALTER TABLE dependencias ADD CONSTRAINT dependencias_nombre_key UNIQUE (nombre);
                 END IF;
             END $$;
         `);
-        console.log('🔹 Restricción UNIQUE en dependencias verificada');
+        console.log('🔹 Restricción UNIQUE en dependencias verificada (y limpieza de duplicados realizada)');
     } catch (err) {
         console.error('❌ Error al inicializar BD:', err.message);
     }
