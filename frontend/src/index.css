@@ -629,51 +629,81 @@ tbody td {
    ============================================ */
 .folder-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
-  gap: 20px;
-  padding: 20px 0;
+  grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+  gap: 24px;
+  padding: 24px 0;
 }
 
 .folder-card {
   background: white;
-  border: 1.5px solid var(--color-borde);
-  border-radius: 12px;
-  padding: 24px 16px;
+  border: 1px solid var(--color-borde);
+  border-radius: 16px;
+  padding: 30px 20px;
   text-align: center;
   cursor: pointer;
-  transition: var(--transicion);
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
   display: flex;
   flex-direction: column;
   align-items: center;
-  gap: 12px;
+  gap: 14px;
+  box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.05);
+  position: relative;
+  overflow: hidden;
+}
+
+.folder-card::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 4px;
+  background: var(--color-primario);
+  opacity: 0;
+  transition: var(--transicion);
 }
 
 .folder-card:hover {
   border-color: var(--color-acento);
-  transform: translateY(-4px);
+  transform: translateY(-6px);
   box-shadow: var(--sombra-hover);
 }
 
+.folder-card:hover::before {
+  opacity: 1;
+}
+
 .folder-icon {
-  font-size: 48px;
-  color: #f1c40f;
-  /* Color carpeta clásico */
+  font-size: 56px;
+  filter: drop-shadow(0 4px 6px rgba(241, 196, 15, 0.3));
+  transition: var(--transicion);
+}
+
+.folder-card:hover .folder-icon {
+  transform: scale(1.1);
 }
 
 .folder-name {
   font-weight: 700;
-  font-size: 14px;
+  font-size: 14.5px;
   color: var(--color-primario);
-  line-height: 1.3;
+  line-height: 1.4;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
 }
 
 .folder-siglas {
-  font-size: 11px;
-  background: #f0f4f8;
-  padding: 2px 8px;
-  border-radius: 4px;
+  font-size: 10.5px;
+  background: #f1f5f9;
+  padding: 4px 10px;
+  border-radius: 20px;
   color: var(--color-texto-suave);
-  font-weight: 600;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  border: 1px solid var(--color-borde);
 }
 
 /* ============================================
@@ -755,59 +785,77 @@ tbody td {
 }
 
 /* ============================================
-   DASHBOARD STATS
+   DASHBOARD STATS INSTITUCIONAL
    ============================================ */
 .stats-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
-  gap: 16px;
-  margin-bottom: 24px;
+  grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+  gap: 20px;
+  margin-bottom: 30px;
 }
 
 .stat-card {
   background: white;
-  border-radius: var(--radio-card);
-  padding: 20px;
-  box-shadow: var(--sombra-card);
-  border: 1px solid rgba(0, 0, 0, 0.04);
+  border-radius: 16px;
+  padding: 24px;
+  box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1);
+  border: 1px solid var(--color-borde);
   display: flex;
-  align-items: center;
+  flex-direction: column;
   gap: 16px;
-  transition: var(--transicion);
+  transition: all 0.3s ease;
+  position: relative;
+  overflow: hidden;
 }
 
 .stat-card:hover {
-  transform: translateY(-2px);
-  box-shadow: var(--sombra-hover);
+  transform: translateY(-4px);
+  box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1);
 }
 
-.stat-icon {
-  width: 52px;
-  height: 52px;
+.stat-card-top {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.stat-icon-wrapper {
+  width: 48px;
+  height: 48px;
   border-radius: 12px;
   display: flex;
   align-items: center;
   justify-content: center;
-  font-size: 24px;
-  flex-shrink: 0;
+  font-size: 20px;
 }
 
-.stat-info {
-  flex: 1;
+.stat-label {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--color-texto-suave);
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
 }
 
 .stat-value {
-  font-size: 26px;
+  font-size: 32px;
   font-weight: 800;
   color: var(--color-primario);
   line-height: 1;
 }
 
-.stat-label {
-  font-size: 12px;
-  color: var(--color-texto-suave);
-  margin-top: 4px;
-  font-weight: 500;
+.stat-progress-bg {
+  height: 6px;
+  background: #f1f5f9;
+  border-radius: 3px;
+  overflow: hidden;
+  margin-top: auto;
+}
+
+.stat-progress-fill {
+  height: 100%;
+  border-radius: 3px;
+  transition: width 1s ease-out;
 }
 
 /* ============================================

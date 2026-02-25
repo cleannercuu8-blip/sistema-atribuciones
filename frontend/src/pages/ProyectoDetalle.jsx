@@ -2,6 +2,7 @@ import React, { useEffect, useState } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import api from '../services/api';
 import { useAuth } from '../context/AuthContext';
+import DashboardCarga from '../components/DashboardCarga';
 
 // ==================== COMPONENTE ÁRBOL VISUAL ====================
 const NodoArbol = ({ nodo, nivel = 0, onSeleccionar, seleccionado }) => {
@@ -574,6 +575,7 @@ export default function ProyectoDetalle() {
                     { id: 'organigrama', label: '🌳 Organigrama' },
                     { id: 'ley', label: '📜 Atrib. Generales (Ley)' },
                     { id: 'atribuciones', label: '📝 Atribuciones' },
+                    { id: 'carga', label: '⚖️ Carga de Trabajo' },
                     { id: 'glosario', label: '📖 Glosario' },
                     { id: 'revisiones', label: '🔍 Revisiones' }
                 ].map(t => (
@@ -632,7 +634,6 @@ export default function ProyectoDetalle() {
             )}
 
             {/* ===== TAB: ATRIBUCIONES ESPECÍFICAS ===== */}
-            {/* ===== TAB: ATRIBUCIONES ESPECÍFICAS ===== */}
             {tab === 'atribuciones' && (
                 <div className="card" style={{ minHeight: '60vh' }}>
                     <TabAtribuciones
@@ -642,6 +643,12 @@ export default function ProyectoDetalle() {
                         setUnidad={setUnidadSeleccionada}
                         atribGenerales={atribGenerales}
                     />
+                </div>
+            )}
+
+            {tab === 'carga' && (
+                <div className="card">
+                    <DashboardCarga proyectoId={id} />
                 </div>
             )}
 
@@ -857,6 +864,49 @@ export default function ProyectoDetalle() {
                                 <button type="button" className="btn btn-outline" onClick={() => setMostrarBulkAG(false)}>Cancelar</button>
                                 <button type="button" className="btn btn-primary" onClick={guardarBulkAG} disabled={!bulkTextAG.trim() || exportando}>
                                     {exportando ? '⌛ Cargando...' : `✅ Cargar ${bulkTextAG.split('\n').filter(l => l.trim()).length} artículos`}
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            )}
+
+            {/* MODALES CARGA MASIVA (Unificados en ProyectoDetalle) */}
+            {mostrarBulkUnidades && (
+                <div className="modal-overlay" onClick={() => setMostrarBulkUnidades(false)}>
+                    <div className="modal modal-lg" onClick={e => e.stopPropagation()}>
+                        <div className="modal-header">
+                            <h2 className="modal-title">🌳 Carga Masiva de Unidades</h2>
+                            <button className="modal-close" onClick={() => setMostrarBulkUnidades(false)}>×</button>
+                        </div>
+                        <div style={{ padding: '0 24px 24px' }}>
+                            <p style={{ fontSize: 13, color: '#64748b', marginBottom: 15 }}>Formato: <strong>Nombre de la Unidad|SIGLAS|SIGLAS_PADRE</strong> (Una por línea)</p>
+                            <textarea className="form-control" rows={12} value={bulkTextUnidades} onChange={e => setBulkTextUnidades(e.target.value)} placeholder="Ej:&#10;Dirección General|DG|TITULAR&#10;Departamento de Tecnologías|DT|DG" />
+                            <div style={{ display: 'flex', gap: 10, justifyContent: 'flex-end', marginTop: 16 }}>
+                                <button className="btn btn-outline" onClick={() => setMostrarBulkUnidades(false)}>Cancelar</button>
+                                <button className="btn btn-primary" onClick={guardarBulkUnidades} disabled={exportando}>
+                                    {exportando ? '⌛ Procesando...' : '🚀 Cargar Estructura'}
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            )}
+
+            {mostrarBulkGlosario && (
+                <div className="modal-overlay" onClick={() => setMostrarBulkGlosario(false)}>
+                    <div className="modal modal-lg" onClick={e => e.stopPropagation()}>
+                        <div className="modal-header">
+                            <h2 className="modal-title">📖 Carga Masiva Glosario</h2>
+                            <button className="modal-close" onClick={() => setMostrarBulkGlosario(false)}>×</button>
+                        </div>
+                        <div style={{ padding: '0 24px 24px' }}>
+                            <p style={{ fontSize: 13, color: '#64748b', marginBottom: 15 }}>Formato: <strong>SIGLAS|Significado completo</strong> (Una por línea)</p>
+                            <textarea className="form-control" rows={12} value={bulkTextGlosario} onChange={e => setBulkTextGlosario(e.target.value)} placeholder="Ej:&#10;SEP|Secretaría de Educación Pública&#10;LFPDPPP|Ley Federal de Protección de Datos Personales..." />
+                            <div style={{ display: 'flex', gap: 10, justifyContent: 'flex-end', marginTop: 16 }}>
+                                <button className="btn btn-outline" onClick={() => setMostrarBulkGlosario(false)}>Cancelar</button>
+                                <button className="btn btn-primary" onClick={guardarBulkGlosario} disabled={exportando}>
+                                    {exportando ? '⌛ Procesando...' : '🚀 Cargar Glosario'}
                                 </button>
                             </div>
                         </div>
@@ -1113,51 +1163,9 @@ const TabRevisiones = ({ proyectoId, usuario }) => {
                 </div>
             )}
 
-            {/* MODALES CARGA MASIVA */}
-            {mostrarBulkUnidades && (
-                <div className="modal-overlay" onClick={() => setMostrarBulkUnidades(false)}>
-                    <div className="modal modal-lg" onClick={e => e.stopPropagation()}>
-                        <div className="modal-header">
-                            <h2 className="modal-title">🌳 Carga Masiva de Unidades</h2>
-                            <button className="modal-close" onClick={() => setMostrarBulkUnidades(false)}>×</button>
-                        </div>
-                        <div style={{ padding: '0 24px 24px' }}>
-                            <p style={{ fontSize: 13, color: '#64748b', marginBottom: 15 }}>Formato: <strong>Nombre de la Unidad|SIGLAS|SIGLAS_PADRE</strong> (Una por línea)</p>
-                            <textarea className="form-control" rows={12} value={bulkTextUnidades} onChange={e => setBulkTextUnidades(e.target.value)} placeholder="Ej:&#10;Dirección General|DG|TITULAR&#10;Departamento de Tecnologías|DT|DG" />
-                            <div style={{ display: 'flex', gap: 10, justifyContent: 'flex-end', marginTop: 16 }}>
-                                <button className="btn btn-outline" onClick={() => setMostrarBulkUnidades(false)}>Cancelar</button>
-                                <button className="btn btn-primary" onClick={guardarBulkUnidades} disabled={exportando}>
-                                    {exportando ? '⌛ Procesando...' : '🚀 Cargar Estructura'}
-                                </button>
-                            </div>
-                        </div>
-                    </div>
-                </div>
-            )}
-
-            {mostrarBulkGlosario && (
-                <div className="modal-overlay" onClick={() => setMostrarBulkGlosario(false)}>
-                    <div className="modal modal-lg" onClick={e => e.stopPropagation()}>
-                        <div className="modal-header">
-                            <h2 className="modal-title">📖 Carga Masiva Glosario</h2>
-                            <button className="modal-close" onClick={() => setMostrarBulkGlosario(false)}>×</button>
-                        </div>
-                        <div style={{ padding: '0 24px 24px' }}>
-                            <p style={{ fontSize: 13, color: '#64748b', marginBottom: 15 }}>Formato: <strong>SIGLAS|Significado completo</strong> (Una por línea)</p>
-                            <textarea className="form-control" rows={12} value={bulkTextGlosario} onChange={e => setBulkTextGlosario(e.target.value)} placeholder="Ej:&#10;SEP|Secretaría de Educación Pública&#10;LFPDPPP|Ley Federal de Protección de Datos Personales..." />
-                            <div style={{ display: 'flex', gap: 10, justifyContent: 'flex-end', marginTop: 16 }}>
-                                <button className="btn btn-outline" onClick={() => setMostrarBulkGlosario(false)}>Cancelar</button>
-                                <button className="btn btn-primary" onClick={guardarBulkGlosario} disabled={exportando}>
-                                    {exportando ? '⌛ Procesando...' : '🚀 Cargar Glosario'}
-                                </button>
-                            </div>
-                        </div>
-                    </div>
-                </div>
-            )}
         </div>
     );
-};
+}
 
 // ==================== CARD OBSERVACIÓN ====================
 const ObservacionCard = ({ obs, esDependencia, esRevisor, onSubsanar, onEditar, onEliminar }) => {
