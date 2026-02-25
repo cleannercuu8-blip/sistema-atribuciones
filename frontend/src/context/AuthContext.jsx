@@ -11,11 +11,17 @@ export const AuthProvider = ({ children }) => {
         const token = localStorage.getItem('token');
         const usuarioGuardado = localStorage.getItem('usuario');
 
-        if (token && usuarioGuardado && usuarioGuardado !== 'undefined') {
+        if (token && usuarioGuardado && usuarioGuardado !== 'undefined' && usuarioGuardado !== 'null') {
             try {
-                setUsuario(JSON.parse(usuarioGuardado));
+                const parsed = JSON.parse(usuarioGuardado);
+                if (parsed && typeof parsed === 'object') {
+                    setUsuario(parsed);
+                } else {
+                    localStorage.removeItem('token');
+                    localStorage.removeItem('usuario');
+                }
             } catch (err) {
-                console.error("Error al parsear usuario de localStorage:", err);
+                console.error("Sesión corrupta detectada, limpiando...", err);
                 localStorage.removeItem('usuario');
                 localStorage.removeItem('token');
             }
