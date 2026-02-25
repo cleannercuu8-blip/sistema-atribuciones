@@ -159,7 +159,7 @@ export default function Proyectos() {
                                             <div><strong>Avance:</strong> {p.avance_nombre || 'N/A'}</div>
                                         </div>
                                         <div style={{ marginTop: 15, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                                            <span style={{ fontSize: 12, color: '#999' }}>ID: {p.id.substring(0, 8)}</span>
+                                            <span style={{ fontSize: 12, color: '#999' }}>ID: {p.id}</span>
                                             <div style={{ display: 'flex', gap: 8 }}>
                                                 {usuario.rol === 'admin' && (
                                                     <button className="btn btn-outline btn-sm" onClick={(e) => abrirEdicion(e, p)}>✏️ Editar</button>
@@ -191,7 +191,7 @@ export default function Proyectos() {
                                             <div><strong>Avance:</strong> {p.avance_nombre || 'N/A'}</div>
                                         </div>
                                         <div style={{ marginTop: 15, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                                            <span style={{ fontSize: 12, color: '#999' }}>ID: {p.id.substring(0, 8)}</span>
+                                            <span style={{ fontSize: 12, color: '#999' }}>ID: {p.id}</span>
                                             <div style={{ display: 'flex', gap: 8 }}>
                                                 {usuario.rol === 'admin' && (
                                                     <button className="btn btn-outline btn-sm" onClick={(e) => abrirEdicion(e, p)}>✏️ Editar</button>
