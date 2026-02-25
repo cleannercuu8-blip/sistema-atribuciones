@@ -197,6 +197,6 @@ INSERT INTO usuarios (nombre, email, password_hash, rol)
 VALUES (
   'Administrador',
   'admin@atribuciones.gob',
-  '$2a$10$XoKZFQ3W4HJ9d8TK2GZX8eB3k5X1Y7E6R4T8U9V0W2A3S5D7F9H1J',
+  '$2a$10$hFAJig5vwXGk/yzTUAnwpeJhWVQPDv.0Abi6je12CFF9JRgiGTOm.',
   'admin'
 );
