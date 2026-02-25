@@ -92,6 +92,27 @@ const listarEspecificas = async (req, res) => {
     }
 };
 
+// GET /api/atribuciones/especificas/todas
+const listarTodasEspecificas = async (req, res) => {
+    try {
+        const query = `
+      SELECT ae.*, ua.nombre as unidad_nombre, ua.siglas as unidad_siglas, p.nombre as proyecto_nombre,
+             u.nombre as responsable_nombre,
+             (SELECT ARRAY_AGG(nombre) FROM usuarios WHERE id = ANY(ae.apoyo_ids)) as apoyo_nombres
+      FROM atribuciones_especificas ae
+      JOIN unidades_administrativas ua ON ae.unidad_id = ua.id
+      JOIN proyectos p ON ae.proyecto_id = p.id
+      LEFT JOIN usuarios u ON ae.responsable_id = u.id
+      WHERE ae.activo = true AND p.activo = true
+      ORDER BY p.nombre ASC, ua.nivel_numero ASC, ae.clave ASC`;
+        const result = await pool.query(query);
+        res.json(result.rows);
+    } catch (err) {
+        console.error(err);
+        res.status(500).json({ error: 'Error del servidor' });
+    }
+};
+
 // POST /api/proyectos/:proyectoId/atribuciones-especificas
 const crearEspecifica = async (req, res) => {
     const { proyectoId } = req.params;
@@ -168,5 +189,5 @@ const cargarMasivoGenerales = async (req, res) => {
 
 module.exports = {
     listar, crear, actualizar, eliminar, cargarMasivoGenerales,
-    listarEspecificas, crearEspecifica, actualizarEspecifica, eliminarEspecifica
+    listarEspecificas, listarTodasEspecificas, crearEspecifica, actualizarEspecifica, eliminarEspecifica
 };

@@ -10,6 +10,7 @@ import Revisiones from './pages/Revisiones';
 import Admin from './pages/Admin';
 import Perfil from './pages/Perfil';
 import Catalogos from './pages/Catalogos';
+import CargaGlobal from './pages/CargaGlobal';
 
 const RutaProtegida = ({ children, roles }) => {
     const { usuario, cargando } = useAuth();
@@ -36,6 +37,11 @@ const AppRoutes = () => {
                 <Route path="catalogos" element={
                     <RutaProtegida roles={['admin']}>
                         <Catalogos />
+                    </RutaProtegida>
+                } />
+                <Route path="carga-trabajo" element={
+                    <RutaProtegida roles={['admin', 'revisor']}>
+                        <CargaGlobal />
                     </RutaProtegida>
                 } />
                 <Route path="revisiones" element={

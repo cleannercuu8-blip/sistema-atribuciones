@@ -6,6 +6,7 @@ const navItems = [
     { to: '/', label: 'Reporte General', icon: '📊', roles: ['admin', 'dependencia', 'revisor'], exact: true },
     { to: '/proyectos', label: 'Proyectos', icon: '📁', roles: ['admin', 'dependencia', 'revisor'] },
     { to: '/catalogos', label: 'Catálogos', icon: '📚', roles: ['admin'] },
+    { to: '/carga-trabajo', label: 'Carga de Trabajo', icon: '⚖️', roles: ['admin', 'revisor'] },
     { to: '/revisiones', label: 'Revisiones', icon: '🔍', roles: ['admin', 'revisor'] },
     { to: '/admin', label: 'Administración', icon: '⚙️', roles: ['admin'] },
 ];

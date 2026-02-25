@@ -32,6 +32,29 @@ const NodoArbol = ({ nodo, nivel = 0, onSeleccionar, seleccionado }) => {
     );
 };
 
+// ==================== MINI NODO ÁRBOL (SIDEBAR) ====================
+const MiniNodoArbol = ({ nodo, onSeleccionar, seleccionado }) => {
+    const esActivo = seleccionado?.id === nodo.id;
+    return (
+        <div className="mini-tree-wrapper">
+            <div
+                className={`mini-tree-item ${esActivo ? 'active' : ''}`}
+                onClick={() => onSeleccionar(nodo)}
+            >
+                <span className="mini-tree-icon">{nodo.hijos?.length > 0 ? '📂' : '📄'}</span>
+                <span className="mini-tree-label">{nodo.siglas}</span>
+            </div>
+            {nodo.hijos?.length > 0 && (
+                <div className="mini-tree-children">
+                    {nodo.hijos.map(h => (
+                        <MiniNodoArbol key={h.id} nodo={h} onSeleccionar={onSeleccionar} seleccionado={seleccionado} />
+                    ))}
+                </div>
+            )}
+        </div>
+    );
+};
+
 // ==================== COMPONENTE ATRIBUCIONES ====================
 const TabAtribuciones = ({ proyectoId, unidad, setUnidad, arbol, atribGenerales }) => {
     const { usuario } = useAuth();
@@ -186,89 +209,137 @@ const TabAtribuciones = ({ proyectoId, unidad, setUnidad, arbol, atribGenerales 
     }
 
     return (
-        <div style={{ padding: 20 }}>
-            <div className="breadcrumb">
-                <span className="breadcrumb-item" onClick={() => setUnidad(null)} style={{ cursor: 'pointer', color: 'var(--color-acento)' }}>🏠 Inicio</span>
-                {breadcrumbs.map(b => (
-                    <React.Fragment key={b.id}>
-                        <span className="breadcrumb-separator">/</span>
-                        <span className="breadcrumb-item" onClick={() => setUnidad(b)} style={{ cursor: 'pointer', color: b.id === unidad.id ? 'var(--color-primario)' : 'var(--color-acento)', fontWeight: b.id === unidad.id ? '700' : '400' }}>{b.siglas}</span>
-                    </React.Fragment>
-                ))}
-            </div>
-
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 24, borderBottom: '1px solid var(--color-borde)', paddingBottom: 16 }}>
-                <div>
-                    <h2 style={{ fontSize: 22, fontWeight: 800, color: 'var(--color-primario)', marginBottom: 4 }}>
-                        {unidad ? unidad.nombre : 'Estructura Organizacional'}
-                    </h2>
-                    {unidad && <span className="nivel-chip">Nivel {unidad.nivel_numero} — {unidad.siglas}</span>}
+        <div className="explorer-container">
+            {/* SIDEBAR JURÍDICO-ADMINISTRATIVO */}
+            <aside className="explorer-sidebar">
+                <div className="explorer-sidebar-header">
+                    <h5 style={{ fontSize: 13, fontWeight: 800, color: 'var(--color-primario)', textTransform: 'uppercase', letterSpacing: '0.05em' }}>🌳 Estructura Orgánica</h5>
+                    <p style={{ fontSize: 11, color: 'var(--color-texto-suave)', marginTop: 4 }}>Seleccione una unidad para gestionar</p>
                 </div>
-                {unidad && puedeEditar && (
-                    <div style={{ display: 'flex', gap: 10 }}>
-                        <button className="btn btn-outline btn-sm" onClick={() => setMostrarBulk(true)}>📑 Carga Masiva</button>
-                        <button className="btn btn-primary btn-sm" onClick={() => abrirForm()}>➕ Nueva Atribución</button>
+                <div className="explorer-tree-container">
+                    <div
+                        className={`mini-tree-item ${!unidad ? 'active' : ''}`}
+                        onClick={() => setUnidad(null)}
+                    >
+                        <span className="mini-tree-icon">🏠</span>
+                        <span className="mini-tree-label">Titular / Inicio</span>
                     </div>
-                )}
-            </div>
-
-            {/* Grid de Sub-Unidades */}
-            {getHijos().length > 0 && (
-                <div style={{ marginBottom: 40 }}>
-                    <h4 style={{ fontSize: 13, color: 'var(--color-texto-suave)', marginBottom: 16, textTransform: 'uppercase', letterSpacing: '0.05em', fontWeight: 700 }}>📁 Sub-Unidades</h4>
-                    <div className="folder-grid">
-                        {getHijos().map(h => (
-                            <div key={h.id} className="folder-card" onClick={() => setUnidad(h)}>
-                                <div className="folder-icon">📂</div>
-                                <div className="folder-name">{h.nombre}</div>
-                                <div className="folder-siglas">{h.siglas}</div>
-                            </div>
-                        ))}
-                    </div>
+                    {arbol.map(n => (
+                        <MiniNodoArbol key={n.id} nodo={n} onSeleccionar={setUnidad} seleccionado={unidad} />
+                    ))}
                 </div>
-            )}
+            </aside>
 
-            {/* Listado de Atribuciones */}
-            {unidad && (
-                <div style={{ marginTop: 20 }}>
-                    <h4 style={{ fontSize: 13, color: 'var(--color-texto-suave)', marginBottom: 16, textTransform: 'uppercase', letterSpacing: '0.05em', fontWeight: 700 }}>📝 Atribuciones Específicas</h4>
-                    {cargando ? <div className="loading-container"><div className="spinner" /></div> : (
-                        atribs.length === 0 ? (
-                            <div className="empty-state" style={{ background: '#f8fafc', border: '2px dashed #e2e8f0' }}>
-                                <div className="empty-icon">📝</div>
-                                <h3>Sin atribuciones</h3>
-                                <p>Esta unidad no registra atribuciones aún.</p>
-                                {puedeEditar && <button className="btn btn-primary btn-sm" style={{ marginTop: 15 }} onClick={() => abrirForm()}>Añadir ahora</button>}
+            {/* CONTENIDO DEL EXPLORADOR */}
+            <main className="explorer-content">
+                <div className="breadcrumb" style={{ marginBottom: 24, background: '#f8fafc', padding: '10px 16px', borderRadius: 8 }}>
+                    <span className="breadcrumb-item" onClick={() => setUnidad(null)} style={{ cursor: 'pointer', color: 'var(--color-acento)' }}>🏠 Inicio</span>
+                    {breadcrumbs.map(b => (
+                        <React.Fragment key={b.id}>
+                            <span className="breadcrumb-separator">/</span>
+                            <span className="breadcrumb-item" onClick={() => setUnidad(b)} style={{ cursor: 'pointer', color: b.id === unidad.id ? 'var(--color-primario)' : 'var(--color-acento)', fontWeight: b.id === unidad.id ? '700' : '400' }}>{b.siglas}</span>
+                        </React.Fragment>
+                    ))}
+                </div>
+
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 30, gap: 20 }}>
+                    <div>
+                        <h2 style={{ fontSize: 24, fontWeight: 800, color: 'var(--color-primario)', marginBottom: 6 }}>
+                            {unidad ? unidad.nombre : 'Estructura Organizacional'}
+                        </h2>
+                        {unidad ? (
+                            <div style={{ display: 'flex', gap: 8 }}>
+                                <span className="nivel-chip">Nivel {unidad.nivel_numero}</span>
+                                <span className="nivel-chip" style={{ background: '#f1f5f9', color: '#475569' }}>{unidad.siglas}</span>
                             </div>
                         ) : (
-                            <div className="atribucion-list">
-                                {atribs.map((a) => (
-                                    <div key={a.id} className={`atribucion-card ${(a.atribucion_general_id || a.padre_atribucion_id) ? 'vinculada' : 'huerfana'}`} style={{ border: '1px solid var(--color-borde)', borderLeftWidth: 6, borderRadius: 10, padding: 20, marginBottom: 16, background: a.tipo === 'indelegable' ? '#fff1f2' : 'white', display: 'flex', justifyContent: 'space-between', gap: 20, boxShadow: '0 2px 4px rgba(0,0,0,0.02)' }}>
-                                        <div style={{ flex: 1 }}>
-                                            <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8, alignItems: 'center', marginBottom: 10 }}>
-                                                <strong style={{ color: 'var(--color-primario)', fontSize: 15 }}>{a.clave}</strong>
-                                                <span className={`badge badge-${a.tipo}`}>{a.tipo}</span>
-                                                {a.gen_clave && <span style={{ fontSize: 11, color: '#166534', background: '#dcfce7', padding: '3px 8px', borderRadius: 6, fontWeight: 700 }}>📜 LEY: {a.gen_clave}</span>}
-                                                {a.padre_clave && <span style={{ fontSize: 11, color: '#065f46', background: '#ccfbf1', padding: '3px 8px', borderRadius: 6, fontWeight: 700 }}>🌳 SUP: {a.padre_clave}</span>}
-                                                {a.responsable_nombre && <span className="badge" style={{ background: '#ede9fe', color: '#5b21b6', fontSize: 10, padding: '3px 8px', borderRadius: 6 }}>👤 Resp: {a.responsable_nombre}</span>}
-                                                {a.apoyo_nombres?.length > 0 && <span className="badge" style={{ background: '#e0f2fe', color: '#0369a1', fontSize: 10, padding: '3px 8px', borderRadius: 6 }}>🤝 Apoyo: {a.apoyo_nombres.join(', ')}</span>}
-                                                {a.corresponsabilidad && <span className="badge" style={{ background: '#fef3c7', color: '#92400e', fontSize: 10, padding: '3px 8px', borderRadius: 6 }}>🛡️ {a.corresponsabilidad}</span>}
-                                            </div>
-                                            <p style={{ fontSize: 15, color: '#334155', lineHeight: 1.6 }}>{a.texto}</p>
-                                        </div>
-                                        {puedeEditar && (
-                                            <div style={{ display: 'flex', gap: 6, flexShrink: 0 }}>
-                                                <button className="btn btn-outline btn-icon btn-sm" onClick={() => abrirForm(a)} title="Editar">✏️</button>
-                                                <button className="btn btn-danger btn-icon btn-sm" onClick={() => eliminar(a.id)} title="Eliminar">🗑️</button>
-                                            </div>
-                                        )}
-                                    </div>
-                                ))}
-                            </div>
-                        )
+                            <p style={{ color: 'var(--color-texto-suave)', fontSize: 14 }}>Explore la jerarquía y gestione las atribuciones específicas de cada unidad.</p>
+                        )}
+                    </div>
+                    {unidad && puedeEditar && (
+                        <div style={{ display: 'flex', gap: 10 }}>
+                            <button className="btn btn-outline btn-sm" onClick={() => setMostrarBulk(true)}>📑 Carga Masiva</button>
+                            <button className="btn btn-primary btn-sm" onClick={() => abrirForm()}>➕ Atribución</button>
+                        </div>
                     )}
                 </div>
-            )}
+
+                {/* Sub-Unidades (Modo Carpetas) */}
+                {getHijos().length > 0 && (
+                    <div style={{ marginBottom: 40, background: '#fcfcfc', padding: 20, borderRadius: 12, border: '1px solid #f1f5f9' }}>
+                        <h4 style={{ fontSize: 12, color: 'var(--color-texto-suave)', marginBottom: 20, textTransform: 'uppercase', letterSpacing: '0.08em', fontWeight: 800 }}>� Unidades Dependientes</h4>
+                        <div className="folder-grid">
+                            {getHijos().map(h => (
+                                <div key={h.id} className="folder-card" onClick={() => setUnidad(h)}>
+                                    <div className="folder-icon">📂</div>
+                                    <div className="folder-name">{h.nombre}</div>
+                                    <div className="folder-siglas">{h.siglas}</div>
+                                </div>
+                            ))}
+                        </div>
+                    </div>
+                )}
+
+                {/* Atribuciones Específicas */}
+                {unidad ? (
+                    <div>
+                        <h4 style={{ fontSize: 12, color: 'var(--color-texto-suave)', marginBottom: 20, textTransform: 'uppercase', letterSpacing: '0.08em', fontWeight: 800 }}>📝 Listado de Atribuciones</h4>
+                        {cargando ? <div className="loading-container" style={{ minHeight: 200 }}><div className="spinner" /></div> : (
+                            atribs.length === 0 ? (
+                                <div className="explorer-empty">
+                                    <div style={{ fontSize: 48, marginBottom: 15 }}>📝</div>
+                                    <h3 style={{ fontSize: 18, color: 'var(--color-primario)' }}>Sin atribuciones registradas</h3>
+                                    <p>Esta unidad administrativa no cuenta con atribuciones específicas en este proyecto.</p>
+                                    {puedeEditar && <button className="btn btn-primary btn-sm" style={{ marginTop: 20 }} onClick={() => abrirForm()}>➕ Registrar Atribución</button>}
+                                </div>
+                            ) : (
+                                <div className="atribucion-list">
+                                    {atribs.map((a) => (
+                                        <div key={a.id} className={`atribucion-card ${(a.atribucion_general_id || a.padre_atribucion_id) ? 'vinculada' : 'huerfana'}`}
+                                            style={{
+                                                border: '1px solid var(--color-borde)',
+                                                borderLeftWidth: 6,
+                                                borderRadius: 12,
+                                                padding: 24,
+                                                marginBottom: 20,
+                                                background: a.tipo === 'indelegable' ? '#fff1f2' : 'white',
+                                                display: 'flex',
+                                                justifyContent: 'space-between',
+                                                gap: 24,
+                                                boxShadow: '0 4px 6px -1px rgba(0,0,0,0.02), 0 2px 4px -1px rgba(0,0,0,0.01)'
+                                            }}>
+                                            <div style={{ flex: 1 }}>
+                                                <div style={{ display: 'flex', flexWrap: 'wrap', gap: 10, alignItems: 'center', marginBottom: 12 }}>
+                                                    <strong style={{ color: 'var(--color-primario)', fontSize: 16 }}>{a.clave}</strong>
+                                                    <span className={`badge badge-${a.tipo}`}>{a.tipo}</span>
+                                                    {a.gen_clave && <span style={{ fontSize: 10, color: '#166534', background: '#dcfce7', padding: '4px 10px', borderRadius: 20, fontWeight: 800, textTransform: 'uppercase' }}>📜 LEY: {a.gen_clave}</span>}
+                                                    {a.padre_clave && <span style={{ fontSize: 10, color: '#0369a1', background: '#e0f2fe', padding: '4px 10px', borderRadius: 20, fontWeight: 800, textTransform: 'uppercase' }}>🌳 SUP: {a.padre_clave}</span>}
+                                                    {a.responsable_nombre && <span className="badge" style={{ background: '#f5f3ff', color: '#5b21b6', fontSize: 10, padding: '4px 10px', borderRadius: 20, fontWeight: 700 }}>👤 Resp: {a.responsable_nombre}</span>}
+                                                    {a.apoyo_nombres?.length > 0 && <span className="badge" style={{ background: '#f0f9ff', color: '#0369a1', fontSize: 10, padding: '4px 10px', borderRadius: 20, fontWeight: 700 }}>🤝 Apoyo: {a.apoyo_nombres.join(', ')}</span>}
+                                                    {a.corresponsabilidad && <span className="badge" style={{ background: '#fffbeb', color: '#92400e', fontSize: 10, padding: '4px 10px', borderRadius: 20, fontWeight: 700 }}>🛡️ {a.corresponsabilidad}</span>}
+                                                </div>
+                                                <p style={{ fontSize: 15, color: '#1e293b', lineHeight: 1.6, fontWeight: 500 }}>{a.texto}</p>
+                                            </div>
+                                            {puedeEditar && (
+                                                <div style={{ display: 'flex', gap: 8, flexShrink: 0, alignItems: 'flex-start' }}>
+                                                    <button className="btn btn-outline btn-icon btn-sm" onClick={() => abrirForm(a)} title="Editar" style={{ width: 36, height: 36 }}>✏️</button>
+                                                    <button className="btn btn-danger btn-icon btn-sm" onClick={() => eliminar(a.id)} title="Eliminar" style={{ width: 36, height: 36 }}>🗑️</button>
+                                                </div>
+                                            )}
+                                        </div>
+                                    ))}
+                                </div>
+                            )
+                        )}
+                    </div>
+                ) : (
+                    <div className="explorer-empty" style={{ background: '#f8fafc', borderRadius: 16, border: '2px dashed #e2e8f0' }}>
+                        <div style={{ fontSize: 64, marginBottom: 20 }}>🔍</div>
+                        <h3 style={{ fontSize: 20, color: 'var(--color-primario)', fontWeight: 800 }}>Navegador Orgánico</h3>
+                        <p style={{ maxWidth: 400 }}>Utilice el árbol lateral o las carpetas de arriba para profundizar en los niveles de la institución y gestionar sus atribuciones.</p>
+                    </div>
+                )}
+            </main>
 
             {/* Modal carga masiva */}
             {mostrarBulk && (

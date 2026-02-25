@@ -10,5 +10,6 @@ router.delete('/:id', ctrl.eliminar);
 
 router.put('/especificas/:id', ctrl.actualizarEspecifica);
 router.delete('/especificas/:id', ctrl.eliminarEspecifica);
+router.get('/especificas/todas', ctrl.listarTodasEspecificas);
 
 module.exports = router;
