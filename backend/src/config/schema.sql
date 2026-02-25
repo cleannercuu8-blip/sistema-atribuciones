@@ -33,7 +33,7 @@ CREATE TABLE usuarios (
 -- =============================================
 CREATE TABLE dependencias (
   id SERIAL PRIMARY KEY,
-  nombre VARCHAR(300) NOT NULL,
+  nombre VARCHAR(300) NOT NULL UNIQUE,
   siglas VARCHAR(50),
   tipo tipo_dependencia NOT NULL,
   descripcion TEXT,
