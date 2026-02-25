@@ -15,10 +15,13 @@ export default function Login() {
         setError('');
         setCargando(true);
         try {
+            console.log('📝 Intentando ingresar con:', email);
             await login(email, password);
             navigate('/');
         } catch (err) {
-            setError(err.response?.data?.error || 'Error al iniciar sesión');
+            console.error('❌ Error capturado en Login:', err);
+            console.error('🔍 Detalle del error:', err.response?.data);
+            setError(err.response?.data?.error || 'Error de conexión con el servidor (404)');
         } finally {
             setCargando(false);
         }
