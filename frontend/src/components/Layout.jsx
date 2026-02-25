@@ -5,8 +5,8 @@ import { useAuth } from '../context/AuthContext';
 const navItems = [
     { to: '/', label: 'Reporte General', icon: '📊', roles: ['admin', 'dependencia', 'revisor'], exact: true },
     { to: '/proyectos', label: 'Proyectos', icon: '📁', roles: ['admin', 'dependencia', 'revisor'] },
+    { to: '/catalogos', label: 'Catálogos', icon: '📚', roles: ['admin'] },
     { to: '/revisiones', label: 'Revisiones', icon: '🔍', roles: ['admin', 'revisor'] },
-    { to: '/perfil', label: 'Mi Perfil', icon: '👤', roles: ['admin', 'dependencia', 'revisor'] },
     { to: '/admin', label: 'Administración', icon: '⚙️', roles: ['admin'] },
 ];
 
@@ -60,9 +60,12 @@ export default function Layout() {
                 <div className="sidebar-footer">
                     <div style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '8px 4px', marginBottom: 8 }}>
                         <div className="user-avatar">{userInitials}</div>
-                        <div>
+                        <div style={{ flex: 1 }}>
                             <div style={{ fontSize: 13, fontWeight: 600, color: 'white', lineHeight: 1.2 }}>{usuario?.nombre}</div>
-                            <div style={{ fontSize: 11, color: 'rgba(255,255,255,0.6)' }}>{getRolLabel(usuario?.rol)}</div>
+                            <div style={{ fontSize: 11, color: 'rgba(255,255,255,0.6)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                                {getRolLabel(usuario?.rol)}
+                                <NavLink to="/perfil" className="sidebar-perfil-link" title="Ir a mi perfil">👤 Perfil</NavLink>
+                            </div>
                         </div>
                     </div>
                     <button className="nav-item" onClick={handleLogout} style={{ color: '#ff8a8a' }}>

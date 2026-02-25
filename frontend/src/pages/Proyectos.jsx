@@ -14,6 +14,8 @@ export default function Proyectos() {
     const navigate = useNavigate();
     const [proyectos, setProyectos] = useState([]);
     const [dependencias, setDependencias] = useState([]);
+    const [catResponsables, setCatResponsables] = useState([]);
+    const [catEnlaces, setCatEnlaces] = useState([]);
     const [usuarios, setUsuarios] = useState([]);
     const [cargando, setCargando] = useState(true);
     const [mostrarModal, setMostrarModal] = useState(false);
@@ -30,12 +32,16 @@ export default function Proyectos() {
 
     const cargarDatos = async () => {
         try {
-            const [pRes, dRes] = await Promise.all([
+            const [pRes, dRes, rRes, eRes] = await Promise.all([
                 api.get('/proyectos'),
                 api.get('/dependencias'),
+                api.get('/catalogos/responsables'),
+                api.get('/catalogos/enlaces')
             ]);
             setProyectos(pRes.data);
             setDependencias(dRes.data);
+            setCatResponsables(rRes.data);
+            setCatEnlaces(eRes.data);
             if (usuario.rol === 'admin') {
                 const uRes = await api.get('/usuarios');
                 setUsuarios(uRes.data.filter(u => u.activo && u.rol !== 'admin'));
@@ -234,8 +240,12 @@ export default function Proyectos() {
                                     className="form-control"
                                     value={form.responsable}
                                     onChange={e => setForm({ ...form, responsable: e.target.value })}
-                                    placeholder="Nombre completo del responsable"
+                                    placeholder="Seleccione o escriba el responsable"
+                                    list="list-responsables"
                                 />
+                                <datalist id="list-responsables">
+                                    {catResponsables.map(r => <option key={r.id} value={r.nombre} />)}
+                                </datalist>
                             </div>
                             <div className="form-group">
                                 <label className="form-label">Personas Enlace (emails o nombres)</label>
@@ -243,9 +253,13 @@ export default function Proyectos() {
                                     className="form-control"
                                     value={form.enlaces}
                                     onChange={e => setForm({ ...form, enlaces: e.target.value })}
-                                    placeholder="Separe con comas..."
+                                    placeholder="Seleccione o separe con comas..."
                                     rows={2}
+                                    list="list-enlaces"
                                 />
+                                <datalist id="list-enlaces">
+                                    {catEnlaces.map(e => <option key={e.id} value={e.email}>{e.nombre}</option>)}
+                                </datalist>
                             </div>
                             <div className="form-group">
                                 <label className="form-label">Fecha de Expediente</label>

@@ -9,6 +9,7 @@ import ProyectoDetalle from './pages/ProyectoDetalle';
 import Revisiones from './pages/Revisiones';
 import Admin from './pages/Admin';
 import Perfil from './pages/Perfil';
+import Catalogos from './pages/Catalogos';
 
 const RutaProtegida = ({ children, roles }) => {
     const { usuario, cargando } = useAuth();
@@ -32,6 +33,11 @@ const AppRoutes = () => {
                 <Route path="proyectos" element={<Proyectos />} />
                 <Route path="proyectos/:id" element={<ProyectoDetalle />} />
                 <Route path="perfil" element={<Perfil />} />
+                <Route path="catalogos" element={
+                    <RutaProtegida roles={['admin']}>
+                        <Catalogos />
+                    </RutaProtegida>
+                } />
                 <Route path="revisiones" element={
                     <RutaProtegida roles={['admin', 'revisor']}>
                         <Revisiones />

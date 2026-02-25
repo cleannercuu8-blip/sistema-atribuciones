@@ -49,7 +49,25 @@ const initDB = async () => {
             ALTER TABLE proyectos ADD COLUMN IF NOT EXISTS enlaces TEXT;
             ALTER TABLE proyectos ADD COLUMN IF NOT EXISTS fecha_expediente DATE;
         `);
-        console.log('🔹 Migración de columnas completada');
+
+        // Tablas de Catálogos
+        await pool.query(`
+            CREATE TABLE IF NOT EXISTS cat_responsables (
+                id SERIAL PRIMARY KEY,
+                nombre VARCHAR(255) NOT NULL UNIQUE,
+                activo BOOLEAN DEFAULT true,
+                created_at TIMESTAMPTZ DEFAULT NOW()
+            );
+
+            CREATE TABLE IF NOT EXISTS cat_enlaces (
+                id SERIAL PRIMARY KEY,
+                nombre VARCHAR(255) NOT NULL,
+                email VARCHAR(255) NOT NULL UNIQUE,
+                activo BOOLEAN DEFAULT true,
+                created_at TIMESTAMPTZ DEFAULT NOW()
+            );
+        `);
+        console.log('🔹 Migración de tablas de catálogos completada');
     } catch (err) {
         console.error('❌ Error al inicializar BD:', err.message);
     }
@@ -74,6 +92,7 @@ app.use('/api/proyectos', require('./routes/proyectos.routes'));
 app.use('/api/revisiones', require('./routes/revisiones.routes'));
 app.use('/api/unidades', require('./routes/unidades.routes'));
 app.use('/api/atribuciones-generales', require('./routes/atribuciones.routes'));
+app.use('/api/catalogos', require('./routes/catalogos.routes'));
 
 // Configuración de email (solo admin)
 const emailService = require('./services/email.service');
