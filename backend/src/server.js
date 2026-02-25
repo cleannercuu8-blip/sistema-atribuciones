@@ -46,15 +46,7 @@ const initDB = async () => {
         await pool.query(schema);
         console.log('✅ Esquema de BD inicializado correctamente');
 
-        // Migración de columnas nuevas para Proyectos
-        await pool.query(`
-            ALTER TABLE proyectos ADD COLUMN IF NOT EXISTS responsable VARCHAR(255);
-            ALTER TABLE proyectos ADD COLUMN IF NOT EXISTS enlaces TEXT;
-            ALTER TABLE proyectos ADD COLUMN IF NOT EXISTS fecha_expediente DATE;
-            ALTER TABLE proyectos ADD COLUMN IF NOT EXISTS avance_id INTEGER REFERENCES cat_avances(id);
-        `);
-
-        // Tablas de Catálogos
+        // 1. Tablas de Catálogos (Bases para FKs)
         await pool.query(`
             CREATE TABLE IF NOT EXISTS cat_responsables (
                 id SERIAL PRIMARY KEY,
@@ -78,7 +70,16 @@ const initDB = async () => {
                 created_at TIMESTAMPTZ DEFAULT NOW()
             );
         `);
-        console.log('🔹 Migración de tablas de catálogos completada');
+        console.log('🔹 Tablas de catálogos listas');
+
+        // 2. Migración de columnas nuevas para Proyectos (Dependen de Catálogos)
+        await pool.query(`
+            ALTER TABLE proyectos ADD COLUMN IF NOT EXISTS responsable VARCHAR(255);
+            ALTER TABLE proyectos ADD COLUMN IF NOT EXISTS enlaces TEXT;
+            ALTER TABLE proyectos ADD COLUMN IF NOT EXISTS fecha_expediente DATE;
+            ALTER TABLE proyectos ADD COLUMN IF NOT EXISTS avance_id INTEGER REFERENCES cat_avances(id);
+        `);
+        console.log('🔹 Migración de Proyectos completada');
 
         // Migración para documentos de Word en Revisiones
         await pool.query(`
