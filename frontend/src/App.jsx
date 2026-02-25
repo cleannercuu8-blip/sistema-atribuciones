@@ -8,6 +8,7 @@ import Proyectos from './pages/Proyectos';
 import ProyectoDetalle from './pages/ProyectoDetalle';
 import Revisiones from './pages/Revisiones';
 import Admin from './pages/Admin';
+import Perfil from './pages/Perfil';
 
 const RutaProtegida = ({ children, roles }) => {
     const { usuario, cargando } = useAuth();
@@ -30,6 +31,7 @@ const AppRoutes = () => {
                 <Route index element={<Dashboard />} />
                 <Route path="proyectos" element={<Proyectos />} />
                 <Route path="proyectos/:id" element={<ProyectoDetalle />} />
+                <Route path="perfil" element={<Perfil />} />
                 <Route path="revisiones" element={
                     <RutaProtegida roles={['admin', 'revisor']}>
                         <Revisiones />

@@ -7,15 +7,7 @@ const listar = async (req, res) => {
         let query;
         let params = [];
 
-        if (req.user.rol === 'admin') {
-            query = `
-        SELECT p.*, d.nombre as dependencia_nombre, d.tipo as dependencia_tipo,
-               u.nombre as creado_por
-        FROM proyectos p
-        JOIN dependencias d ON p.dependencia_id = d.id
-        LEFT JOIN usuarios u ON p.created_by = u.id
-        ORDER BY p.created_at DESC`;
-        } else if (req.user.rol === 'revisor') {
+        if (req.user.rol === 'admin' || req.user.rol === 'revisor') {
             query = `
         SELECT p.*, d.nombre as dependencia_nombre, d.tipo as dependencia_tipo,
                u.nombre as creado_por
@@ -24,7 +16,6 @@ const listar = async (req, res) => {
         LEFT JOIN usuarios u ON p.created_by = u.id
         ORDER BY p.created_at DESC`;
         } else {
-            // dependencia: solo sus proyectos asignados
             query = `
         SELECT p.*, d.nombre as dependencia_nombre, d.tipo as dependencia_tipo,
                u.nombre as creado_por, pu.rol_en_proyecto
@@ -85,7 +76,7 @@ const obtener = async (req, res) => {
 
 // POST /api/proyectos
 const crear = async (req, res) => {
-    const { nombre, dependencia_id, usuarios_ids, revisores_ids } = req.body;
+    const { nombre, dependencia_id, responsable, enlaces, fecha_expediente, usuarios_ids, revisores_ids } = req.body;
     if (!nombre || !dependencia_id)
         return res.status(400).json({ error: 'Nombre y dependencia son requeridos' });
 
@@ -94,9 +85,9 @@ const crear = async (req, res) => {
         await client.query('BEGIN');
 
         const proyResult = await client.query(
-            `INSERT INTO proyectos (nombre, dependencia_id, created_by)
-       VALUES ($1, $2, $3) RETURNING *`,
-            [nombre, dependencia_id, req.user.id]
+            `INSERT INTO proyectos (nombre, dependencia_id, responsable, enlaces, fecha_expediente, created_by)
+       VALUES ($1, $2, $3, $4, $5, $6) RETURNING *`,
+            [nombre, dependencia_id, responsable, enlaces, fecha_expediente, req.user.id]
         );
         const proyecto = proyResult.rows[0];
 
@@ -134,15 +125,17 @@ const crear = async (req, res) => {
 // PUT /api/proyectos/:id
 const actualizar = async (req, res) => {
     const { id } = req.params;
-    const { nombre, dependencia_id, estado, usuarios_ids, revisores_ids } = req.body;
+    const { nombre, dependencia_id, responsable, enlaces, fecha_expediente, estado, usuarios_ids, revisores_ids } = req.body;
 
     const client = await pool.connect();
     try {
         await client.query('BEGIN');
 
         await client.query(
-            `UPDATE proyectos SET nombre=$1, dependencia_id=$2, estado=$3, updated_at=NOW() WHERE id=$4`,
-            [nombre, dependencia_id, estado, id]
+            `UPDATE proyectos 
+             SET nombre=$1, dependencia_id=$2, responsable=$3, enlaces=$4, fecha_expediente=$5, estado=$6, updated_at=NOW() 
+             WHERE id=$7`,
+            [nombre, dependencia_id, responsable, enlaces, fecha_expediente, estado, id]
         );
 
         if (usuarios_ids !== undefined) {

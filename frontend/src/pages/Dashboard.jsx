@@ -41,7 +41,7 @@ export default function Dashboard() {
                     {saludo}, {usuario?.nombre?.split(' ')[0]} 👋
                 </h1>
                 <p style={{ color: 'var(--color-texto-suave)', marginTop: 4 }}>
-                    Bienvenido al Sistema de Atribuciones Jerárquicas
+                    Bienvenido al Sistema para Árbol de Atribuciones
                 </p>
             </div>
 

@@ -4,8 +4,8 @@ import { useAuth } from '../context/AuthContext';
 
 const ROLES = ['admin', 'dependencia', 'revisor'];
 const TIPOS_DEP = [
-    { value: 'centralizada', label: 'Dependencia Centralizada' },
-    { value: 'paraestatal', label: 'Entidad Paraestatal' },
+    { value: 'centralizada', label: 'Dependencia' },
+    { value: 'paraestatal', label: 'Entidad' },
     { value: 'organismo_autonomo', label: 'Organismo Autónomo' },
     { value: 'otro', label: 'Otro' },
 ];

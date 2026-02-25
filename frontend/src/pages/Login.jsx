@@ -31,8 +31,8 @@ export default function Login() {
         <div className="login-container">
             <div className="login-card">
                 <div className="login-logo">
-                    <div className="logo-emoji">🏛️</div>
-                    <h1>Sistema de Atribuciones<br />Jerárquicas</h1>
+                    <div className="logo-emoji">🌳</div>
+                    <h1>Sistema para Árbol<br />de Atribuciones</h1>
                     <p>Ingrese sus credenciales para acceder</p>
                 </div>
 

@@ -42,6 +42,14 @@ const initDB = async () => {
         const schema = fs.readFileSync(schemaPath, 'utf8');
         await pool.query(schema);
         console.log('✅ Esquema de BD inicializado correctamente');
+
+        // Migración de columnas nuevas para Proyectos
+        await pool.query(`
+            ALTER TABLE proyectos ADD COLUMN IF NOT EXISTS responsable VARCHAR(255);
+            ALTER TABLE proyectos ADD COLUMN IF NOT EXISTS enlaces TEXT;
+            ALTER TABLE proyectos ADD COLUMN IF NOT EXISTS fecha_expediente DATE;
+        `);
+        console.log('🔹 Migración de columnas completada');
     } catch (err) {
         console.error('❌ Error al inicializar BD:', err.message);
     }

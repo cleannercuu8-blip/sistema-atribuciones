@@ -3,9 +3,10 @@ import { Outlet, NavLink, useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 
 const navItems = [
-    { to: '/', label: 'Dashboard', icon: '📊', roles: ['admin', 'dependencia', 'revisor'], exact: true },
+    { to: '/', label: 'Reporte General', icon: '📊', roles: ['admin', 'dependencia', 'revisor'], exact: true },
     { to: '/proyectos', label: 'Proyectos', icon: '📁', roles: ['admin', 'dependencia', 'revisor'] },
     { to: '/revisiones', label: 'Revisiones', icon: '🔍', roles: ['admin', 'revisor'] },
+    { to: '/perfil', label: 'Mi Perfil', icon: '👤', roles: ['admin', 'dependencia', 'revisor'] },
     { to: '/admin', label: 'Administración', icon: '⚙️', roles: ['admin'] },
 ];
 
@@ -31,10 +32,10 @@ export default function Layout() {
             {/* SIDEBAR */}
             <aside className="sidebar">
                 <div className="sidebar-logo">
-                    <span className="logo-icon">🏛️</span>
+                    <span className="logo-icon">🌳</span>
                     <div>
-                        <h1>Sistema de Atribuciones</h1>
-                        <p>Jerárquicas</p>
+                        <h1>Árbol de Atribuciones</h1>
+                        <p>Plataforma de Gestión</p>
                     </div>
                 </div>
 
