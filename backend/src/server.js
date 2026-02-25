@@ -68,7 +68,11 @@ app.put('/api/admin/email-config', authMiddleware, requireRole('admin'), emailSe
 
 // Health check para Render
 app.get('/api/health', (req, res) => {
-    res.json({ status: 'ok', timestamp: new Date().toISOString() });
+    res.json({
+        status: 'ok',
+        version: '1.1-debug',
+        timestamp: new Date().toISOString()
+    });
 });
 
 // Ruta raíz
