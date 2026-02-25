@@ -255,31 +255,33 @@ export default function Proyectos() {
                                 </div>
                             </div>
                             <div className="form-group">
-                                <label className="form-label">Responsable del Proyecto</label>
-                                <input
-                                    type="text"
+                                <label className="form-label">👨‍💼 Responsable del proyecto</label>
+                                <select
                                     className="form-control"
                                     value={form.responsable}
                                     onChange={e => setForm({ ...form, responsable: e.target.value })}
-                                    placeholder="Seleccione o escriba el responsable"
-                                    list="list-responsables"
-                                />
-                                <datalist id="list-responsables">
-                                    {catResponsables.map(r => <option key={r.id} value={r.nombre} />)}
-                                </datalist>
+                                    required
+                                >
+                                    <option value="">Seleccione un responsable...</option>
+                                    {catResponsables.map(r => (
+                                        <option key={r.id} value={r.nombre}>{r.nombre}</option>
+                                    ))}
+                                </select>
                             </div>
+
                             <div className="form-group">
-                                <label className="form-label">Personas Enlace (emails o nombres)</label>
-                                <textarea
+                                <label className="form-label">📧 Persona enlace</label>
+                                <select
                                     className="form-control"
                                     value={form.enlaces}
                                     onChange={e => setForm({ ...form, enlaces: e.target.value })}
-                                    placeholder="Seleccione o separe con comas..."
-                                    rows={2}
-                                />
-                                <div style={{ fontSize: 11, color: '#999', marginTop: 4 }}>
-                                    Sugerencias: {catEnlaces.slice(0, 3).map(e => e.email).join(', ')}...
-                                </div>
+                                    required
+                                >
+                                    <option value="">Seleccione un enlace...</option>
+                                    {catEnlaces.map(en => (
+                                        <option key={en.id} value={en.nombre}>{en.nombre} ({en.email})</option>
+                                    ))}
+                                </select>
                             </div>
                             <div className="form-group">
                                 <label className="form-label">Fecha de Expediente</label>

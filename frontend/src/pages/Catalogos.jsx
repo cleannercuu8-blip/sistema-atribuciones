@@ -3,7 +3,7 @@ import api from '../services/api';
 import * as XLSX from 'xlsx';
 
 export default function Catalogos() {
-    const [tab, setTab] = useState('responsables');
+    const [tab, setTab] = useState('dependencias');
     const [responsables, setResponsables] = useState([]);
     const [enlaces, setEnlaces] = useState([]);
     const [dependencias, setDependencias] = useState([]);
@@ -13,6 +13,10 @@ export default function Catalogos() {
     const [preview, setPreview] = useState([]);
     const [mostrandoModalCarga, setMostrandoModalCarga] = useState(false);
     const [procesando, setProcesando] = useState(false);
+
+    // Estado para carga individual
+    const [formIndividual, setFormIndividual] = useState({ nombre: '', email: '', tipo: 'centralizada' });
+    const [agregandoIndividual, setAgregandoIndividual] = useState(false);
 
     const cargarDatos = async () => {
         setCargando(true);
@@ -34,6 +38,27 @@ export default function Catalogos() {
     };
 
     useEffect(() => { cargarDatos(); }, []);
+
+    const handleIndividualSubmit = async (e) => {
+        e.preventDefault();
+        setAgregandoIndividual(true);
+        try {
+            const endpoint = `/catalogos/${tab}`;
+            const payload = tab === 'enlaces'
+                ? { nombre: formIndividual.nombre, email: formIndividual.email }
+                : tab === 'dependencias'
+                    ? { nombre: formIndividual.nombre, tipo: formIndividual.tipo }
+                    : { nombre: formIndividual.nombre };
+
+            await api.post(endpoint, payload);
+            setFormIndividual({ nombre: '', email: '', tipo: 'centralizada' });
+            cargarDatos();
+            alert('✅ Registro agregado correctamente');
+        } catch (err) {
+            alert(err.response?.data?.error || 'Error al agregar registro');
+        }
+        setAgregandoIndividual(false);
+    };
 
     const handleFileUpload = (e) => {
         const file = e.target.files[0];
@@ -118,20 +143,67 @@ export default function Catalogos() {
         <div>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 24 }}>
                 <div>
-                    <h1 style={{ fontSize: 22, fontWeight: 800, color: 'var(--color-primario)' }}>📚 Gestión de Catálogos</h1>
-                    <p style={{ color: 'var(--color-texto-suave)', marginTop: 4 }}>Administración centralizada de responsables y enlaces</p>
+                    <h1 style={{ fontSize: 22, fontWeight: 800, color: 'var(--color-primario)' }}>🗺️ Gestión de Catálogos</h1>
+                    <p style={{ color: 'var(--color-texto-suave)', marginTop: 4 }}>Administración centralizada de responsables, enlaces y tipos de organismos</p>
                 </div>
                 <div style={{ display: 'flex', gap: 10 }}>
                     <button className="btn btn-outline" onClick={descargarPlantilla}>📥 Bajar Plantilla</button>
-                    <button className="btn btn-primary" onClick={() => setMostrandoModalCarga(true)}>📤 Carga Masiva (Excel)</button>
+                    <button className="btn btn-primary" onClick={() => setMostrandoModalCarga(true)}>🚀 Carga Masiva (Excel)</button>
                 </div>
             </div>
 
             <div className="tabs">
+                <button className={`tab-btn ${tab === 'dependencias' ? 'active' : ''}`} onClick={() => setTab('dependencias')}>🏢 Dependencias</button>
                 <button className={`tab-btn ${tab === 'responsables' ? 'active' : ''}`} onClick={() => setTab('responsables')}>👨‍💼 Responsables</button>
                 <button className={`tab-btn ${tab === 'enlaces' ? 'active' : ''}`} onClick={() => setTab('enlaces')}>📧 Enlaces</button>
-                <button className={`tab-btn ${tab === 'dependencias' ? 'active' : ''}`} onClick={() => setTab('dependencias')}>🏢 Dependencias</button>
                 <button className={`tab-btn ${tab === 'avances' ? 'active' : ''}`} onClick={() => setTab('avances')}>📊 Avances</button>
+            </div>
+
+            <div className="card" style={{ marginBottom: 24 }}>
+                <h3 className="card-title" style={{ fontSize: 16, marginBottom: 16 }}>➕ Agregar {tab.slice(0, -1)} individualmente</h3>
+                <form onSubmit={handleIndividualSubmit} style={{ display: 'flex', gap: 12, alignItems: 'flex-end', flexWrap: 'wrap' }}>
+                    <div className="form-group" style={{ flex: 1, minWidth: 200, marginBottom: 0 }}>
+                        <label className="form-label">Nombre</label>
+                        <input
+                            type="text"
+                            className="form-control"
+                            value={formIndividual.nombre}
+                            onChange={e => setFormIndividual({ ...formIndividual, nombre: e.target.value })}
+                            required
+                            placeholder={`Nombre de ${tab.slice(0, -1)}...`}
+                        />
+                    </div>
+                    {tab === 'enlaces' && (
+                        <div className="form-group" style={{ flex: 1, minWidth: 200, marginBottom: 0 }}>
+                            <label className="form-label">Correo Electrónico</label>
+                            <input
+                                type="email"
+                                className="form-control"
+                                value={formIndividual.email}
+                                onChange={e => setFormIndividual({ ...formIndividual, email: e.target.value })}
+                                required
+                                placeholder="ejemplo@correo.com"
+                            />
+                        </div>
+                    )}
+                    {tab === 'dependencias' && (
+                        <div className="form-group" style={{ flex: 1, minWidth: 200, marginBottom: 0 }}>
+                            <label className="form-label">Tipo de Organismo</label>
+                            <select
+                                className="form-control"
+                                value={formIndividual.tipo}
+                                onChange={e => setFormIndividual({ ...formIndividual, tipo: e.target.value })}
+                            >
+                                <option value="centralizada">🏢 Centralizada</option>
+                                <option value="paraestatal">🏛️ Paraestatal</option>
+                                <option value="organismo_autonomo">⚖️ Organismo Autónomo</option>
+                            </select>
+                        </div>
+                    )}
+                    <button type="submit" className="btn btn-primary" disabled={agregandoIndividual} style={{ height: 42 }}>
+                        {agregandoIndividual ? '⏳...' : '✅ Agregar'}
+                    </button>
+                </form>
             </div>
 
             <div className="card">

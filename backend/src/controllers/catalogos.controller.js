@@ -133,6 +133,66 @@ const cargarMasivoDependencias = async (req, res) => {
     }
 };
 
+const agregarResponsable = async (req, res) => {
+    const { nombre } = req.body;
+    if (!nombre) return res.status(400).json({ error: 'Nombre requerido' });
+    try {
+        const result = await pool.query(
+            'INSERT INTO cat_responsables (nombre) VALUES ($1) RETURNING *',
+            [nombre]
+        );
+        res.json(result.rows[0]);
+    } catch (err) {
+        if (err.code === '23505') return res.status(400).json({ error: 'El responsable ya existe' });
+        res.status(500).json({ error: 'Error al agregar responsable' });
+    }
+};
+
+const agregarEnlace = async (req, res) => {
+    const { nombre, email } = req.body;
+    if (!nombre || !email) return res.status(400).json({ error: 'Nombre y email requeridos' });
+    try {
+        const result = await pool.query(
+            'INSERT INTO cat_enlaces (nombre, email) VALUES ($1, $2) RETURNING *',
+            [nombre, email]
+        );
+        res.json(result.rows[0]);
+    } catch (err) {
+        if (err.code === '23505') return res.status(400).json({ error: 'El email ya existe' });
+        res.status(500).json({ error: 'Error al agregar enlace' });
+    }
+};
+
+const agregarAvance = async (req, res) => {
+    const { nombre } = req.body;
+    if (!nombre) return res.status(400).json({ error: 'Nombre requerido' });
+    try {
+        const result = await pool.query(
+            'INSERT INTO cat_avances (nombre) VALUES ($1) RETURNING *',
+            [nombre]
+        );
+        res.json(result.rows[0]);
+    } catch (err) {
+        if (err.code === '23505') return res.status(400).json({ error: 'El avance ya existe' });
+        res.status(500).json({ error: 'Error al agregar avance' });
+    }
+};
+
+const agregarDependencia = async (req, res) => {
+    const { nombre, tipo } = req.body;
+    if (!nombre || !tipo) return res.status(400).json({ error: 'Nombre y tipo requeridos' });
+    try {
+        const result = await pool.query(
+            'INSERT INTO dependencias (nombre, tipo) VALUES ($1, $2) RETURNING *',
+            [nombre, tipo]
+        );
+        res.json(result.rows[0]);
+    } catch (err) {
+        if (err.code === '23505') return res.status(400).json({ error: 'La dependencia ya existe' });
+        res.status(500).json({ error: 'Error al agregar dependencia' });
+    }
+};
+
 const limpiarCatalogo = async (req, res) => {
     const { tipo } = req.params;
     const mapaTablas = {
@@ -196,6 +256,10 @@ module.exports = {
     cargarMasivoEnlaces,
     cargarMasivoAvances,
     cargarMasivoDependencias,
+    agregarResponsable,
+    agregarEnlace,
+    agregarAvance,
+    agregarDependencia,
     limpiarCatalogo,
     descargarPlantilla
 };

@@ -10,6 +10,11 @@ router.get('/avances', authMiddleware, catalogosController.listarAvances);
 router.get('/dependencias', authMiddleware, catalogosController.listarDependencias);
 
 // Gestión (Solo Admin)
+router.post('/responsables', authMiddleware, requireRole('admin'), catalogosController.agregarResponsable);
+router.post('/enlaces', authMiddleware, requireRole('admin'), catalogosController.agregarEnlace);
+router.post('/avances', authMiddleware, requireRole('admin'), catalogosController.agregarAvance);
+router.post('/dependencias', authMiddleware, requireRole('admin'), catalogosController.agregarDependencia);
+
 router.post('/responsables/masivo', authMiddleware, requireRole('admin'), catalogosController.cargarMasivoResponsables);
 router.post('/enlaces/masivo', authMiddleware, requireRole('admin'), catalogosController.cargarMasivoEnlaces);
 router.post('/avances/masivo', authMiddleware, requireRole('admin'), catalogosController.cargarMasivoAvances);
