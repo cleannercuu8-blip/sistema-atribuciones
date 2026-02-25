@@ -204,6 +204,12 @@ const exportarExcel = async (proyectoId) => {
                 ws.getColumn(colIdx + 1).width = 45;
                 colIdx += 2;
             }
+            // Columna Corresponsabilidad
+            const colCorr = getColumnLetter(colIdx);
+            estiloSubHeader(ws.getCell(`${colCorr}3`), 'CORRESPONSABILIDAD');
+            ws.getColumn(colIdx).width = 25;
+            colIdx++;
+
             // Columna Sugerencia
             estiloSubHeader(ws.getCell(`${getColumnLetter(colIdx)}3`), 'SUGERENCIA / COMENTARIO');
             ws.getColumn(colIdx).width = 25;
@@ -229,7 +235,6 @@ const exportarExcel = async (proyectoId) => {
                     const gen = atriGenerales.find(g => g.id === atr.atribucion_general_id);
                     if (gen) atribsPorNivel[0] = { clave: gen.clave, texto: gen.texto };
                 } else if (actual.atribucion_general_id) {
-                    // Si el ancestro más alto tiene relación con ley
                     const gen = atriGenerales.find(g => g.id === actual.atribucion_general_id);
                     if (gen) atribsPorNivel[0] = { clave: gen.clave, texto: gen.texto };
                 }
@@ -242,9 +247,37 @@ const exportarExcel = async (proyectoId) => {
                     estiloCelda(ws.getCell(`${getColumnLetter(c + 1)}${fila}`), data?.texto);
                     c += 2;
                 }
+                // Corresponsabilidad
+                estiloCelda(ws.getCell(`${getColumnLetter(c)}${fila}`), atr.corresponsabilidad);
                 fila++;
             }
         }
+    }
+
+    // ===== HOJA: CONSOLIDADO FINAL (TODO EL ÁRBOL) =====
+    const wsCons = workbook.addWorksheet('CONSOLIDADO');
+    wsCons.getColumn('A').width = 15;
+    wsCons.getColumn('B').width = 35;
+    wsCons.getColumn('C').width = 15;
+    wsCons.getColumn('D').width = 60;
+    wsCons.getColumn('E').width = 40;
+
+    estiloHeader(wsCons.getCell('A1'), 'REPORTE CONSOLIDADO DE TODAS LAS ATRIBUCIONES');
+    wsCons.mergeCells('A1:E1');
+
+    ['NIVEL', 'UNIDAD', 'CLAVE', 'TEXTO ATRIBUCIÓN', 'CORRESPONSABILIDAD'].forEach((h, i) => {
+        estiloSubHeader(wsCons.getCell(`${getColumnLetter(i + 1)}2`), h);
+    });
+
+    let fCons = 3;
+    for (const atr of atriEspecificas) {
+        const unidad = unidadesMap[atr.unidad_id];
+        wsCons.getCell(`A${fCons}`).value = unidad?.nivel_numero;
+        estiloCelda(wsCons.getCell(`B${fCons}`), unidad?.nombre);
+        estiloCelda(wsCons.getCell(`C${fCons}`), atr.clave);
+        estiloCelda(wsCons.getCell(`D${fCons}`), atr.texto);
+        estiloCelda(wsCons.getCell(`E${fCons}`), atr.corresponsabilidad);
+        fCons++;
     }
 
     return workbook;

@@ -118,9 +118,17 @@ const cargarMasivoDependencias = async (req, res) => {
         await client.query('BEGIN');
         for (const item of items) {
             if (!item.nombre || !item.tipo) continue;
+
+            // Normalización de tipos (manejar español y variaciones)
+            let tipoNormalizado = String(item.tipo).toLowerCase().trim();
+            if (tipoNormalizado.includes('dependencia') || tipoNormalizado === 'centralizada') tipoNormalizado = 'centralizada';
+            else if (tipoNormalizado.includes('entidad') || tipoNormalizado === 'paraestatal') tipoNormalizado = 'paraestatal';
+            else if (tipoNormalizado.includes('autónomo') || tipoNormalizado.includes('autonomo') || tipoNormalizado === 'organismo_autonomo') tipoNormalizado = 'organismo_autonomo';
+            else tipoNormalizado = 'otro';
+
             await client.query(
                 'INSERT INTO dependencias (nombre, tipo) VALUES ($1, $2) ON CONFLICT (nombre) DO UPDATE SET tipo = EXCLUDED.tipo',
-                [item.nombre, item.tipo]
+                [item.nombre, tipoNormalizado]
             );
         }
         await client.query('COMMIT');

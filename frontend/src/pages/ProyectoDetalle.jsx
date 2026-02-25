@@ -17,8 +17,8 @@ const NodoArbol = ({ nodo, nivel = 0, onSeleccionar, seleccionado }) => {
             >
                 <span style={{ fontSize: 12, color: '#999', minWidth: 20 }}>{nodo.hijos?.length > 0 ? (expandido ? '▼' : '▶') : '•'}</span>
                 <span className="tree-node-chip" style={{ background: color }}>{nodo.siglas}</span>
-                <span style={{ fontSize: 13.5, color: 'var(--color-texto)', flex: 1 }}>{nodo.nombre}</span>
-                <span className="nivel-chip">Nivel {nodo.nivel_numero}</span>
+                <span style={{ fontSize: 13, color: 'var(--color-texto)', flex: 1, whiteSpace: 'normal', wordBreak: 'break-word', display: 'inline-block', verticalAlign: 'middle' }}>{nodo.nombre}</span>
+                <span className="nivel-chip" style={{ flexShrink: 0 }}>Nivel {nodo.nivel_numero}</span>
             </div>
             {expandido && nodo.hijos?.length > 0 && (
                 <div className="tree-children">
@@ -40,7 +40,7 @@ const TabAtribuciones = ({ proyectoId, unidad, atribGenerales }) => {
     const [mostrarBulk, setMostrarBulk] = useState(false);
     const [bulkText, setBulkText] = useState('');
     const [editando, setEditando] = useState(null);
-    const [form, setForm] = useState({ clave: '', texto: '', tipo: 'normal', padre_atribucion_id: '', atribucion_general_id: '' });
+    const [form, setForm] = useState({ clave: '', texto: '', tipo: 'normal', padre_atribucion_id: '', atribucion_general_id: '', corresponsabilidad: '' });
     const [atribsPadre, setAtribsPadre] = useState([]);
 
     const cargar = async () => {
@@ -75,10 +75,10 @@ const TabAtribuciones = ({ proyectoId, unidad, atribGenerales }) => {
     const abrirForm = (item = null) => {
         if (item) {
             setEditando(item);
-            setForm({ clave: item.clave, texto: item.texto, tipo: item.tipo, padre_atribucion_id: item.padre_atribucion_id || '', atribucion_general_id: item.atribucion_general_id || '' });
+            setForm({ clave: item.clave, texto: item.texto, tipo: item.tipo, padre_atribucion_id: item.padre_atribucion_id || '', atribucion_general_id: item.atribucion_general_id || '', corresponsabilidad: item.corresponsabilidad || '' });
         } else {
             setEditando(null);
-            setForm({ clave: autoGenerarClave(), texto: '', tipo: 'normal', padre_atribucion_id: '', atribucion_general_id: '' });
+            setForm({ clave: autoGenerarClave(), texto: '', tipo: 'normal', padre_atribucion_id: '', atribucion_general_id: '', corresponsabilidad: '' });
         }
         setMostrarForm(true);
     };
@@ -168,10 +168,18 @@ const TabAtribuciones = ({ proyectoId, unidad, atribGenerales }) => {
                                 <div style={{ display: 'flex', justifyContent: 'space-between', gap: 10 }}>
                                     <div style={{ flex: 1 }}>
                                         <div style={{ display: 'flex', gap: 8, alignItems: 'center', marginBottom: 6 }}>
+                                            {/* Indicador de correlación: Verde si tiene padre o ley, Rojo si no */}
+                                            <div style={{
+                                                width: 10, height: 10, borderRadius: '50%',
+                                                background: (a.atribucion_general_id || a.padre_atribucion_id) ? '#27ae60' : '#e74c3c',
+                                                boxShadow: '0 0 5px rgba(0,0,0,0.1)'
+                                            }} title={(a.atribucion_general_id || a.padre_atribucion_id) ? 'Vinculada' : 'No vinculada'} />
+
                                             <strong style={{ color: 'var(--color-primario)', fontSize: 13 }}>{a.clave}</strong>
                                             <span className={`badge badge-${a.tipo}`}>{a.tipo}</span>
-                                            {a.gen_clave && <span style={{ fontSize: 11, color: '#999' }}>← Ley: {a.gen_clave}</span>}
-                                            {a.padre_clave && <span style={{ fontSize: 11, color: '#666' }}>← {a.padre_clave}</span>}
+                                            {a.gen_clave && <span style={{ fontSize: 11, color: '#27ae60', fontWeight: 'bold' }}>📜 {a.gen_clave}</span>}
+                                            {a.padre_clave && <span style={{ fontSize: 11, color: '#2ecc71' }}>🌳 {a.padre_clave}</span>}
+                                            {a.corresponsabilidad && <span className="badge" style={{ background: '#e0f2fe', color: '#0369a1', fontSize: 10 }}>🤝 {a.corresponsabilidad}</span>}
                                         </div>
                                         <p style={{ fontSize: 13.5, color: 'var(--color-texto)' }}>{a.texto}</p>
                                     </div>
@@ -244,6 +252,10 @@ const TabAtribuciones = ({ proyectoId, unidad, atribGenerales }) => {
                                 <label className="form-label">Texto de la atribución <span className="required">*</span></label>
                                 <textarea className="form-control" rows={4} value={form.texto} onChange={e => setForm({ ...form, texto: e.target.value })} required placeholder="Ej: Supervisar la elaboración de los programas educativos..." />
                             </div>
+                            <div className="form-group">
+                                <label className="form-label">Corresponsabilidad (Siglas de áreas involucradas)</label>
+                                <input className="form-control" value={form.corresponsabilidad} onChange={e => setForm({ ...form, corresponsabilidad: e.target.value })} placeholder="Ej: SA, DGP, RH..." />
+                            </div>
                             {atribGenerales.length > 0 && (
                                 <div className="form-group">
                                     <label className="form-label">Se deriva de (atribución de ley)</label>
@@ -298,6 +310,8 @@ export default function ProyectoDetalle() {
     const [formGlosario, setFormGlosario] = useState({ acronimo: '', significado: '' });
     const [unidadesPlanas, setUnidadesPlanas] = useState([]);
     const [exportando, setExportando] = useState(false);
+    const [mostrarBulkAG, setMostrarBulkAG] = useState(false);
+    const [bulkTextAG, setBulkTextAG] = useState('');
 
     const cargar = async () => {
         try {
@@ -362,6 +376,23 @@ export default function ProyectoDetalle() {
             a.download = `atribuciones-${proyecto.nombre}.xlsx`;
             a.click();
         } catch { alert('Error al exportar'); }
+        setExportando(false);
+    };
+
+    const guardarBulkAG = async () => {
+        const lineas = bulkTextAG.split('\n').map(l => l.trim()).filter(l => l.length > 0);
+        if (lineas.length === 0) return;
+        setExportando(true);
+        try {
+            const items = lineas.map((l, i) => {
+                const clave = `S${String(atribGenerales.length + 1 + i).padStart(2, '0')}`;
+                return { clave, texto: l, norma: '', articulo: '', fraccion_parrafo: '' };
+            });
+            await api.post(`/proyectos/${id}/atribuciones-generales/masivo`, { items });
+            setMostrarBulkAG(false);
+            setBulkTextAG('');
+            cargar();
+        } catch (err) { alert(err.response?.data?.error || 'Error en carga masiva'); }
         setExportando(false);
     };
 
@@ -484,7 +515,12 @@ export default function ProyectoDetalle() {
                 <div className="card">
                     <div className="card-header">
                         <span className="card-title">📜 Atribuciones Generales — Ley / Decreto</span>
-                        {puedeEditar && <button className="btn btn-primary btn-sm" onClick={() => { setFormAG({ clave: `S${String(atribGenerales.length + 1).padStart(2, '0')}`, norma: '', articulo: '', fraccion_parrafo: '', texto: '' }); setMostrarModalAG(true); }} id="btn-agregar-ley">➕ Agregar</button>}
+                        {puedeEditar && (
+                            <div style={{ display: 'flex', gap: 8 }}>
+                                <button className="btn btn-outline btn-sm" onClick={() => setMostrarBulkAG(true)}>📑 Carga Masiva</button>
+                                <button className="btn btn-primary btn-sm" onClick={() => { setFormAG({ clave: `S${String(atribGenerales.length + 1).padStart(2, '0')}`, norma: '', articulo: '', fraccion_parrafo: '', texto: '' }); setMostrarModalAG(true); }} id="btn-agregar-ley">➕ Agregar una</button>
+                            </div>
+                        )}
                     </div>
                     {atribGenerales.length === 0 ? (
                         <div className="empty-state"><div className="empty-icon">📜</div><h3>Sin atribuciones de ley</h3><p>Captura las atribuciones del fundamento legal</p></div>
@@ -654,6 +690,36 @@ export default function ProyectoDetalle() {
                                 <button type="submit" className="btn btn-primary">✅ Agregar</button>
                             </div>
                         </form>
+                    </div>
+                </div>
+            )}
+
+            {/* Modal carga masiva AG */}
+            {mostrarBulkAG && (
+                <div className="modal-overlay" onClick={() => setMostrarBulkAG(false)}>
+                    <div className="modal modal-lg" onClick={e => e.stopPropagation()}>
+                        <div className="modal-header">
+                            <h2 className="modal-title">📑 Carga Masiva de Ley</h2>
+                            <button className="modal-close" onClick={() => setMostrarBulkAG(false)}>×</button>
+                        </div>
+                        <div style={{ padding: '0 20px 20px' }}>
+                            <p style={{ fontSize: 13, color: '#666', marginBottom: 15 }}>
+                                Pega aquí los artículos de ley, uno por cada línea. Se generarán automáticamente las claves SXX.
+                            </p>
+                            <textarea
+                                className="form-control"
+                                rows={10}
+                                value={bulkTextAG}
+                                onChange={e => setBulkTextAG(e.target.value)}
+                                placeholder={"Ejemplo:\nAdministrar los recursos financieros...\nValidar la legalidad de los actos...\nCuidar el cumplimiento de..."}
+                            />
+                            <div style={{ display: 'flex', gap: 10, justifyContent: 'flex-end', marginTop: 16 }}>
+                                <button type="button" className="btn btn-outline" onClick={() => setMostrarBulkAG(false)}>Cancelar</button>
+                                <button type="button" className="btn btn-primary" onClick={guardarBulkAG} disabled={!bulkTextAG.trim() || exportando}>
+                                    {exportando ? '⌛ Cargando...' : `✅ Cargar ${bulkTextAG.split('\n').filter(l => l.trim()).length} artículos`}
+                                </button>
+                            </div>
+                        </div>
                     </div>
                 </div>
             )}

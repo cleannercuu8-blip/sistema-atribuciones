@@ -104,6 +104,12 @@ const initDB = async () => {
                 END IF;
             END $$;
         `);
+        // Añadir columna de corresponsabilidad
+        await pool.query(`
+            ALTER TABLE atribuciones_especificas ADD COLUMN IF NOT EXISTS corresponsabilidad TEXT;
+        `);
+        console.log('🔹 Columna corresponsabilidad verificada');
+
         console.log('🔹 Restricción UNIQUE en dependencias verificada (y limpieza de duplicados realizada)');
     } catch (err) {
         console.error('❌ Error al inicializar BD:', err.message);

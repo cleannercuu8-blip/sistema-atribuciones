@@ -75,6 +75,7 @@ router.post('/:proyectoId/unidades', unidadesCtrl.crear);
 // === ATRIBUCIONES GENERALES ===
 router.get('/:proyectoId/atribuciones-generales', atribCtrl.listar);
 router.post('/:proyectoId/atribuciones-generales', atribCtrl.crear);
+router.post('/:proyectoId/atribuciones-generales/masivo', atribCtrl.cargarMasivoGenerales);
 
 // === ATRIBUCIONES ESPECÍFICAS ===
 router.get('/:proyectoId/atribuciones-especificas', atribCtrl.listarEspecificas);

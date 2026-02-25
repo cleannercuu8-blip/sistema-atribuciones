@@ -92,14 +92,14 @@ const listarEspecificas = async (req, res) => {
 // POST /api/proyectos/:proyectoId/atribuciones-especificas
 const crearEspecifica = async (req, res) => {
     const { proyectoId } = req.params;
-    const { unidad_id, clave, texto, tipo, padre_atribucion_id, atribucion_general_id } = req.body;
+    const { unidad_id, clave, texto, tipo, padre_atribucion_id, atribucion_general_id, corresponsabilidad } = req.body;
     if (!unidad_id || !clave || !texto)
         return res.status(400).json({ error: 'Unidad, clave y texto son requeridos' });
     try {
         const result = await pool.query(
-            `INSERT INTO atribuciones_especificas (proyecto_id, unidad_id, clave, texto, tipo, padre_atribucion_id, atribucion_general_id)
-       VALUES ($1,$2,$3,$4,$5,$6,$7) RETURNING *`,
-            [proyectoId, unidad_id, clave, texto, tipo || 'normal', padre_atribucion_id || null, atribucion_general_id || null]
+            `INSERT INTO atribuciones_especificas (proyecto_id, unidad_id, clave, texto, tipo, padre_atribucion_id, atribucion_general_id, corresponsabilidad)
+       VALUES ($1,$2,$3,$4,$5,$6,$7,$8) RETURNING *`,
+            [proyectoId, unidad_id, clave, texto, tipo || 'normal', padre_atribucion_id || null, atribucion_general_id || null, corresponsabilidad || null]
         );
         res.status(201).json(result.rows[0]);
     } catch (err) {
@@ -111,13 +111,13 @@ const crearEspecifica = async (req, res) => {
 // PUT /api/atribuciones-especificas/:id
 const actualizarEspecifica = async (req, res) => {
     const { id } = req.params;
-    const { clave, texto, tipo, padre_atribucion_id, atribucion_general_id } = req.body;
+    const { clave, texto, tipo, padre_atribucion_id, atribucion_general_id, corresponsabilidad } = req.body;
     try {
         const result = await pool.query(
             `UPDATE atribuciones_especificas
-       SET clave=$1, texto=$2, tipo=$3, padre_atribucion_id=$4, atribucion_general_id=$5, updated_at=NOW()
-       WHERE id=$6 RETURNING *`,
-            [clave, texto, tipo || 'normal', padre_atribucion_id || null, atribucion_general_id || null, id]
+       SET clave=$1, texto=$2, tipo=$3, padre_atribucion_id=$4, atribucion_general_id=$5, corresponsabilidad=$6, updated_at=NOW()
+       WHERE id=$7 RETURNING *`,
+            [clave, texto, tipo || 'normal', padre_atribucion_id || null, atribucion_general_id || null, corresponsabilidad || null, id]
         );
         res.json(result.rows[0]);
     } catch (err) {
@@ -136,7 +136,34 @@ const eliminarEspecifica = async (req, res) => {
     }
 };
 
+const cargarMasivoGenerales = async (req, res) => {
+    const { proyectoId } = req.params;
+    const { items } = req.body; // [{clave, norma, articulo, fraccion_parrafo, texto}]
+    if (!Array.isArray(items)) return res.status(400).json({ error: 'Formato inválido' });
+
+    const client = await pool.connect();
+    try {
+        await client.query('BEGIN');
+        for (const item of items) {
+            if (!item.clave || !item.texto) continue;
+            await client.query(
+                `INSERT INTO atribuciones_generales (proyecto_id, clave, norma, articulo, fraccion_parrafo, texto)
+                 VALUES ($1, $2, $3, $4, $5, $6)`,
+                [proyectoId, item.clave, item.norma || null, item.articulo || null, item.fraccion_parrafo || null, item.texto]
+            );
+        }
+        await client.query('COMMIT');
+        res.json({ mensaje: 'Carga masiva de ley completada' });
+    } catch (err) {
+        await client.query('ROLLBACK');
+        console.error(err);
+        res.status(500).json({ error: 'Error en la carga masiva' });
+    } finally {
+        client.release();
+    }
+};
+
 module.exports = {
-    listar, crear, actualizar, eliminar,
+    listar, crear, actualizar, eliminar, cargarMasivoGenerales,
     listarEspecificas, crearEspecifica, actualizarEspecifica, eliminarEspecifica
 };
