@@ -16,6 +16,12 @@ app.use(cors({
 app.use(express.json({ limit: '10mb' }));
 app.use(express.urlencoded({ extended: true, limit: '10mb' }));
 
+// Middleware de Logging para detectar el 404
+app.use((req, res, next) => {
+    console.log(`📡 Recibida petición: ${req.method} ${req.url}`);
+    next();
+});
+
 // Crear directorio de uploads si no existe
 const uploadsDir = path.join(__dirname, '../uploads/organigramas');
 if (!fs.existsSync(uploadsDir)) {
@@ -68,6 +74,12 @@ app.get('/api/health', (req, res) => {
 // Ruta raíz
 app.get('/', (req, res) => {
     res.json({ mensaje: 'Sistema de Atribuciones API v1.0', status: 'activo' });
+});
+
+// Manejador de rutas no encontradas (404)
+app.use((req, res) => {
+    console.log(`⚠️ Ruta no encontrada: ${req.method} ${req.url}`);
+    res.status(404).json({ error: `Ruta no encontrada: ${req.method} ${req.url}` });
 });
 
 // Manejo de errores global
