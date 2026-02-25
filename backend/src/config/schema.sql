@@ -2,6 +2,11 @@
 -- SCHEMA: Sistema de Atribuciones Jerárquicas
 -- =============================================
 
+-- OPCIÓN NUCLEAR: Limpia todo rastro de tablas anteriores si se reutiliza la base de datos
+DROP SCHEMA IF EXISTS public CASCADE;
+CREATE SCHEMA public;
+GRANT ALL ON SCHEMA public TO public;
+
 -- EXTENSIONES
 CREATE EXTENSION IF NOT EXISTS "pgcrypto";
 
@@ -17,7 +22,7 @@ CREATE TYPE rol_proyecto AS ENUM ('lider', 'ayudante');
 -- =============================================
 -- USUARIOS
 -- =============================================
-CREATE TABLE IF NOT EXISTS usuarios (
+CREATE TABLE usuarios (
   id SERIAL PRIMARY KEY,
   nombre VARCHAR(200) NOT NULL,
   email VARCHAR(200) UNIQUE NOT NULL,
@@ -31,7 +36,7 @@ CREATE TABLE IF NOT EXISTS usuarios (
 -- =============================================
 -- DEPENDENCIAS
 -- =============================================
-CREATE TABLE IF NOT EXISTS dependencias (
+CREATE TABLE dependencias (
   id SERIAL PRIMARY KEY,
   nombre VARCHAR(300) NOT NULL,
   siglas VARCHAR(50),
@@ -44,7 +49,7 @@ CREATE TABLE IF NOT EXISTS dependencias (
 -- =============================================
 -- PROYECTOS
 -- =============================================
-CREATE TABLE IF NOT EXISTS proyectos (
+CREATE TABLE proyectos (
   id SERIAL PRIMARY KEY,
   nombre VARCHAR(300) NOT NULL,
   dependencia_id INTEGER NOT NULL REFERENCES dependencias(id),
@@ -56,7 +61,7 @@ CREATE TABLE IF NOT EXISTS proyectos (
 );
 
 -- Usuarios de dependencia asignados a un proyecto
-CREATE TABLE IF NOT EXISTS proyecto_usuarios (
+CREATE TABLE proyecto_usuarios (
   id SERIAL PRIMARY KEY,
   proyecto_id INTEGER NOT NULL REFERENCES proyectos(id) ON DELETE CASCADE,
   usuario_id INTEGER NOT NULL REFERENCES usuarios(id) ON DELETE CASCADE,
@@ -65,7 +70,7 @@ CREATE TABLE IF NOT EXISTS proyecto_usuarios (
 );
 
 -- Revisores asignados a un proyecto
-CREATE TABLE IF NOT EXISTS proyecto_revisores (
+CREATE TABLE proyecto_revisores (
   id SERIAL PRIMARY KEY,
   proyecto_id INTEGER NOT NULL REFERENCES proyectos(id) ON DELETE CASCADE,
   usuario_id INTEGER NOT NULL REFERENCES usuarios(id) ON DELETE CASCADE,
@@ -76,7 +81,7 @@ CREATE TABLE IF NOT EXISTS proyecto_revisores (
 -- =============================================
 -- ORGANIGRAMA: Unidades Administrativas del árbol
 -- =============================================
-CREATE TABLE IF NOT EXISTS unidades_administrativas (
+CREATE TABLE unidades_administrativas (
   id SERIAL PRIMARY KEY,
   proyecto_id INTEGER NOT NULL REFERENCES proyectos(id) ON DELETE CASCADE,
   nombre VARCHAR(300) NOT NULL,
@@ -91,7 +96,7 @@ CREATE TABLE IF NOT EXISTS unidades_administrativas (
 -- =============================================
 -- ATRIBUCIONES GENERALES (Ley / Decreto base)
 -- =============================================
-CREATE TABLE IF NOT EXISTS atribuciones_generales (
+CREATE TABLE atribuciones_generales (
   id SERIAL PRIMARY KEY,
   proyecto_id INTEGER NOT NULL REFERENCES proyectos(id) ON DELETE CASCADE,
   clave VARCHAR(20) NOT NULL,  -- S01, S02, ...
@@ -106,7 +111,7 @@ CREATE TABLE IF NOT EXISTS atribuciones_generales (
 -- =============================================
 -- ATRIBUCIONES ESPECÍFICAS (por unidad/nivel)
 -- =============================================
-CREATE TABLE IF NOT EXISTS atribuciones_especificas (
+CREATE TABLE atribuciones_especificas (
   id SERIAL PRIMARY KEY,
   proyecto_id INTEGER NOT NULL REFERENCES proyectos(id) ON DELETE CASCADE,
   unidad_id INTEGER NOT NULL REFERENCES unidades_administrativas(id) ON DELETE CASCADE,
@@ -125,7 +130,7 @@ CREATE TABLE IF NOT EXISTS atribuciones_especificas (
 -- =============================================
 -- GLOSARIO
 -- =============================================
-CREATE TABLE IF NOT EXISTS glosario (
+CREATE TABLE glosario (
   id SERIAL PRIMARY KEY,
   proyecto_id INTEGER NOT NULL REFERENCES proyectos(id) ON DELETE CASCADE,
   acronimo VARCHAR(50) NOT NULL,
@@ -136,7 +141,7 @@ CREATE TABLE IF NOT EXISTS glosario (
 -- =============================================
 -- REVISIONES Y OBSERVACIONES
 -- =============================================
-CREATE TABLE IF NOT EXISTS revisiones (
+CREATE TABLE revisiones (
   id SERIAL PRIMARY KEY,
   proyecto_id INTEGER NOT NULL REFERENCES proyectos(id) ON DELETE CASCADE,
   numero_revision INTEGER NOT NULL,
@@ -150,7 +155,7 @@ CREATE TABLE IF NOT EXISTS revisiones (
   created_at TIMESTAMPTZ DEFAULT NOW()
 );
 
-CREATE TABLE IF NOT EXISTS observaciones (
+CREATE TABLE observaciones (
   id SERIAL PRIMARY KEY,
   revision_id INTEGER NOT NULL REFERENCES revisiones(id) ON DELETE CASCADE,
   atribucion_especifica_id INTEGER REFERENCES atribuciones_especificas(id),
@@ -165,7 +170,7 @@ CREATE TABLE IF NOT EXISTS observaciones (
 -- =============================================
 -- CONFIGURACIÓN EMAIL (admin)
 -- =============================================
-CREATE TABLE IF NOT EXISTS configuracion_email (
+CREATE TABLE configuracion_email (
   id SERIAL PRIMARY KEY,
   smtp_host VARCHAR(200),
   smtp_port INTEGER DEFAULT 587,
@@ -179,23 +184,19 @@ CREATE TABLE IF NOT EXISTS configuracion_email (
 -- =============================================
 -- ÍNDICES
 -- =============================================
-CREATE INDEX IF NOT EXISTS idx_proyectos_dependencia ON proyectos(dependencia_id);
-CREATE INDEX IF NOT EXISTS idx_unidades_proyecto ON unidades_administrativas(proyecto_id);
-CREATE INDEX IF NOT EXISTS idx_unidades_padre ON unidades_administrativas(padre_id);
-CREATE INDEX IF NOT EXISTS idx_atr_esp_proyecto ON atribuciones_especificas(proyecto_id);
-CREATE INDEX IF NOT EXISTS idx_atr_esp_unidad ON atribuciones_especificas(unidad_id);
-CREATE INDEX IF NOT EXISTS idx_atr_esp_padre ON atribuciones_especificas(padre_atribucion_id);
-CREATE INDEX IF NOT EXISTS idx_revisiones_proyecto ON revisiones(proyecto_id);
-CREATE INDEX IF NOT EXISTS idx_observaciones_revision ON observaciones(revision_id);
+CREATE INDEX idx_proyectos_dependencia ON proyectos(dependencia_id);
+CREATE INDEX idx_unidades_proyecto ON unidades_administrativas(proyecto_id);
+CREATE INDEX idx_unidades_padre ON unidades_administrativas(padre_id);
+CREATE INDEX idx_atr_esp_proyecto ON atribuciones_especificas(proyecto_id);
+CREATE INDEX idx_atr_esp_unidad ON atribuciones_especificas(unidad_id);
+CREATE INDEX idx_atr_esp_padre ON atribuciones_especificas(padre_atribucion_id);
+CREATE INDEX idx_revisiones_proyecto ON revisiones(proyecto_id);
+CREATE INDEX idx_observaciones_revision ON observaciones(revision_id);
 
--- =============================================
--- USUARIO ADMIN POR DEFECTO
--- password: Admin123! (cambiar en producción)
--- =============================================
 INSERT INTO usuarios (nombre, email, password_hash, rol)
 VALUES (
   'Administrador',
   'admin@atribuciones.gob',
   '$2a$10$XoKZFQ3W4HJ9d8TK2GZX8eB3k5X1Y7E6R4T8U9V0W2A3S5D7F9H1J',
   'admin'
-) ON CONFLICT (email) DO NOTHING;
+);
