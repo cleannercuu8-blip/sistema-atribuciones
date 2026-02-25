@@ -573,29 +573,35 @@ tbody td {
 
 /* ============================================
    ÁRBOL VISUAL
-   ============================================ */
+   ============================================/* Árbol y Unidades */
 .tree {
-  font-size: 13.5px;
+  padding: 10px;
+  overflow-x: auto;
 }
 
 .tree-node {
-  position: relative;
+  margin-bottom: 4px;
+  white-space: nowrap;
 }
 
 .tree-node-header {
   display: flex;
   align-items: center;
-  gap: 8px;
+  gap: 10px;
   padding: 8px 12px;
-  border-radius: 8px;
+  border-radius: 6px;
   cursor: pointer;
-  transition: var(--transicion);
-  border: 1px solid transparent;
+  transition: all 0.2s;
+  min-width: max-content;
 }
 
 .tree-node-header:hover {
-  background: #f0f7ff;
-  border-color: var(--color-acento);
+  background: #f1f5f9;
+}
+
+.tree-node-header.selected {
+  background: #e0e7ff;
+  border: 1px solid #c7d2fe;
 }
 
 .tree-node-header.selected {

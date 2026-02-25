@@ -212,12 +212,34 @@ const exportarExcel = async (proyectoId) => {
             // Filas de datos
             let fila = 4;
             for (const atr of atribUnidad) {
+                // Mapear atribuciones por nivel para esta fila
+                const atribsPorNivel = {};
+                atribsPorNivel[nivel] = { clave: atr.clave, texto: atr.texto };
+
+                // Subir por la jerarquía para llenar los niveles superiores
+                let actual = atr;
+                while (actual.padre_atribucion_id && atriMap[actual.padre_atribucion_id]) {
+                    actual = atriMap[actual.padre_atribucion_id];
+                    const n = actual.nivel_numero || (actual.unidad_id ? unidadesMap[actual.unidad_id]?.nivel_numero : null);
+                    if (n !== null) atribsPorNivel[n] = { clave: actual.clave, texto: actual.texto };
+                }
+
+                // Atribución General (Ley - Nivel 0)
+                if (atr.atribucion_general_id) {
+                    const gen = atriGenerales.find(g => g.id === atr.atribucion_general_id);
+                    if (gen) atribsPorNivel[0] = { clave: gen.clave, texto: gen.texto };
+                } else if (actual.atribucion_general_id) {
+                    // Si el ancestro más alto tiene relación con ley
+                    const gen = atriGenerales.find(g => g.id === actual.atribucion_general_id);
+                    if (gen) atribsPorNivel[0] = { clave: gen.clave, texto: gen.texto };
+                }
+
+                // Escribir en las celdas siguiendo la 'cadena' de la unidad
                 let c = 1;
-                // Construir la cadena de padres hasta la ley
-                const cadenaAtr = obtenerCadenaAtribuciones(atr, atriMap, atriGenerales);
-                for (const ca of cadenaAtr) {
-                    estiloCelda(ws.getCell(`${getColumnLetter(c)}${fila}`), ca.clave);
-                    estiloCelda(ws.getCell(`${getColumnLetter(c + 1)}${fila}`), ca.texto);
+                for (const nv of cadena) {
+                    const data = atribsPorNivel[nv.nivel_numero];
+                    estiloCelda(ws.getCell(`${getColumnLetter(c)}${fila}`), data?.clave);
+                    estiloCelda(ws.getCell(`${getColumnLetter(c + 1)}${fila}`), data?.texto);
                     c += 2;
                 }
                 fila++;
@@ -236,27 +258,10 @@ const obtenerCadena = (unidad, mapaUnidades) => {
         cadena.unshift(actual);
         actual = actual.padre_id ? mapaUnidades[actual.padre_id] : null;
     }
-    return cadena;
-};
-
-// Obtener la cadena de atribuciones (de padre en padre hasta la ley)
-const obtenerCadenaAtribuciones = (atr, mapaAtr, atriGenerales) => {
-    const cadena = [];
-    cadena.push({ clave: atr.clave, texto: atr.texto });
-
-    // Subir por los padres
-    let actual = atr;
-    while (actual.padre_atribucion_id && mapaAtr[actual.padre_atribucion_id]) {
-        actual = mapaAtr[actual.padre_atribucion_id];
-        cadena.unshift({ clave: actual.clave, texto: actual.texto });
+    // Siempre añadir el "Nivel 0" (Base legal) al inicio si no existe
+    if (cadena.length === 0 || cadena[0].nivel_numero !== 0) {
+        cadena.unshift({ nivel_numero: 0, nombre: 'ORIGEN DE LA ATRIBUCIÓN', siglas: 'LEY' });
     }
-
-    // Agregar la atribución general (ley) al inicio si existe
-    if (atr.atribucion_general_id) {
-        const gen = atriGenerales.find(g => g.id === atr.atribucion_general_id);
-        if (gen) cadena.unshift({ clave: gen.clave, texto: gen.texto });
-    }
-
     return cadena;
 };
 

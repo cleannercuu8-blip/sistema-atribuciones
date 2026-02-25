@@ -2,11 +2,6 @@
 -- SCHEMA: Sistema de Atribuciones Jerárquicas
 -- =============================================
 
--- OPCIÓN NUCLEAR: Limpia todo rastro de tablas anteriores si se reutiliza la base de datos
-DROP SCHEMA IF EXISTS public CASCADE;
-CREATE SCHEMA public;
-GRANT ALL ON SCHEMA public TO public;
-
 -- EXTENSIONES
 CREATE EXTENSION IF NOT EXISTS "pgcrypto";
 

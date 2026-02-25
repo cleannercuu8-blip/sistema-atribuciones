@@ -37,6 +37,8 @@ const TabAtribuciones = ({ proyectoId, unidad, atribGenerales }) => {
     const [atribs, setAtribs] = useState([]);
     const [cargando, setCargando] = useState(false);
     const [mostrarForm, setMostrarForm] = useState(false);
+    const [mostrarBulk, setMostrarBulk] = useState(false);
+    const [bulkText, setBulkText] = useState('');
     const [editando, setEditando] = useState(null);
     const [form, setForm] = useState({ clave: '', texto: '', tipo: 'normal', padre_atribucion_id: '', atribucion_general_id: '' });
     const [atribsPadre, setAtribsPadre] = useState([]);
@@ -51,9 +53,9 @@ const TabAtribuciones = ({ proyectoId, unidad, atribGenerales }) => {
     };
 
     const cargarPadres = async () => {
-        if (unidad.nivel_numero <= 1) return;
+        if (unidad.nivel_numero < 1) return;
         try {
-            // Obtener atribuciones del nivel anterior
+            // Obtener todas las atribuciones para filtrar las del nivel superior
             const res = await api.get(`/proyectos/${proyectoId}/atribuciones-especificas`);
             const del_nivel_anterior = res.data.filter(a => a.nivel_numero === unidad.nivel_numero - 1);
             setAtribsPadre(del_nivel_anterior);
@@ -64,9 +66,9 @@ const TabAtribuciones = ({ proyectoId, unidad, atribGenerales }) => {
         if (unidad) { cargar(); cargarPadres(); }
     }, [unidad?.id]);
 
-    const autoGenerarClave = () => {
+    const autoGenerarClave = (indexOffset = 0) => {
         const sig = unidad.siglas;
-        const num = (atribs.length + 1).toString().padStart(2, '0');
+        const num = (atribs.length + 1 + indexOffset).toString().padStart(2, '0');
         return `${sig}${num}`;
     };
 
@@ -97,6 +99,32 @@ const TabAtribuciones = ({ proyectoId, unidad, atribGenerales }) => {
         }
     };
 
+    const guardarBulk = async () => {
+        const lineas = bulkText.split('\n').map(l => l.trim()).filter(l => l.length > 0);
+        if (lineas.length === 0) return;
+
+        setCargando(true);
+        try {
+            for (let i = 0; i < lineas.length; i++) {
+                const payload = {
+                    clave: autoGenerarClave(i),
+                    texto: lineas[i],
+                    tipo: 'normal',
+                    unidad_id: unidad.id,
+                    padre_atribucion_id: null,
+                    atribucion_general_id: null
+                };
+                await api.post(`/proyectos/${proyectoId}/atribuciones-especificas`, payload);
+            }
+            setMostrarBulk(false);
+            setBulkText('');
+            cargar();
+        } catch (err) {
+            alert('Error parcial al cargar: ' + (err.response?.data?.error || err.message));
+        }
+        setCargando(false);
+    };
+
     const eliminar = async (id) => {
         if (!window.confirm('¿Eliminar esta atribución?')) return;
         try {
@@ -118,7 +146,12 @@ const TabAtribuciones = ({ proyectoId, unidad, atribGenerales }) => {
                     </h3>
                     <span className="nivel-chip">Nivel {unidad.nivel_numero}</span>
                 </div>
-                {puedeEditar && <button className="btn btn-primary btn-sm" onClick={() => abrirForm()} id="btn-agregar-atribucion">➕ Agregar atribución</button>}
+                {puedeEditar && (
+                    <div style={{ display: 'flex', gap: 8 }}>
+                        <button className="btn btn-outline btn-sm" onClick={() => setMostrarBulk(true)}>📑 Carga Masiva</button>
+                        <button className="btn btn-primary btn-sm" onClick={() => abrirForm()} id="btn-agregar-atribucion">➕ Agregar una</button>
+                    </div>
+                )}
             </div>
 
             {cargando ? <div className="loading-container"><div className="spinner" /></div> : (
@@ -155,7 +188,37 @@ const TabAtribuciones = ({ proyectoId, unidad, atribGenerales }) => {
                 )
             )}
 
-            {/* Modal atribución */}
+            {/* Modal carga masiva */}
+            {mostrarBulk && (
+                <div className="modal-overlay" onClick={() => setMostrarBulk(false)}>
+                    <div className="modal modal-lg" onClick={e => e.stopPropagation()}>
+                        <div className="modal-header">
+                            <h2 className="modal-title">📑 Carga Masiva de Atribuciones</h2>
+                            <button className="modal-close" onClick={() => setMostrarBulk(false)}>×</button>
+                        </div>
+                        <div style={{ padding: '0 20px 20px' }}>
+                            <p style={{ fontSize: 13, color: '#666', marginBottom: 15 }}>
+                                Pega aquí las atribuciones, una por cada línea. Se generarán automáticamente las claves siguiendo el patrón {unidad.siglas}XX.
+                            </p>
+                            <textarea
+                                className="form-control"
+                                rows={10}
+                                value={bulkText}
+                                onChange={e => setBulkText(e.target.value)}
+                                placeholder={"Ejemplo:\nSupervisar la ejecución técnica...\nCoordinar las acciones de mejora...\nAtender las solicitudes de..."}
+                            />
+                            <div style={{ display: 'flex', gap: 10, justifyContent: 'flex-end', marginTop: 16 }}>
+                                <button type="button" className="btn btn-outline" onClick={() => setMostrarBulk(false)}>Cancelar</button>
+                                <button type="button" className="btn btn-primary" onClick={guardarBulk} disabled={!bulkText.trim() || cargando}>
+                                    {cargando ? '⌛ Cargando...' : `✅ Cargar ${bulkText.split('\n').filter(l => l.trim()).length} atribuciones`}
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            )}
+
+            {/* Modal atribución individual */}
             {mostrarForm && (
                 <div className="modal-overlay" onClick={() => setMostrarForm(false)}>
                     <div className="modal modal-lg" onClick={e => e.stopPropagation()}>
@@ -194,11 +257,11 @@ const TabAtribuciones = ({ proyectoId, unidad, atribGenerales }) => {
                             )}
                             {atribsPadre.length > 0 && (
                                 <div className="form-group">
-                                    <label className="form-label">Se relaciona con (nivel superior)</label>
+                                    <label className="form-label">Se relaciona con (nivel superior: {atribsPadre[0]?.unidad_siglas})</label>
                                     <select className="form-control" value={form.padre_atribucion_id} onChange={e => setForm({ ...form, padre_atribucion_id: e.target.value })}>
                                         <option value="">-- Sin relación con nivel superior --</option>
                                         {atribsPadre.map(ap => (
-                                            <option key={ap.id} value={ap.id}>[{ap.clave}] - {ap.unidad_siglas}: {ap.texto?.substring(0, 60)}...</option>
+                                            <option key={ap.id} value={ap.id}>[{ap.clave}] {ap.texto?.substring(0, 80)}...</option>
                                         ))}
                                     </select>
                                 </div>
@@ -337,13 +400,15 @@ export default function ProyectoDetalle() {
 
             {/* TABS */}
             <div className="tabs">
-                {['organigrama', 'atribuciones', 'ley', 'glosario', 'revisiones'].map(t => (
-                    <button key={t} className={`tab-btn ${tab === t ? 'active' : ''}`} onClick={() => setTab(t)}>
-                        {t === 'organigrama' && '🌳 Organigrama'}
-                        {t === 'atribuciones' && '📝 Atribuciones'}
-                        {t === 'ley' && '📜 Atrib. Generales (Ley)'}
-                        {t === 'glosario' && '📖 Glosario'}
-                        {t === 'revisiones' && '🔍 Revisiones'}
+                {[
+                    { id: 'organigrama', label: '🌳 Organigrama' },
+                    { id: 'ley', label: '📜 Atrib. Generales (Ley)' },
+                    { id: 'atribuciones', label: '📝 Atribuciones' },
+                    { id: 'glosario', label: '📖 Glosario' },
+                    { id: 'revisiones', label: '🔍 Revisiones' }
+                ].map(t => (
+                    <button key={t.id} className={`tab-btn ${tab === t.id ? 'active' : ''}`} onClick={() => setTab(t.id)}>
+                        {t.label}
                     </button>
                 ))}
             </div>
@@ -397,12 +462,12 @@ export default function ProyectoDetalle() {
 
             {/* ===== TAB: ATRIBUCIONES ESPECÍFICAS ===== */}
             {tab === 'atribuciones' && (
-                <div style={{ display: 'grid', gridTemplateColumns: '300px 1fr', gap: 20 }}>
-                    <div className="card">
+                <div style={{ display: 'grid', gridTemplateColumns: 'minmax(250px, 320px) 1fr', gap: 20, alignItems: 'start' }}>
+                    <div className="card" style={{ overflow: 'hidden' }}>
                         <div className="card-header">
-                            <span className="card-title" style={{ fontSize: 13 }}>🌳 Unidades</span>
+                            <span className="card-title" style={{ fontSize: 13 }}>🌳 Estructura</span>
                         </div>
-                        <div className="tree">
+                        <div className="tree" style={{ maxHeight: '70vh', overflowY: 'auto' }}>
                             {arbol.map(nodo => (
                                 <NodoArbol key={nodo.id} nodo={nodo} onSeleccionar={setUnidadSeleccionada} seleccionado={unidadSeleccionada} />
                             ))}
