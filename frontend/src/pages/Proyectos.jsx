@@ -205,7 +205,7 @@ export default function Proyectos() {
                                         <div style={{ marginTop: 15, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                                             <span style={{ fontSize: 12, color: '#999' }}>ID: {p.id}</span>
                                             <div style={{ display: 'flex', gap: 8 }}>
-                                                {puedeGestionar(p) && (
+                                                {(usuario.rol === 'admin' || usuario.rol === 'revisor') && (
                                                     <>
                                                         <button className="btn btn-outline btn-sm" onClick={(e) => abrirEdicion(e, p)}>✏️</button>
                                                         <button className="btn btn-danger btn-sm" onClick={(e) => handleEliminar(e, p.id)}>🗑️</button>
@@ -248,7 +248,7 @@ export default function Proyectos() {
                                         <div style={{ marginTop: 15, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                                             <span style={{ fontSize: 12, color: '#999' }}>ID: {p.id}</span>
                                             <div style={{ display: 'flex', gap: 8 }}>
-                                                {puedeGestionar(p) && (
+                                                {(usuario.rol === 'admin' || usuario.rol === 'revisor') && (
                                                     <>
                                                         <button className="btn btn-outline btn-sm" onClick={(e) => abrirEdicion(e, p)}>✏️</button>
                                                         <button className="btn btn-danger btn-sm" onClick={(e) => handleEliminar(e, p.id)}>🗑️</button>
