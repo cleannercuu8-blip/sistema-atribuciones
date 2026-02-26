@@ -8,16 +8,18 @@ const CargaGlobal = () => {
 
     const cargarDatos = async () => {
         try {
-            const [atribsRes, respRes] = await Promise.all([
+            const [atribsRes, respRes, proyRes] = await Promise.all([
                 api.get('/atribuciones/especificas/todas'),
-                api.get('/catalogos/responsables')
+                api.get('/catalogos/responsables'),
+                api.get('/proyectos')
             ]);
             const atribs = atribsRes.data;
             const catResponsables = respRes.data;
+            const proyectos = proyRes.data;
 
             const mapa = {};
 
-            // Inicializar con todos los responsables del catálogo
+            // 1. Inicializar con todos los responsables del catálogo para asegurar que todos aparezcan
             catResponsables.forEach(r => {
                 mapa[r.nombre] = {
                     nombre: r.nombre,
@@ -28,6 +30,23 @@ const CargaGlobal = () => {
                 };
             });
 
+            // 2. Agregar información de los proyectos para ver qué responsable tiene asignado qué proyecto
+            proyectos.forEach(p => {
+                if (p.responsable) {
+                    if (!mapa[p.responsable]) {
+                        mapa[p.responsable] = {
+                            nombre: p.responsable,
+                            principal: 0,
+                            apoyo: 0,
+                            proyectos: new Set(),
+                            detalle: []
+                        };
+                    }
+                    mapa[p.responsable].proyectos.add(p.nombre);
+                }
+            });
+
+            // 3. Contabilizar atribuciones específicas
             atribs.forEach(a => {
                 // Principal
                 if (a.responsable_nombre) {

@@ -630,7 +630,6 @@ export default function ProyectoDetalle() {
                     { id: 'organigrama', label: '🌳 Organigrama' },
                     { id: 'ley', label: '📜 Atrib. Generales (Ley)' },
                     { id: 'atribuciones', label: '📝 Atribuciones' },
-                    { id: 'carga', label: '⚖️ Carga de Trabajo' },
                     { id: 'glosario', label: '📖 Glosario' },
                     { id: 'revisiones', label: '🔍 Revisiones' }
                 ].map(t => (
@@ -701,11 +700,6 @@ export default function ProyectoDetalle() {
                 </div>
             )}
 
-            {tab === 'carga' && (
-                <div className="card">
-                    <DashboardCarga proyectoId={id} />
-                </div>
-            )}
 
             {/* ===== TAB: ATRIBUCIONES GENERALES (LEY) ===== */}
             {tab === 'ley' && (
