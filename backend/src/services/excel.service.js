@@ -27,7 +27,7 @@ const estiloSubHeader = (cell, texto) => {
     cell.alignment = { vertical: 'middle', horizontal: 'center', wrapText: true };
 };
 
-const estiloCelda = (cell, texto) => {
+const estiloCelda = (cell, texto, color = null) => {
     cell.value = texto || '';
     cell.alignment = { vertical: 'top', wrapText: true };
     cell.border = {
@@ -36,6 +36,13 @@ const estiloCelda = (cell, texto) => {
         left: { style: 'hair', color: { argb: 'cccccc' } },
         right: { style: 'hair', color: { argb: 'cccccc' } }
     };
+    if (color) {
+        cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: color } };
+    }
+};
+
+const estiloCeldaVerde = (cell, texto) => {
+    estiloCelda(cell, texto, 'dcfce7');
 };
 
 const exportarExcel = async (proyectoId) => {
@@ -159,13 +166,21 @@ const exportarExcel = async (proyectoId) => {
     // Obtener niveles únicos ordenados
     const nivelesUnicos = [...new Set(unidades.map(u => u.nivel_numero))].sort((a, b) => a - b);
 
-    // Mapa de atribuciones por ID
+    // Mapa de atribuciones por ID (usando String para evitar problemas de tipos)
     const atriMap = {};
-    atriEspecificas.forEach(a => { atriMap[a.id] = a; });
+    atriEspecificas.forEach(a => { atriMap[String(a.id)] = a; });
+
+    // Ids de atribuciones que son padres (superior jerárquico) de otras en este proyecto
+    const idsConHijos = new Set();
+    atriEspecificas.forEach(a => {
+        if (a.padre_atribucion_id) {
+            idsConHijos.add(String(a.padre_atribucion_id));
+        }
+    });
 
     // Mapa de unidades por ID
     const unidadesMap = {};
-    unidades.forEach(u => { unidadesMap[u.id] = u; });
+    unidades.forEach(u => { unidadesMap[String(u.id)] = u; });
 
     for (const nivel of nivelesUnicos) {
         const unidadesNivel = unidades.filter(u => u.nivel_numero === nivel);
@@ -178,7 +193,7 @@ const exportarExcel = async (proyectoId) => {
 
             // Construir cadena de niveles para esta hoja (desde nivel 0 hasta este nivel)
             const cadena = obtenerCadena(unidad, unidadesMap);
-            const numColumnas = cadena.length * 2 + 1; // clave + texto por cada nivel + sugerencia
+            const numColumnas = cadena.length * 2 + 1; // clave + texto por cada nivel + corresponsabilidad
 
             // Título
             const ultimaCol = getColumnLetter(numColumnas);
@@ -208,11 +223,6 @@ const exportarExcel = async (proyectoId) => {
             const colCorr = getColumnLetter(colIdx);
             estiloSubHeader(ws.getCell(`${colCorr}3`), 'CORRESPONSABILIDAD');
             ws.getColumn(colIdx).width = 25;
-            colIdx++;
-
-            // Columna Sugerencia
-            estiloSubHeader(ws.getCell(`${getColumnLetter(colIdx)}3`), 'SUGERENCIA / COMENTARIO');
-            ws.getColumn(colIdx).width = 25;
             ws.getRow(3).height = 35;
 
             // Filas de datos
@@ -224,10 +234,10 @@ const exportarExcel = async (proyectoId) => {
 
                 // Subir por la jerarquía para llenar los niveles superiores siguiendo el rastro explicitamente
                 let actual = atr;
-                while (actual.padre_atribucion_id && atriMap[actual.padre_atribucion_id]) {
-                    actual = atriMap[actual.padre_atribucion_id];
+                while (actual.padre_atribucion_id && atriMap[String(actual.padre_atribucion_id)]) {
+                    actual = atriMap[String(actual.padre_atribucion_id)];
                     // Obtener nivel real
-                    const n = actual.nivel_numero !== undefined ? actual.nivel_numero : (actual.unidad_id ? unidadesMap[actual.unidad_id]?.nivel_numero : null);
+                    const n = actual.nivel_numero !== undefined ? actual.nivel_numero : (actual.unidad_id ? unidadesMap[String(actual.unidad_id)]?.nivel_numero : null);
                     if (n !== null) {
                         atribsPorNivel[n] = { clave: actual.clave, texto: actual.texto };
                     }
@@ -239,8 +249,8 @@ const exportarExcel = async (proyectoId) => {
                 if (!idLey) {
                     // Si no tiene vinculo directo, puede que algun padre si lo tenga
                     let aux = atr;
-                    while (aux.padre_atribucion_id && atriMap[aux.padre_atribucion_id]) {
-                        aux = atriMap[aux.padre_atribucion_id];
+                    while (aux.padre_atribucion_id && atriMap[String(aux.padre_atribucion_id)]) {
+                        aux = atriMap[String(aux.padre_atribucion_id)];
                         if (aux.atribucion_general_id) {
                             idLey = aux.atribucion_general_id;
                             break;
@@ -249,7 +259,7 @@ const exportarExcel = async (proyectoId) => {
                 }
 
                 if (idLey) {
-                    const gen = atriGenerales.find(g => g.id === idLey);
+                    const gen = atriGenerales.find(g => String(g.id) === String(idLey));
                     if (gen) atribsPorNivel[0] = { clave: gen.clave, texto: gen.texto };
                 }
 
@@ -261,8 +271,13 @@ const exportarExcel = async (proyectoId) => {
                     estiloCelda(ws.getCell(`${getColumnLetter(c + 1)}${fila}`), data?.texto || '-');
                     c += 2;
                 }
-                // Corresponsabilidad
-                estiloCelda(ws.getCell(`${getColumnLetter(c)}${fila}`), atr.corresponsabilidad || '-');
+                // Corresponsabilidad (Verde si se está "bajando", es decir, si es el padre de otra atribución)
+                const cellCorrValue = ws.getCell(`${getColumnLetter(c)}${fila}`);
+                if (idsConHijos.has(String(atr.id))) {
+                    estiloCeldaVerde(cellCorrValue, atr.corresponsabilidad || '-');
+                } else {
+                    estiloCelda(cellCorrValue, atr.corresponsabilidad || '-');
+                }
                 fila++;
             }
         }
