@@ -2,7 +2,12 @@ import React, { useEffect, useState } from 'react';
 import api from '../services/api';
 import { useAuth } from '../context/AuthContext';
 
-const ROLES = ['admin', 'dependencia', 'revisor'];
+const ROLES = [
+    { value: 'admin', label: 'Administrador' },
+    { value: 'revisor', label: 'Revisor / Responsable' },
+    { value: 'visualizador', label: 'Visualizador' },
+    { value: 'enlace', label: 'Enlace' }
+];
 const TIPOS_DEP = [
     { value: 'centralizada', label: 'Dependencia' },
     { value: 'paraestatal', label: 'Entidad' },
@@ -19,12 +24,16 @@ export default function Admin() {
     const [mostrarModalD, setMostrarModalD] = useState(false);
     const [editandoU, setEditandoU] = useState(null);
     const [editandoD, setEditandoD] = useState(null);
-    const [formU, setFormU] = useState({ nombre: '', email: '', password: '', rol: 'dependencia', activo: true });
+    const [formU, setFormU] = useState({ nombre: '', email: '', password: '', rol: 'revisor', activo: true });
     const [formD, setFormD] = useState({ nombre: '', siglas: '', tipo: 'centralizada', descripcion: '' });
     const [formEmail, setFormEmail] = useState({ smtp_host: '', smtp_port: 587, smtp_user: '', smtp_pass: '', from_name: 'Sistema de Atribuciones' });
     const [guardandoEmail, setGuardandoEmail] = useState(false);
     const [msgEmail, setMsgEmail] = useState('');
     const { usuario } = useAuth();
+
+    const getRolLabel = (rol) => {
+        return ROLES.find(r => r.value === rol)?.label || rol;
+    };
 
     const cargar = async () => {
         try {
@@ -79,7 +88,7 @@ export default function Admin() {
 
     const abrirModalU = (u = null) => {
         setEditandoU(u);
-        setFormU(u ? { nombre: u.nombre, email: u.email, password: '', rol: u.rol, activo: u.activo } : { nombre: '', email: '', password: '', rol: 'dependencia', activo: true });
+        setFormU(u ? { nombre: u.nombre, email: u.email, password: '', rol: u.rol, activo: u.activo } : { nombre: '', email: '', password: '', rol: 'revisor', activo: true });
         setMostrarModalU(true);
     };
 
@@ -129,7 +138,7 @@ export default function Admin() {
                                     <tr key={u.id} style={{ opacity: u.activo ? 1 : 0.5 }}>
                                         <td><strong>{u.nombre}</strong></td>
                                         <td>{u.email}</td>
-                                        <td><span className={`badge badge-${u.rol}`}>{u.rol}</span></td>
+                                        <td><span className={`badge badge-${u.rol}`}>{getRolLabel(u.rol)}</span></td>
                                         <td><span className={`badge ${u.activo ? 'badge-aprobado' : 'badge-pendiente'}`}>{u.activo ? 'Activo' : 'Inactivo'}</span></td>
                                         <td>
                                             <div style={{ display: 'flex', gap: 4 }}>
@@ -250,9 +259,9 @@ export default function Admin() {
                                 <div className="form-group">
                                     <label className="form-label">Rol <span className="required">*</span></label>
                                     <select className="form-control" value={formU.rol} onChange={e => setFormU({ ...formU, rol: e.target.value })}>
-                                        <option value="dependencia">Dependencia</option>
-                                        <option value="revisor">Revisor</option>
-                                        <option value="admin">Administrador</option>
+                                        {ROLES.map(r => (
+                                            <option key={r.value} value={r.value}>{r.label}</option>
+                                        ))}
                                     </select>
                                 </div>
                             </div>
