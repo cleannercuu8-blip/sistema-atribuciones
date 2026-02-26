@@ -237,6 +237,7 @@ app.use('/api/revisiones', require('./routes/revisiones.routes'));
 app.use('/api/unidades', require('./routes/unidades.routes'));
 app.use('/api/atribuciones-generales', require('./routes/atribuciones.routes'));
 app.use('/api/catalogos', require('./routes/catalogos.routes'));
+app.use('/api/dashboard', require('./routes/dashboard.routes'));
 
 // Configuración de email (solo admin)
 const emailService = require('./services/email.service');

@@ -7,14 +7,19 @@ export default function Dashboard() {
     const { usuario } = useAuth();
     const navigate = useNavigate();
     const [stats, setStats] = useState(null);
+    const [innovations, setInnovations] = useState({ workload: [], activity: [] });
     const [proyectos, setProyectos] = useState([]);
     const [cargando, setCargando] = useState(true);
 
     useEffect(() => {
         const cargarDatos = async () => {
             try {
-                const res = await api.get('/proyectos');
-                const projs = res.data;
+                const [resProjs, resInnov] = await Promise.all([
+                    api.get('/proyectos'),
+                    api.get('/dashboard/innovations')
+                ]);
+
+                const projs = resProjs.data;
                 setProyectos(projs.slice(0, 5));
                 setStats({
                     total: projs.length,
@@ -22,135 +27,206 @@ export default function Dashboard() {
                     en_revision: projs.filter(p => p.estado === 'en_revision').length,
                     aprobado: projs.filter(p => p.estado === 'aprobado').length,
                 });
-            } catch { }
+
+                setInnovations(resInnov.data);
+            } catch (err) {
+                console.error("Error al cargar dashboard:", err);
+            }
             setCargando(false);
         };
         cargarDatos();
     }, []);
 
-    if (cargando) return <div className="loading-container"><div className="spinner" /><p>Cargando...</p></div>;
+    if (cargando) return <div className="loading-container"><div className="spinner" /><p>Cargando Dashboard...</p></div>;
 
     const hora = new Date().getHours();
     const saludo = hora < 12 ? 'Buenos días' : hora < 18 ? 'Buenas tardes' : 'Buenas noches';
 
+    // Calcular máximo para el balance de responsabilidades
+    const maxWorkload = innovations.workload.length > 0 ? Math.max(...innovations.workload.map(w => w.total)) : 10;
+
     return (
-        <div>
+        <div className="dashboard-container">
             {/* Saludo */}
             <div style={{ marginBottom: 28 }}>
-                <h1 style={{ fontSize: 24, fontWeight: 800, color: 'var(--color-primario)' }}>
-                    {saludo}, {usuario?.nombre?.split(' ')[0]} 👋
+                <h1 style={{ fontSize: 28, fontWeight: 900, color: 'var(--color-primario)', letterSpacing: '-0.5px' }}>
+                    {saludo}, {usuario?.nombre?.split(' ')[0]} <span style={{ fontSize: 24 }}>👋</span>
                 </h1>
-                <p style={{ color: 'var(--color-texto-suave)', marginTop: 4 }}>
-                    Bienvenido al Sistema para Árbol de Atribuciones
+                <p style={{ color: 'var(--color-texto-suave)', marginTop: 4, fontSize: 15 }}>
+                    Esta es la visión general de la institución para el Arbol de Atribuciones.
                 </p>
             </div>
 
-            {/* Stats */}
+            {/* Stats Cards */}
             {stats && (
-                <div className="stats-grid">
-                    <div className="stat-card">
-                        <div className="stat-icon" style={{ background: '#dbeafe' }}>📁</div>
+                <div className="stats-grid" style={{ marginBottom: 32 }}>
+                    <div className="stat-card" style={{ borderBottom: '4px solid #3b82f6' }}>
+                        <div className="stat-icon" style={{ background: '#dbeafe', color: '#1e40af' }}>📁</div>
                         <div className="stat-info">
                             <div className="stat-value">{stats.total}</div>
-                            <div className="stat-label">Total proyectos</div>
+                            <div className="stat-label">Total Gestión</div>
                         </div>
                     </div>
-                    <div className="stat-card">
-                        <div className="stat-icon" style={{ background: '#fef3c7' }}>✏️</div>
+                    <div className="stat-card" style={{ borderBottom: '4px solid #f59e0b' }}>
+                        <div className="stat-icon" style={{ background: '#fef3c7', color: '#92400e' }}>✏️</div>
                         <div className="stat-info">
                             <div className="stat-value">{stats.borrador}</div>
-                            <div className="stat-label">En borrador</div>
+                            <div className="stat-label">En Redacción</div>
                         </div>
                     </div>
-                    <div className="stat-card">
-                        <div className="stat-icon" style={{ background: '#fde68a' }}>🔍</div>
+                    <div className="stat-card" style={{ borderBottom: '4px solid #eab308' }}>
+                        <div className="stat-icon" style={{ background: '#fef9c3', color: '#854d0e' }}>🔍</div>
                         <div className="stat-info">
                             <div className="stat-value">{stats.en_revision}</div>
-                            <div className="stat-label">En revisión</div>
+                            <div className="stat-label">En Revisión</div>
                         </div>
                     </div>
-                    <div className="stat-card">
-                        <div className="stat-icon" style={{ background: '#d1fae5' }}>✅</div>
+                    <div className="stat-card" style={{ borderBottom: '4px solid #10b981' }}>
+                        <div className="stat-icon" style={{ background: '#d1fae5', color: '#065f46' }}>✅</div>
                         <div className="stat-info">
                             <div className="stat-value">{stats.aprobado}</div>
-                            <div className="stat-label">Aprobados</div>
+                            <div className="stat-label">Validados</div>
                         </div>
                     </div>
                 </div>
             )}
 
-            {/* Proyectos recientes */}
-            <div className="card">
-                <div className="card-header">
-                    <span className="card-title">📁 Proyectos recientes</span>
-                    <button className="btn btn-primary btn-sm" onClick={() => navigate('/proyectos')}>
-                        Ver todos
-                    </button>
-                </div>
-                {proyectos.length === 0 ? (
-                    <div className="empty-state">
-                        <div className="empty-icon">📋</div>
-                        <h3>No hay proyectos aún</h3>
-                        <p>Los proyectos de atribuciones aparecerán aquí</p>
-                    </div>
-                ) : (
-                    <div className="table-responsive">
-                        <table>
-                            <thead>
-                                <tr>
-                                    <th>Proyecto</th>
-                                    <th>Dependencia</th>
-                                    <th>Estado</th>
-                                    <th>Acciones</th>
-                                </tr>
-                            </thead>
-                            <tbody>
-                                {proyectos.map(p => (
-                                    <tr key={p.id}>
-                                        <td><strong>{p.nombre}</strong></td>
-                                        <td>{p.dependencia_nombre}</td>
-                                        <td>
-                                            <span className={`badge badge-${p.estado}`}>
-                                                {p.estado === 'borrador' ? '✏️ Borrador'
-                                                    : p.estado === 'en_revision' ? '🔍 En revisión'
-                                                        : '✅ Aprobado'}
-                                            </span>
-                                        </td>
-                                        <td>
-                                            <button className="btn btn-outline btn-sm" onClick={() => navigate(`/proyectos/${p.id}`)}>
-                                                Abrir
-                                            </button>
-                                        </td>
-                                    </tr>
-                                ))}
-                            </tbody>
-                        </table>
-                    </div>
-                )}
-            </div>
-
-            {/* Info de acceso rápido */}
-            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))', gap: 16 }}>
-                <div className="card" style={{ borderLeft: '4px solid var(--color-acento)' }}>
-                    <h3 style={{ fontSize: 14, fontWeight: 700, marginBottom: 8, color: 'var(--color-primario)' }}>🌳 Árbol de atribuciones</h3>
-                    <p style={{ fontSize: 13, color: 'var(--color-texto-suave)', marginBottom: 16 }}>
-                        Capture y relacione las atribuciones desde la Ley hasta el último nivel de la unidad administrativa.
-                    </p>
-                    <button className="btn btn-secondary btn-sm" onClick={() => navigate('/proyectos')}>
-                        Ir a proyectos
-                    </button>
-                </div>
-                {(usuario?.rol === 'admin' || usuario?.rol === 'revisor') && (
-                    <div className="card" style={{ borderLeft: '4px solid var(--color-advertencia)' }}>
-                        <h3 style={{ fontSize: 14, fontWeight: 700, marginBottom: 8, color: 'var(--color-primario)' }}>🔍 Revisiones activas</h3>
-                        <p style={{ fontSize: 13, color: 'var(--color-texto-suave)', marginBottom: 16 }}>
-                            Emita observaciones, asigne plazos y realice el seguimiento de las subsanaciones.
-                        </p>
-                        <button className="btn btn-outline btn-sm" onClick={() => navigate('/revisiones')}>
-                            Ver revisiones
+            <div style={{ display: 'grid', gridTemplateColumns: '2fr 1fr', gap: 24, marginBottom: 24 }}>
+                {/* Proyectos recientes */}
+                <div className="card" style={{ margin: 0 }}>
+                    <div className="card-header" style={{ borderBottom: '1px solid #f1f5f9', padding: '16px 20px' }}>
+                        <span className="card-title" style={{ fontSize: 16, fontWeight: 800 }}>📁 Proyectos Recientes</span>
+                        <button className="btn btn-primary btn-sm" onClick={() => navigate('/proyectos')} style={{ borderRadius: 8 }}>
+                            Ver Todos
                         </button>
                     </div>
-                )}
+                    {proyectos.length === 0 ? (
+                        <div className="empty-state" style={{ padding: 40 }}>
+                            <div className="empty-icon" style={{ fontSize: 48, marginBottom: 16 }}>📋</div>
+                            <h3>Sin actividad</h3>
+                            <p>Los proyectos aparecerán aquí conforme se creen.</p>
+                        </div>
+                    ) : (
+                        <div className="table-responsive">
+                            <table style={{ width: '100%', borderCollapse: 'collapse' }}>
+                                <thead>
+                                    <tr style={{ textAlign: 'left', background: '#f8fafc' }}>
+                                        <th style={{ padding: '12px 20px', fontSize: 12, color: '#64748b' }}>PROYECTO</th>
+                                        <th style={{ padding: '12px 20px', fontSize: 12, color: '#64748b' }}>DEPENDENCIA</th>
+                                        <th style={{ padding: '12px 20px', fontSize: 12, color: '#64748b' }}>ESTADO</th>
+                                        <th style={{ padding: '12px 20px', fontSize: 12, color: '#64748b', textAlign: 'right' }}>ACCIONES</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    {proyectos.map(p => (
+                                        <tr key={p.id} style={{ borderBottom: '1px solid #f1f5f9' }}>
+                                            <td style={{ padding: '16px 20px' }}><strong>{p.nombre}</strong></td>
+                                            <td style={{ padding: '16px 20px', color: '#64748b', fontSize: 13 }}>{p.dependencia_nombre}</td>
+                                            <td style={{ padding: '16px 20px' }}>
+                                                <span className={`badge badge-${p.estado}`} style={{ fontSize: 11, padding: '4px 10px', borderRadius: 6 }}>
+                                                    {p.estado === 'borrador' ? '✏️ Borrador'
+                                                        : p.estado === 'en_revision' ? '🔍 En revisión'
+                                                            : '✅ Aprobado'}
+                                                </span>
+                                            </td>
+                                            <td style={{ padding: '16px 20px', textAlign: 'right' }}>
+                                                <button className="btn btn-outline btn-sm" onClick={() => navigate(`/proyectos/${p.id}`)} style={{ borderRadius: 6 }}>
+                                                    Abrir
+                                                </button>
+                                            </td>
+                                        </tr>
+                                    ))}
+                                </tbody>
+                            </table>
+                        </div>
+                    )}
+                </div>
+
+                {/* Balance de Responsabilidades */}
+                <div className="card" style={{ margin: 0, display: 'flex', flexDirection: 'column' }}>
+                    <div className="card-header" style={{ borderBottom: '1px solid #f1f5f9', padding: '16px 20px' }}>
+                        <span className="card-title" style={{ fontSize: 16, fontWeight: 800 }}>⚖️ Balance de Responsables</span>
+                    </div>
+                    <div style={{ padding: '20px', flex: 1 }}>
+                        {innovations.workload.length === 0 ? (
+                            <p style={{ textAlign: 'center', color: '#94a3b8', fontSize: 13, marginTop: 40 }}>Pendiente de asignación</p>
+                        ) : (
+                            <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
+                                {innovations.workload.map((w, idx) => {
+                                    const percent = (w.total / maxWorkload) * 100;
+                                    return (
+                                        <div key={idx}>
+                                            <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 6, fontSize: 13 }}>
+                                                <span style={{ fontWeight: 600, color: '#334155' }}>{w.responsable}</span>
+                                                <span style={{ fontWeight: 800, color: 'var(--color-primario)' }}>{w.total} atr.</span>
+                                            </div>
+                                            <div style={{ height: 8, background: '#f1f5f9', borderRadius: 4, overflow: 'hidden' }}>
+                                                <div style={{
+                                                    height: '100%',
+                                                    width: `${percent}%`,
+                                                    background: 'linear-gradient(90deg, #1a3a5c, #3b82f6)',
+                                                    borderRadius: 4,
+                                                    transition: 'width 1s ease-out'
+                                                }}></div>
+                                            </div>
+                                        </div>
+                                    )
+                                })}
+                            </div>
+                        )}
+                    </div>
+                    <div style={{ background: '#f8fafc', padding: '12px 20px', borderTop: '1px solid #f1f5f9', borderBottomLeftRadius: 12, borderBottomRightRadius: 12 }}>
+                        <p style={{ fontSize: 11, color: '#64748b', fontStyle: 'italic' }}>Top 5 personas con mayor carga de atribuciones.</p>
+                    </div>
+                </div>
+            </div>
+
+            {/* Feed de Actividad Reciente */}
+            <div className="card" style={{ margin: 0 }}>
+                <div className="card-header" style={{ borderBottom: '1px solid #f1f5f9', padding: '16px 20px', background: 'linear-gradient(to right, #f8fafc, #ffffff)' }}>
+                    <span className="card-title" style={{ fontSize: 16, fontWeight: 800 }}>🔔 Feed de Validaciones y Actividad</span>
+                </div>
+                <div style={{ padding: 0 }}>
+                    {innovations.activity.length === 0 ? (
+                        <div style={{ padding: 40, textAlign: 'center', color: '#94a3b8' }}>
+                            <p>No se han registrado movimientos recientes en el sistema.</p>
+                        </div>
+                    ) : (
+                        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(300px, 1fr))', gap: 1, background: '#f1f5f9' }}>
+                            {innovations.activity.map((a, idx) => (
+                                <div key={idx} style={{ background: '#fff', padding: '20px', display: 'flex', gap: 16 }}>
+                                    <div style={{
+                                        width: 40, height: 40, borderRadius: 12,
+                                        display: 'flex', alignItems: 'center', justifyContent: 'center',
+                                        background: a.tipo === 'observacion' ? '#fff1f2' : '#f0fdf4',
+                                        color: a.tipo === 'observacion' ? '#e11d48' : '#166534',
+                                        fontSize: 20
+                                    }}>
+                                        {a.tipo === 'observacion' ? '💬' : '📌'}
+                                    </div>
+                                    <div style={{ flex: 1 }}>
+                                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 4 }}>
+                                            <span style={{ fontSize: 11, fontWeight: 700, color: a.tipo === 'observacion' ? '#e11d48' : '#166534', textTransform: 'uppercase', letterSpacing: '0.5px' }}>
+                                                {a.tipo === 'observacion' ? 'Nueva Observación' : 'Cambio de Estado'}
+                                            </span>
+                                            <span style={{ fontSize: 11, color: '#94a3b8' }}>
+                                                {new Date(a.created_at).toLocaleDateString()}
+                                            </span>
+                                        </div>
+                                        <p style={{ fontSize: 14, color: '#334155', marginBottom: 8, lineHeight: 1.4 }}>
+                                            {a.mensaje}
+                                        </p>
+                                        <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                                            <span style={{ fontSize: 12, fontWeight: 700, color: '#1a3a5c' }}>📄 {a.proyecto_nombre}</span>
+                                            <span style={{ fontSize: 12, color: '#94a3b8' }}>•</span>
+                                            <span style={{ fontSize: 12, color: '#64748b' }}>👤 {a.autor}</span>
+                                        </div>
+                                    </div>
+                                </div>
+                            ))}
+                        </div>
+                    )}
+                </div>
             </div>
         </div>
     );
