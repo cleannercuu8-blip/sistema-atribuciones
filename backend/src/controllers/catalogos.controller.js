@@ -351,6 +351,54 @@ const eliminarDependencia = async (req, res) => {
     }
 };
 
+// --- ESTADOS DE PROYECTO ---
+const listarEstadosProyecto = async (req, res) => {
+    try {
+        const result = await pool.query('SELECT * FROM cat_estados_proyecto WHERE activo = true ORDER BY id ASC');
+        res.json(result.rows);
+    } catch (err) {
+        res.status(500).json({ error: 'Error al listar estados de proyecto' });
+    }
+};
+
+const agregarEstadoProyecto = async (req, res) => {
+    const { nombre, color } = req.body;
+    if (!nombre) return res.status(400).json({ error: 'Nombre requerido' });
+    try {
+        const result = await pool.query(
+            'INSERT INTO cat_estados_proyecto (nombre, color) VALUES ($1, $2) RETURNING *',
+            [nombre, color || '#475569']
+        );
+        res.json(result.rows[0]);
+    } catch (err) {
+        res.status(500).json({ error: 'Error al agregar estado' });
+    }
+};
+
+const actualizarEstadoProyecto = async (req, res) => {
+    const { id } = req.params;
+    const { nombre, color } = req.body;
+    try {
+        const result = await pool.query(
+            'UPDATE cat_estados_proyecto SET nombre = $1, color = $2, updated_at = NOW() WHERE id = $3 RETURNING *',
+            [nombre, color, id]
+        );
+        res.json(result.rows[0]);
+    } catch (err) {
+        res.status(500).json({ error: 'Error al actualizar estado' });
+    }
+};
+
+const eliminarEstadoProyecto = async (req, res) => {
+    const { id } = req.params;
+    try {
+        await pool.query('UPDATE cat_estados_proyecto SET activo = false WHERE id = $1', [id]);
+        res.json({ mensaje: 'Estado desactivado' });
+    } catch (err) {
+        res.status(500).json({ error: 'Error al eliminar estado' });
+    }
+};
+
 const cargarMasivoGlosario = async (req, res) => {
     const { proyectoId } = req.params;
     const { items } = req.body; // [{acronimo, significado}]
@@ -401,6 +449,10 @@ module.exports = {
     eliminarAvance,
     actualizarDependencia,
     eliminarDependencia,
+    listarEstadosProyecto,
+    agregarEstadoProyecto,
+    actualizarEstadoProyecto,
+    eliminarEstadoProyecto,
     limpiarCatalogo,
     descargarPlantilla
 };

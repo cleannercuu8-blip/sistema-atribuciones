@@ -72,14 +72,43 @@ const initDB = async () => {
         `);
         console.log('🔹 Tablas de catálogos listas');
 
-        // 2. Migración de columnas nuevas para Proyectos (Dependen de Catálogos)
+        // 3. Tablas de Estados de Proyecto
         await pool.query(`
-            ALTER TABLE proyectos ADD COLUMN IF NOT EXISTS responsable VARCHAR(255);
-            ALTER TABLE proyectos ADD COLUMN IF NOT EXISTS enlaces TEXT;
-            ALTER TABLE proyectos ADD COLUMN IF NOT EXISTS fecha_expediente DATE;
-            ALTER TABLE proyectos ADD COLUMN IF NOT EXISTS avance_id INTEGER REFERENCES cat_avances(id);
+            CREATE TABLE IF NOT EXISTS cat_estados_proyecto (
+                id SERIAL PRIMARY KEY,
+                nombre VARCHAR(100) NOT NULL UNIQUE,
+                color VARCHAR(20) DEFAULT '#475569',
+                activo BOOLEAN DEFAULT true,
+                created_at TIMESTAMPTZ DEFAULT NOW()
+            );
         `);
-        console.log('🔹 Migración de Proyectos completada');
+
+        // Insertar estados base si no hay ninguno
+        const estadosCheck = await pool.query('SELECT count(*) FROM cat_estados_proyecto');
+        if (parseInt(estadosCheck.rows[0].count) === 0) {
+            await pool.query(`
+                INSERT INTO cat_estados_proyecto (nombre, color) VALUES 
+                ('Borrador', '#64748b'),
+                ('Activo', '#22c55e'),
+                ('En Pausa', '#f59e0b'),
+                ('Cerrado por inactividad', '#ef4444'),
+                ('Dictaminado', '#3b82f6')
+            `);
+        }
+
+        // 4. Migración de Proyectos para usar catálogo de estados
+        await pool.query(`
+            ALTER TABLE proyectos ADD COLUMN IF NOT EXISTS estado_id INTEGER REFERENCES cat_estados_proyecto(id);
+        `);
+
+        // Migrar estados actuales (texto) a IDs si aplica
+        await pool.query(`
+            UPDATE proyectos p
+            SET estado_id = (SELECT id FROM cat_estados_proyecto WHERE nombre ILIKE p.estado::text LIMIT 1)
+            WHERE estado_id IS NULL AND estado IS NOT NULL;
+        `);
+
+        console.log('🔹 Catálogo de estados y migración de proyectos lista');
 
         // Migración para documentos de Word en Revisiones
         await pool.query(`

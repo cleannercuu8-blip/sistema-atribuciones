@@ -8,6 +8,7 @@ export default function Catalogos() {
     const [enlaces, setEnlaces] = useState([]);
     const [dependencias, setDependencias] = useState([]);
     const [avances, setAvances] = useState([]);
+    const [estadosProyecto, setEstadosProyecto] = useState([]);
     const [cargando, setCargando] = useState(true);
     const [archivo, setArchivo] = useState(null);
     const [preview, setPreview] = useState([]);
@@ -15,27 +16,29 @@ export default function Catalogos() {
     const [procesando, setProcesando] = useState(false);
 
     // Estado para carga individual
-    const [formIndividual, setFormIndividual] = useState({ nombre: '', email: '', tipo: 'centralizada' });
+    const [formIndividual, setFormIndividual] = useState({ nombre: '', email: '', tipo: 'centralizada', color: '#64748b' });
     const [agregandoIndividual, setAgregandoIndividual] = useState(false);
 
     // Estado para edición
     const [editandoItem, setEditandoItem] = useState(null);
-    const [formEdicion, setFormEdicion] = useState({ nombre: '', email: '', tipo: 'centralizada' });
+    const [formEdicion, setFormEdicion] = useState({ nombre: '', email: '', tipo: 'centralizada', color: '#64748b' });
     const [guardandoEdicion, setGuardandoEdicion] = useState(false);
 
     const cargarDatos = async () => {
         setCargando(true);
         try {
-            const [rRes, eRes, dRes, aRes] = await Promise.all([
+            const [rRes, eRes, dRes, aRes, stRes] = await Promise.all([
                 api.get('/catalogos/responsables'),
                 api.get('/catalogos/enlaces'),
                 api.get('/catalogos/dependencias'),
-                api.get('/catalogos/avances')
+                api.get('/catalogos/avances'),
+                api.get('/catalogos/estados-proyecto')
             ]);
             setResponsables(rRes.data);
             setEnlaces(eRes.data);
             setDependencias(dRes.data);
             setAvances(aRes.data);
+            setEstadosProyecto(stRes.data);
         } catch (err) {
             console.error('Error al cargar catálogos', err);
         }
@@ -53,10 +56,12 @@ export default function Catalogos() {
                 ? { nombre: formIndividual.nombre, email: formIndividual.email }
                 : tab === 'dependencias'
                     ? { nombre: formIndividual.nombre, tipo: formIndividual.tipo }
-                    : { nombre: formIndividual.nombre };
+                    : tab === 'estados-proyecto'
+                        ? { nombre: formIndividual.nombre, color: formIndividual.color }
+                        : { nombre: formIndividual.nombre };
 
             await api.post(endpoint, payload);
-            setFormIndividual({ nombre: '', email: '', tipo: 'centralizada' });
+            setFormIndividual({ nombre: '', email: '', tipo: 'centralizada', color: '#64748b' });
             cargarDatos();
             alert('✅ Registro agregado correctamente');
         } catch (err) {
@@ -70,7 +75,8 @@ export default function Catalogos() {
         setFormEdicion({
             nombre: item.nombre,
             email: item.email || '',
-            tipo: item.tipo || 'centralizada'
+            tipo: item.tipo || 'centralizada',
+            color: item.color || '#64748b'
         });
     };
 
@@ -150,6 +156,11 @@ export default function Catalogos() {
                     nombre: row['Nombre de Dependencia'],
                     tipo: row['Tipo (centralizada, paraestatal, organismo_autonomo)']
                 })).filter(item => item.nombre && item.tipo);
+            } else if (tab === 'estados-proyecto') {
+                payload = preview.map(row => ({
+                    nombre: row['Nombre del Estado'],
+                    color: row['Color (Hex)']
+                })).filter(item => item.nombre);
             }
 
             await api.post(`/catalogos/${tab}/masivo`, { items: payload });
@@ -196,6 +207,7 @@ export default function Catalogos() {
                 <button className={`tab-btn ${tab === 'responsables' ? 'active' : ''}`} onClick={() => setTab('responsables')}>👨‍💼 Responsables</button>
                 <button className={`tab-btn ${tab === 'enlaces' ? 'active' : ''}`} onClick={() => setTab('enlaces')}>📧 Enlaces</button>
                 <button className={`tab-btn ${tab === 'avances' ? 'active' : ''}`} onClick={() => setTab('avances')}>📊 Avances</button>
+                <button className={`tab-btn ${tab === 'estados-proyecto' ? 'active' : ''}`} onClick={() => setTab('estados-proyecto')}>📑 Estados Proy.</button>
             </div>
 
             <div className="card" style={{ marginBottom: 24 }}>
@@ -239,6 +251,18 @@ export default function Catalogos() {
                             </select>
                         </div>
                     )}
+                    {tab === 'estados-proyecto' && (
+                        <div className="form-group" style={{ flex: 1, minWidth: 200, marginBottom: 0 }}>
+                            <label className="form-label">Color del Estado</label>
+                            <input
+                                type="color"
+                                className="form-control"
+                                style={{ height: 42, padding: 2 }}
+                                value={formIndividual.color}
+                                onChange={e => setFormIndividual({ ...formIndividual, color: e.target.value })}
+                            />
+                        </div>
+                    )}
                     <button type="submit" className="btn btn-primary" disabled={agregandoIndividual} style={{ height: 42 }}>
                         {agregandoIndividual ? '⏳...' : '✅ Agregar'}
                     </button>
@@ -251,7 +275,8 @@ export default function Catalogos() {
                         {tab === 'responsables' ? `Responsables (${responsables.length})` :
                             tab === 'enlaces' ? `Enlaces (${enlaces.length})` :
                                 tab === 'dependencias' ? `Dependencias (${dependencias.length})` :
-                                    `Estados de Avance (${avances.length})`}
+                                    tab === 'estados-proyecto' ? `Estados de Proyecto (${estadosProyecto.length})` :
+                                        `Estados de Avance (${avances.length})`}
                     </h2>
                     <button className="btn btn-danger btn-sm" onClick={limpiarCatalogo}>🗑️ Limpiar Catálogo</button>
                 </div>
@@ -263,6 +288,8 @@ export default function Catalogos() {
                                 <tr><th>Nombre</th><th>Estado</th><th>Fecha</th><th style={{ textAlign: 'right' }}>Acciones</th></tr>
                             ) : tab === 'enlaces' ? (
                                 <tr><th>Nombre</th><th>Email</th><th>Estado</th><th>Fecha</th><th style={{ textAlign: 'right' }}>Acciones</th></tr>
+                            ) : tab === 'estados-proyecto' ? (
+                                <tr><th>Nombre</th><th>Color</th><th>Estado</th><th>Fecha</th><th style={{ textAlign: 'right' }}>Acciones</th></tr>
                             ) : (
                                 <tr><th>Nombre</th><th>Tipo</th><th>Estado</th><th>Fecha</th><th style={{ textAlign: 'right' }}>Acciones</th></tr>
                             )}
@@ -270,24 +297,32 @@ export default function Catalogos() {
                         <tbody>
                             {(tab === 'responsables' ? responsables :
                                 tab === 'enlaces' ? enlaces :
-                                    tab === 'dependencias' ? dependencias : avances).map(item => (
-                                        <tr key={item.id}>
-                                            <td><strong>{item.nombre}</strong></td>
-                                            {tab === 'enlaces' && <td>{item.email}</td>}
-                                            {tab === 'dependencias' && <td><span className="badge badge-normal">{item.tipo}</span></td>}
-                                            <td><span className="badge badge-aprobado">Activo</span></td>
-                                            <td>{new Date(item.created_at).toLocaleDateString()}</td>
-                                            <td style={{ textAlign: 'right' }}>
-                                                <div style={{ display: 'flex', gap: 8, justifyContent: 'flex-end' }}>
-                                                    <button className="btn btn-outline btn-sm" onClick={() => handleAbrirEdicion(item)}>✏️</button>
-                                                    <button className="btn btn-danger btn-sm" onClick={() => handleEliminar(item.id)}>🗑️</button>
-                                                </div>
-                                            </td>
-                                        </tr>
-                                    ))}
+                                    tab === 'dependencias' ? dependencias :
+                                        tab === 'estados-proyecto' ? estadosProyecto : avances).map(item => (
+                                            <tr key={item.id}>
+                                                <td><strong>{item.nombre}</strong></td>
+                                                {tab === 'enlaces' && <td>{item.email}</td>}
+                                                {tab === 'dependencias' && <td><span className="badge badge-normal">{item.tipo}</span></td>}
+                                                {tab === 'estados-proyecto' && <td>
+                                                    <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                                                        <div style={{ width: 16, height: 16, borderRadius: '50%', background: item.color }} />
+                                                        {item.color}
+                                                    </div>
+                                                </td>}
+                                                <td><span className="badge badge-aprobado">Activo</span></td>
+                                                <td>{new Date(item.created_at).toLocaleDateString()}</td>
+                                                <td style={{ textAlign: 'right' }}>
+                                                    <div style={{ display: 'flex', gap: 8, justifyContent: 'flex-end' }}>
+                                                        <button className="btn btn-outline btn-sm" onClick={() => handleAbrirEdicion(item)}>✏️</button>
+                                                        <button className="btn btn-danger btn-sm" onClick={() => handleEliminar(item.id)}>🗑️</button>
+                                                    </div>
+                                                </td>
+                                            </tr>
+                                        ))}
                             {(tab === 'responsables' ? responsables :
                                 tab === 'enlaces' ? enlaces :
-                                    tab === 'dependencias' ? dependencias : avances).length === 0 && (
+                                    tab === 'dependencias' ? dependencias :
+                                        tab === 'estados-proyecto' ? estadosProyecto : avances).length === 0 && (
                                     <tr><td colSpan={6} style={{ textAlign: 'center', padding: '40px', color: '#999' }}>No hay datos. Usa la carga masiva.</td></tr>
                                 )}
                         </tbody>
@@ -339,6 +374,18 @@ export default function Catalogos() {
                                     </select>
                                 </div>
                             )}
+                            {tab === 'estados-proyecto' && (
+                                <div className="form-group">
+                                    <label className="form-label">Color del Estado</label>
+                                    <input
+                                        type="color"
+                                        className="form-control"
+                                        style={{ height: 42, padding: 2 }}
+                                        value={formEdicion.color}
+                                        onChange={e => setFormEdicion({ ...formEdicion, color: e.target.value })}
+                                    />
+                                </div>
+                            )}
                             <div style={{ display: 'flex', gap: 10, justifyContent: 'flex-end', marginTop: 20 }}>
                                 <button type="button" className="btn btn-outline" onClick={() => setEditandoItem(null)}>Cancelar</button>
                                 <button type="submit" className="btn btn-primary" disabled={guardandoEdicion}>
@@ -379,7 +426,8 @@ export default function Catalogos() {
                                                 {tab === 'responsables' ? <th>Responsable</th> :
                                                     tab === 'enlaces' ? <><th>Nombre</th><th>Email</th></> :
                                                         tab === 'avances' ? <th>Estado de Avance</th> :
-                                                            <><th>Dependencia</th><th>Tipo</th></>}
+                                                            tab === 'estados-proyecto' ? <><th>Estado</th><th>Color</th></> :
+                                                                <><th>Dependencia</th><th>Tipo</th></>}
                                             </tr>
                                         </thead>
                                         <tbody>
@@ -388,7 +436,8 @@ export default function Catalogos() {
                                                     {tab === 'responsables' ? <td>{row['Nombre del Responsable']}</td> :
                                                         tab === 'enlaces' ? <><td>{row['Nombre del Enlace']}</td><td>{row['Correo Electrónico']}</td></> :
                                                             tab === 'avances' ? <td>{row['Estado de Avance']}</td> :
-                                                                <><td>{row['Nombre de Dependencia']}</td><td>{row['Tipo (centralizada, paraestatal, organismo_autonomo)']}</td></>}
+                                                                tab === 'estados-proyecto' ? <><td>{row['Nombre del Estado']}</td><td>{row['Color (Hex)']}</td></> :
+                                                                    <><td>{row['Nombre de Dependencia']}</td><td>{row['Tipo (centralizada, paraestatal, organismo_autonomo)']}</td></>}
                                                 </tr>
                                             ))}
                                             {preview.length > 5 && <tr><td colSpan={2} style={{ textAlign: 'center' }}>... y {preview.length - 5} registros más</td></tr>}

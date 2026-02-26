@@ -17,6 +17,7 @@ export default function Proyectos() {
     const [catResponsables, setCatResponsables] = useState([]);
     const [catEnlaces, setCatEnlaces] = useState([]);
     const [catAvances, setCatAvances] = useState([]);
+    const [catEstados, setCatEstados] = useState([]);
     const [usuarios, setUsuarios] = useState([]);
     const [cargando, setCargando] = useState(true);
     const [mostrarModal, setMostrarModal] = useState(false);
@@ -28,7 +29,8 @@ export default function Proyectos() {
         responsable: '',
         enlaces: '',
         fecha_expediente: '',
-        avance_id: ''
+        avance_id: '',
+        estado_id: ''
     });
     const [guardando, setGuardando] = useState(false);
 
@@ -39,13 +41,15 @@ export default function Proyectos() {
                 api.get('/catalogos/dependencias'),
                 api.get('/catalogos/responsables'),
                 api.get('/catalogos/enlaces'),
-                api.get('/catalogos/avances')
+                api.get('/catalogos/avances'),
+                api.get('/catalogos/estados-proyecto')
             ]);
             setProyectos(pRes.data);
             setDependencias(dRes.data);
             setCatResponsables(rRes.data);
             setCatEnlaces(eRes.data);
             setCatAvances(aRes.data);
+            setCatEstados(stRes.data);
             if (usuario.rol === 'admin') {
                 const uRes = await api.get('/usuarios');
                 setUsuarios(uRes.data.filter(u => u.activo && u.rol !== 'admin'));
@@ -84,7 +88,8 @@ export default function Proyectos() {
             responsable: p.responsable || '',
             enlaces: p.enlaces || '',
             fecha_expediente: p.fecha_expediente ? p.fecha_expediente.split('T')[0] : '',
-            avance_id: p.avance_id || ''
+            avance_id: p.avance_id || '',
+            estado_id: p.estado_id || ''
         });
         setMostrarModal(true);
     };
@@ -129,7 +134,7 @@ export default function Proyectos() {
                 {usuario.rol === 'admin' && (
                     <button className="btn btn-primary" onClick={() => {
                         setProyectoEditar(null);
-                        setForm({ nombre: '', dependencia_id: '', responsable: '', enlaces: '', fecha_expediente: '', avance_id: '' });
+                        setForm({ nombre: '', dependencia_id: '', responsable: '', enlaces: '', fecha_expediente: '', avance_id: '', estado_id: '' });
                         setMostrarModal(true);
                     }}>
                         ➕ Nuevo proyecto
@@ -165,8 +170,15 @@ export default function Proyectos() {
                                     <div key={p.id} className="card project-card" onClick={() => navigate(`/proyectos/${p.id}`)}>
                                         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 10 }}>
                                             <h3 style={{ fontSize: 15, fontWeight: 700, color: 'var(--color-primario)', flex: 1 }}>{p.nombre}</h3>
-                                            <span className={`badge badge-${p.estado}`}>
-                                                {p.estado === 'borrador' ? '✏️ Borrador' : p.estado === 'en_revision' ? '🔍 En revisión' : '✅ Aprobado'}
+                                            <span
+                                                className="badge"
+                                                style={{
+                                                    background: (p.estado_color || '#475569') + '20',
+                                                    color: p.estado_color || '#475569',
+                                                    border: `1px solid ${(p.estado_color || '#475569')}40`
+                                                }}
+                                            >
+                                                {p.estado_nombre || 'Desconocido'}
                                             </span>
                                         </div>
                                         <div style={{ fontSize: 13, color: 'var(--color-texto-suave)' }}>
@@ -200,8 +212,15 @@ export default function Proyectos() {
                                     <div key={p.id} className="card project-card" onClick={() => navigate(`/proyectos/${p.id}`)}>
                                         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 10 }}>
                                             <h3 style={{ fontSize: 15, fontWeight: 700, color: 'var(--color-primario)', flex: 1 }}>{p.nombre}</h3>
-                                            <span className={`badge badge-${p.estado}`}>
-                                                {p.estado === 'borrador' ? '✏️ Borrador' : p.estado === 'en_revision' ? '🔍 En revisión' : '✅ Aprobado'}
+                                            <span
+                                                className="badge"
+                                                style={{
+                                                    background: (p.estado_color || '#475569') + '20',
+                                                    color: p.estado_color || '#475569',
+                                                    border: `1px solid ${(p.estado_color || '#475569')}40`
+                                                }}
+                                            >
+                                                {p.estado_nombre || 'Desconocido'}
                                             </span>
                                         </div>
                                         <div style={{ fontSize: 13, color: 'var(--color-texto-suave)' }}>
@@ -302,6 +321,20 @@ export default function Proyectos() {
                                     <option value="">Seleccione un enlace...</option>
                                     {catEnlaces.map(en => (
                                         <option key={en.id} value={en.nombre}>{en.nombre} ({en.email})</option>
+                                    ))}
+                                </select>
+                            </div>
+                            <div className="form-group">
+                                <label className="form-label">Estado del Proyecto <span className="required">*</span></label>
+                                <select
+                                    className="form-control"
+                                    value={form.estado_id}
+                                    onChange={e => setForm({ ...form, estado_id: e.target.value })}
+                                    required
+                                >
+                                    <option value="">-- Seleccione Estado --</option>
+                                    {catEstados.map(st => (
+                                        <option key={st.id} value={st.id}>{st.nombre}</option>
                                     ))}
                                 </select>
                             </div>

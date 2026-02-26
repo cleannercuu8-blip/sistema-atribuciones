@@ -10,17 +10,21 @@ const listar = async (req, res) => {
         if (req.user.rol === 'admin' || req.user.rol === 'revisor') {
             query = `
         SELECT p.*, d.nombre as dependencia_nombre, d.tipo as dependencia_tipo,
+               ep.nombre as estado_nombre, ep.color as estado_color,
                u.nombre as creado_por
         FROM proyectos p
         JOIN dependencias d ON p.dependencia_id = d.id
+        LEFT JOIN cat_estados_proyecto ep ON p.estado_id = ep.id
         LEFT JOIN usuarios u ON p.created_by = u.id
         ORDER BY p.created_at DESC`;
         } else {
             query = `
         SELECT p.*, d.nombre as dependencia_nombre, d.tipo as dependencia_tipo,
+               ep.nombre as estado_nombre, ep.color as estado_color,
                u.nombre as creado_por, pu.rol_en_proyecto
         FROM proyectos p
         JOIN dependencias d ON p.dependencia_id = d.id
+        LEFT JOIN cat_estados_proyecto ep ON p.estado_id = ep.id
         LEFT JOIN usuarios u ON p.created_by = u.id
         JOIN proyecto_usuarios pu ON pu.proyecto_id = p.id AND pu.usuario_id = $1
         ORDER BY p.created_at DESC`;
@@ -40,8 +44,11 @@ const obtener = async (req, res) => {
     const { id } = req.params;
     try {
         const proyResult = await pool.query(
-            `SELECT p.*, d.nombre as dependencia_nombre, d.tipo as dependencia_tipo
-       FROM proyectos p JOIN dependencias d ON p.dependencia_id = d.id
+            `SELECT p.*, d.nombre as dependencia_nombre, d.tipo as dependencia_tipo,
+                    ep.nombre as estado_nombre, ep.color as estado_color
+       FROM proyectos p 
+       JOIN dependencias d ON p.dependencia_id = d.id
+       LEFT JOIN cat_estados_proyecto ep ON p.estado_id = ep.id
        WHERE p.id = $1`,
             [id]
         );
@@ -85,8 +92,8 @@ const crear = async (req, res) => {
         await client.query('BEGIN');
 
         const proyResult = await client.query(
-            `INSERT INTO proyectos (nombre, dependencia_id, responsable, enlaces, fecha_expediente, created_by)
-       VALUES ($1, $2, $3, $4, $5, $6) RETURNING *`,
+            `INSERT INTO proyectos (nombre, dependencia_id, responsable, enlaces, fecha_expediente, created_by, estado_id)
+       VALUES ($1, $2, $3, $4, $5, $6, (SELECT id FROM cat_estados_proyecto WHERE nombre = 'Borrador' LIMIT 1)) RETURNING *`,
             [nombre, dependencia_id, responsable, enlaces, fecha_expediente, req.user.id]
         );
         const proyecto = proyResult.rows[0];
@@ -141,9 +148,9 @@ const actualizar = async (req, res) => {
 
         await client.query(
             `UPDATE proyectos 
-             SET nombre=$1, dependencia_id=$2, responsable=$3, enlaces=$4, fecha_expediente=$5, estado=$6, updated_at=NOW() 
+             SET nombre=$1, dependencia_id=$2, responsable=$3, enlaces=$4, fecha_expediente=$5, estado_id=$6, updated_at=NOW() 
              WHERE id=$7`,
-            [nombre, dependencia_id, responsable, enlaces, fecha_expediente, estado, id]
+            [nombre, dependencia_id, responsable, enlaces, fecha_expediente, req.body.estado_id, id]
         );
 
         if (usuarios_ids !== undefined) {

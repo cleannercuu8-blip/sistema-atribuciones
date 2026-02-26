@@ -8,6 +8,7 @@ router.get('/responsables', authMiddleware, catalogosController.listarResponsabl
 router.get('/enlaces', authMiddleware, catalogosController.listarEnlaces);
 router.get('/avances', authMiddleware, catalogosController.listarAvances);
 router.get('/dependencias', authMiddleware, catalogosController.listarDependencias);
+router.get('/estados-proyecto', authMiddleware, catalogosController.listarEstadosProyecto);
 
 // Gestión (Solo Admin)
 router.post('/responsables', authMiddleware, requireRole('admin'), catalogosController.agregarResponsable);
@@ -25,6 +26,10 @@ router.delete('/avances/:id', authMiddleware, requireRole('admin'), catalogosCon
 router.post('/dependencias', authMiddleware, requireRole('admin'), catalogosController.agregarDependencia);
 router.put('/dependencias/:id', authMiddleware, requireRole('admin'), catalogosController.actualizarDependencia);
 router.delete('/dependencias/:id', authMiddleware, requireRole('admin'), catalogosController.eliminarDependencia);
+
+router.post('/estados-proyecto', authMiddleware, requireRole('admin'), catalogosController.agregarEstadoProyecto);
+router.put('/estados-proyecto/:id', authMiddleware, requireRole('admin'), catalogosController.actualizarEstadoProyecto);
+router.delete('/estados-proyecto/:id', authMiddleware, requireRole('admin'), catalogosController.eliminarEstadoProyecto);
 
 router.post('/responsables/masivo', authMiddleware, requireRole('admin'), catalogosController.cargarMasivoResponsables);
 router.post('/enlaces/masivo', authMiddleware, requireRole('admin'), catalogosController.cargarMasivoEnlaces);
