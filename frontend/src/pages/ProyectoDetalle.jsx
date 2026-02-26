@@ -302,7 +302,9 @@ const TabAtribuciones = ({ proyectoId, unidad, setUnidad, arbol, atribGenerales 
                                             <div style={{ flex: 1 }}>
                                                 <div style={{ display: 'flex', flexWrap: 'wrap', gap: 10, alignItems: 'center', marginBottom: 12 }}>
                                                     <strong style={{ color: 'var(--color-primario)', fontSize: 16 }}>{a.clave}</strong>
-                                                    <span className={`badge badge-${a.tipo}`}>{a.tipo}</span>
+                                                    <span className={`badge badge-${a.tipo}`}>
+                                                        {a.tipo === 'normal' ? 'Delegable' : a.tipo}
+                                                    </span>
                                                     {a.gen_clave && <span style={{ fontSize: 10, color: '#166534', background: '#dcfce7', padding: '4px 10px', borderRadius: 20, fontWeight: 800, textTransform: 'uppercase' }}>📜 LEY: {a.gen_clave}</span>}
                                                     {a.padre_clave && <span style={{ fontSize: 10, color: '#0369a1', background: '#e0f2fe', padding: '4px 10px', borderRadius: 20, fontWeight: 800, textTransform: 'uppercase' }}>🌳 SUP: {a.padre_clave}</span>}
                                                     {a.responsable_nombre && <span className="badge" style={{ background: '#f5f3ff', color: '#5b21b6', fontSize: 10, padding: '4px 10px', borderRadius: 20, fontWeight: 700 }}>👤 Resp: {a.responsable_nombre}</span>}
@@ -371,7 +373,7 @@ const TabAtribuciones = ({ proyectoId, unidad, setUnidad, arbol, atribGenerales 
                                 <div className="form-group">
                                     <label className="form-label">Tipo</label>
                                     <select className="form-control" value={form.tipo} onChange={e => setForm({ ...form, tipo: e.target.value })}>
-                                        <option value="normal">Normal</option>
+                                        <option value="normal">Delegable</option>
                                         <option value="indelegable">Indelegable</option>
                                     </select>
                                 </div>
@@ -380,12 +382,7 @@ const TabAtribuciones = ({ proyectoId, unidad, setUnidad, arbol, atribGenerales 
                                 <label className="form-label">Texto <span className="required">*</span></label>
                                 <textarea className="form-control" rows={5} value={form.texto} onChange={e => setForm({ ...form, texto: e.target.value })} required />
                             </div>
-                            <div className="form-row">
-                                <div className="form-group">
-                                    <label className="form-label">Corresponsabilidad (Siglas)</label>
-                                    <input className="form-control" value={form.corresponsabilidad} onChange={e => setForm({ ...form, corresponsabilidad: e.target.value })} placeholder="Ej: SHCP, SEDENA..." />
-                                </div>
-                            </div>
+
                             <div className="form-row">
                                 {unidad.nivel_numero === 1 && atribGenerales.length > 0 && (
                                     <div className="form-group">
