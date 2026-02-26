@@ -69,6 +69,17 @@ const initDB = async () => {
                 activo BOOLEAN DEFAULT true,
                 created_at TIMESTAMPTZ DEFAULT NOW()
             );
+
+            CREATE TABLE IF NOT EXISTS actividades (
+                id SERIAL PRIMARY KEY,
+                tipo VARCHAR(50) NOT NULL,
+                entidad VARCHAR(50),
+                entidad_id INTEGER,
+                proyecto_id INTEGER,
+                mensaje TEXT NOT NULL,
+                autor VARCHAR(200),
+                created_at TIMESTAMPTZ DEFAULT NOW()
+            );
         `);
         console.log('🔹 Tablas de catálogos listas');
 
@@ -99,7 +110,8 @@ const initDB = async () => {
 
         // 4. Migraciones manuales (idempotentes)
         await pool.query(`
-            ALTER TABLE proyectos ADD COLUMN IF NOT EXISTS responsable_apoyo VARCHAR(200);
+            ALTER TABLE proyectos ADD COLUMN IF NOT EXISTS responsable_apoyo TEXT;
+            ALTER TABLE proyectos ALTER COLUMN responsable_apoyo TYPE TEXT;
         `);
 
         // 5. Migración de Proyectos para usar catálogo de estados

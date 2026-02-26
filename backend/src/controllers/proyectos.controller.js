@@ -109,6 +109,13 @@ const crear = async (req, res) => {
         );
         const proyecto = proyResult.rows[0];
 
+        // LOG ACTIVIDAD: Creación
+        await client.query(
+            `INSERT INTO actividades (tipo, entidad, entidad_id, proyecto_id, mensaje, autor)
+             VALUES ($1, $2, $3, $4, $5, $6)`,
+            ['creacion', 'proyecto', proyecto.id, proyecto.id, `Proyecto "${nombre}" creado`, req.user.nombre]
+        );
+
         if (usuarios_ids && usuarios_ids.length > 0) {
             for (const uid of usuarios_ids) {
                 await client.query(
@@ -164,6 +171,13 @@ const actualizar = async (req, res) => {
             [nombre, dependencia_id, responsable, responsable_apoyo || null, enlaces, fecha_expediente, estado_id || null, avance_id || null, id]
         );
 
+        // LOG ACTIVIDAD: Actualización
+        await client.query(
+            `INSERT INTO actividades (tipo, entidad, entidad_id, proyecto_id, mensaje, autor)
+             VALUES ($1, $2, $3, $4, $5, $6)`,
+            ['actualizacion', 'proyecto', id, id, `Proyecto "${nombre}" actualizado`, req.user.nombre]
+        );
+
         if (usuarios_ids !== undefined) {
             await client.query('DELETE FROM proyecto_usuarios WHERE proyecto_id = $1', [id]);
             for (const uid of usuarios_ids) {
@@ -205,6 +219,13 @@ const eliminar = async (req, res) => {
         if (req.user.rol !== 'admin' && proyCheck.rows[0].created_by !== req.user.id && proyCheck.rows[0].responsable !== req.user.nombre) {
             return res.status(403).json({ error: 'No tienes permiso para eliminar este proyecto' });
         }
+
+        // LOG ACTIVIDAD: Eliminación (Mensaje antes de borrar)
+        await pool.query(
+            `INSERT INTO actividades (tipo, entidad, entidad_id, proyecto_id, mensaje, autor)
+             VALUES ($1, $2, $3, $4, $5, $6)`,
+            ['eliminacion', 'proyecto', id, null, `Proyecto "${proyCheck.rows[0].nombre}" eliminado`, req.user.nombre]
+        );
 
         await pool.query('DELETE FROM proyectos WHERE id = $1', [id]);
         res.json({ mensaje: 'Proyecto eliminado correctamente' });

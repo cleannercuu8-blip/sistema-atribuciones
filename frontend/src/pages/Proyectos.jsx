@@ -317,17 +317,35 @@ export default function Proyectos() {
                             </div>
 
                             <div className="form-group">
-                                <label className="form-label">🤝 Responsable Apoyo</label>
+                                <label className="form-label">🤝 Responsables de Apoyo</label>
+                                <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6, marginBottom: 8 }}>
+                                    {(form.responsable_apoyo ? form.responsable_apoyo.split(',').filter(x => x) : []).map((name, i) => (
+                                        <span key={i} className="badge" style={{ background: '#f1f5f9', color: '#475569', display: 'flex', alignItems: 'center', gap: 6, padding: '4px 10px', borderRadius: 16 }}>
+                                            {name}
+                                            <button type="button" onClick={() => {
+                                                const list = form.responsable_apoyo.split(',').filter(x => x && x !== name);
+                                                setForm({ ...form, responsable_apoyo: list.join(',') });
+                                            }} style={{ border: 'none', background: 'none', cursor: 'pointer', padding: 0, fontSize: 14, color: '#94a3b8' }}>×</button>
+                                        </span>
+                                    ))}
+                                </div>
                                 <select
                                     className="form-control"
-                                    value={form.responsable_apoyo}
-                                    onChange={e => setForm({ ...form, responsable_apoyo: e.target.value })}
+                                    value=""
+                                    onChange={e => {
+                                        if (!e.target.value) return;
+                                        const current = form.responsable_apoyo ? form.responsable_apoyo.split(',').filter(x => x) : [];
+                                        if (!current.includes(e.target.value)) {
+                                            setForm({ ...form, responsable_apoyo: [...current, e.target.value].join(',') });
+                                        }
+                                    }}
                                 >
-                                    <option value="">Seleccione un responsable de apoyo...</option>
+                                    <option value="">+ Agregar responsable de apoyo...</option>
                                     {catResponsables.map(r => (
                                         <option key={r.id} value={r.nombre}>{r.nombre}</option>
                                     ))}
                                 </select>
+                                <p style={{ fontSize: 11, color: '#94a3b8', marginTop: 4 }}>Puedes seleccionar varios responsables de apoyo.</p>
                             </div>
 
                             <div className="form-group">

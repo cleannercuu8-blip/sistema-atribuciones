@@ -190,37 +190,49 @@ export default function Dashboard() {
                         </div>
                     ) : (
                         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(300px, 1fr))', gap: 1, background: '#f1f5f9' }}>
-                            {innovations.activity.map((a, idx) => (
-                                <div key={idx} style={{ background: '#fff', padding: '20px', display: 'flex', gap: 16 }}>
-                                    <div style={{
-                                        width: 40, height: 40, borderRadius: 12,
-                                        display: 'flex', alignItems: 'center', justifyContent: 'center',
-                                        background: a.tipo === 'observacion' ? '#fff1f2' : '#f0fdf4',
-                                        color: a.tipo === 'observacion' ? '#e11d48' : '#166534',
-                                        fontSize: 20
-                                    }}>
-                                        {a.tipo === 'observacion' ? '💬' : '📌'}
-                                    </div>
-                                    <div style={{ flex: 1 }}>
-                                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 4 }}>
-                                            <span style={{ fontSize: 11, fontWeight: 700, color: a.tipo === 'observacion' ? '#e11d48' : '#166534', textTransform: 'uppercase', letterSpacing: '0.5px' }}>
-                                                {a.tipo === 'observacion' ? 'Nueva Observación' : 'Cambio de Estado'}
-                                            </span>
-                                            <span style={{ fontSize: 11, color: '#94a3b8' }}>
-                                                {new Date(a.created_at).toLocaleDateString()}
-                                            </span>
+                            {innovations.activity.map((a, idx) => {
+                                const config = {
+                                    creacion: { icon: '✨', label: 'Creación', color: '#0ea5e9', bg: '#f0f9ff' },
+                                    actualizacion: { icon: '📝', label: 'Actualización', color: '#f59e0b', bg: '#fffbeb' },
+                                    eliminacion: { icon: '🗑️', label: 'Eliminación', color: '#ef4444', bg: '#fef2f2' },
+                                    observacion: { icon: '💬', label: 'Observación', color: '#e11d48', bg: '#fff1f2' },
+                                    estado: { icon: '📌', label: 'Cambio de Estado', color: '#10b981', bg: '#f0fdf4' }
+                                }[a.tipo] || { icon: '🔔', label: 'Actividad', color: '#64748b', bg: '#f8fafc' };
+
+                                return (
+                                    <div key={idx} style={{ background: '#fff', padding: '20px', display: 'flex', gap: 16 }}>
+                                        <div style={{
+                                            width: 40, height: 40, borderRadius: 12,
+                                            display: 'flex', alignItems: 'center', justifyContent: 'center',
+                                            background: config.bg,
+                                            color: config.color,
+                                            fontSize: 20
+                                        }}>
+                                            {config.icon}
                                         </div>
-                                        <p style={{ fontSize: 14, color: '#334155', marginBottom: 8, lineHeight: 1.4 }}>
-                                            {a.mensaje}
-                                        </p>
-                                        <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                                            <span style={{ fontSize: 12, fontWeight: 700, color: '#1a3a5c' }}>📄 {a.proyecto_nombre}</span>
-                                            <span style={{ fontSize: 12, color: '#94a3b8' }}>•</span>
-                                            <span style={{ fontSize: 12, color: '#64748b' }}>👤 {a.autor}</span>
+                                        <div style={{ flex: 1 }}>
+                                            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 4 }}>
+                                                <span style={{ fontSize: 11, fontWeight: 700, color: config.color, textTransform: 'uppercase', letterSpacing: '0.5px' }}>
+                                                    {config.label}
+                                                </span>
+                                                <span style={{ fontSize: 11, color: '#94a3b8' }}>
+                                                    {new Date(a.created_at).toLocaleDateString()}
+                                                </span>
+                                            </div>
+                                            <p style={{ fontSize: 14, color: '#334155', marginBottom: 8, lineHeight: 1.4 }}>
+                                                {a.mensaje}
+                                            </p>
+                                            <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                                                {a.proyecto_nombre && (
+                                                    <span style={{ fontSize: 12, fontWeight: 700, color: '#1a3a5c' }}>📄 {a.proyecto_nombre}</span>
+                                                )}
+                                                {a.proyecto_nombre && <span style={{ fontSize: 12, color: '#94a3b8' }}>•</span>}
+                                                <span style={{ fontSize: 12, color: '#64748b' }}>👤 {a.autor}</span>
+                                            </div>
                                         </div>
                                     </div>
-                                </div>
-                            ))}
+                                );
+                            })}
                         </div>
                     )}
                 </div>
