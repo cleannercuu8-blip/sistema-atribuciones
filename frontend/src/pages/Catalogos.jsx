@@ -16,12 +16,12 @@ export default function Catalogos() {
     const [procesando, setProcesando] = useState(false);
 
     // Estado para carga individual
-    const [formIndividual, setFormIndividual] = useState({ nombre: '', email: '', tipo: 'centralizada', color: '#64748b' });
+    const [formIndividual, setFormIndividual] = useState({ nombre: '', email: '', password: '', tipo: 'centralizada', color: '#64748b' });
     const [agregandoIndividual, setAgregandoIndividual] = useState(false);
 
     // Estado para edición
     const [editandoItem, setEditandoItem] = useState(null);
-    const [formEdicion, setFormEdicion] = useState({ nombre: '', email: '', tipo: 'centralizada', color: '#64748b' });
+    const [formEdicion, setFormEdicion] = useState({ nombre: '', email: '', password: '', tipo: 'centralizada', color: '#64748b' });
     const [guardandoEdicion, setGuardandoEdicion] = useState(false);
 
     const cargarDatos = async () => {
@@ -53,7 +53,7 @@ export default function Catalogos() {
         try {
             const endpoint = `/catalogos/${tab}`;
             const payload = tab === 'enlaces'
-                ? { nombre: formIndividual.nombre, email: formIndividual.email }
+                ? { nombre: formIndividual.nombre, email: formIndividual.email, password: formIndividual.password }
                 : tab === 'dependencias'
                     ? { nombre: formIndividual.nombre, tipo: formIndividual.tipo }
                     : tab === 'estados-proyecto'
@@ -61,7 +61,7 @@ export default function Catalogos() {
                         : { nombre: formIndividual.nombre };
 
             await api.post(endpoint, payload);
-            setFormIndividual({ nombre: '', email: '', tipo: 'centralizada', color: '#64748b' });
+            setFormIndividual({ nombre: '', email: '', password: '', tipo: 'centralizada', color: '#64748b' });
             cargarDatos();
             alert('✅ Registro agregado correctamente');
         } catch (err) {
@@ -75,6 +75,7 @@ export default function Catalogos() {
         setFormEdicion({
             nombre: item.nombre,
             email: item.email || '',
+            password: '',
             tipo: item.tipo || 'centralizada',
             color: item.color || '#64748b'
         });
@@ -225,17 +226,30 @@ export default function Catalogos() {
                         />
                     </div>
                     {tab === 'enlaces' && (
-                        <div className="form-group" style={{ flex: 1, minWidth: 200, marginBottom: 0 }}>
-                            <label className="form-label">Correo Electrónico</label>
-                            <input
-                                type="email"
-                                className="form-control"
-                                value={formIndividual.email}
-                                onChange={e => setFormIndividual({ ...formIndividual, email: e.target.value })}
-                                required
-                                placeholder="ejemplo@correo.com"
-                            />
-                        </div>
+                        <>
+                            <div className="form-group" style={{ flex: 1, minWidth: 200, marginBottom: 0 }}>
+                                <label className="form-label">Correo Electrónico</label>
+                                <input
+                                    type="email"
+                                    className="form-control"
+                                    value={formIndividual.email}
+                                    onChange={e => setFormIndividual({ ...formIndividual, email: e.target.value })}
+                                    required
+                                    placeholder="ejemplo@correo.com"
+                                />
+                            </div>
+                            <div className="form-group" style={{ flex: 1, minWidth: 200, marginBottom: 0 }}>
+                                <label className="form-label">Contraseña (para el usuario)</label>
+                                <input
+                                    type="password"
+                                    className="form-control"
+                                    value={formIndividual.password}
+                                    onChange={e => setFormIndividual({ ...formIndividual, password: e.target.value })}
+                                    required
+                                    placeholder="••••••••"
+                                />
+                            </div>
+                        </>
                     )}
                     {tab === 'dependencias' && (
                         <div className="form-group" style={{ flex: 1, minWidth: 200, marginBottom: 0 }}>

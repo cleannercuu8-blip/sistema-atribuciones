@@ -1,5 +1,6 @@
 const pool = require('../config/db');
 const ExcelJS = require('exceljs');
+const bcrypt = require('bcryptjs');
 
 const listarResponsables = async (req, res) => {
     try {
@@ -110,17 +111,33 @@ const cargarMasivoEnlaces = async (req, res) => {
     const client = await pool.connect();
     try {
         await client.query('BEGIN');
+        const defaultPassword = 'user123456'; // Contraseña por defecto para carga masiva
+        const hash = await bcrypt.hash(defaultPassword, 10);
+
         for (const item of items) {
             if (!item.nombre || !item.email) continue;
+
+            // Insertar o actualizar en catálogo de enlaces
             await client.query(
-                'INSERT INTO cat_enlaces (nombre, email) VALUES ($1, $2) ON CONFLICT (email) DO UPDATE SET nombre = EXCLUDED.nombre',
-                [item.nombre, item.email]
+                `INSERT INTO cat_enlaces (nombre, email) 
+                 VALUES ($1, $2) 
+                 ON CONFLICT (email) DO UPDATE SET nombre = EXCLUDED.nombre`,
+                [item.nombre, item.email.toLowerCase()]
+            );
+
+            // Crear usuario si no existe
+            await client.query(
+                `INSERT INTO usuarios (nombre, email, password_hash, rol)
+                 VALUES ($1, $2, $3, 'enlace')
+                 ON CONFLICT (email) DO NOTHING`,
+                [item.nombre, item.email.toLowerCase(), hash]
             );
         }
         await client.query('COMMIT');
-        res.json({ mensaje: 'Carga masiva completada' });
+        res.json({ mensaje: 'Carga masiva completada y usuarios creados con contraseña: ' + defaultPassword });
     } catch (err) {
         await client.query('ROLLBACK');
+        console.error('Error en carga masiva enlaces:', err);
         res.status(500).json({ error: 'Error en la carga masiva' });
     } finally {
         client.release();
@@ -199,17 +216,40 @@ const agregarResponsable = async (req, res) => {
 };
 
 const agregarEnlace = async (req, res) => {
-    const { nombre, email } = req.body;
-    if (!nombre || !email) return res.status(400).json({ error: 'Nombre y email requeridos' });
+    const { nombre, email, password } = req.body;
+    if (!nombre || !email || !password) {
+        return res.status(400).json({ error: 'Nombre, email y contraseña son requeridos' });
+    }
+
+    const client = await pool.connect();
     try {
-        const result = await pool.query(
+        await client.query('BEGIN');
+
+        // 1. Insertar en catálogo de enlaces
+        const resCat = await client.query(
             'INSERT INTO cat_enlaces (nombre, email) VALUES ($1, $2) RETURNING *',
-            [nombre, email]
+            [nombre, email.toLowerCase()]
         );
-        res.json(result.rows[0]);
+
+        // 2. Crear usuario
+        const hash = await bcrypt.hash(password, 10);
+        await client.query(
+            `INSERT INTO usuarios (nombre, email, password_hash, rol)
+             VALUES ($1, $2, $3, 'enlace')`,
+            [nombre, email.toLowerCase(), hash]
+        );
+
+        await client.query('COMMIT');
+        res.json(resCat.rows[0]);
     } catch (err) {
-        if (err.code === '23505') return res.status(400).json({ error: 'El email ya existe' });
-        res.status(500).json({ error: 'Error al agregar enlace' });
+        await client.query('ROLLBACK');
+        if (err.code === '23505') {
+            return res.status(400).json({ error: 'El email ya existe en el catálogo o como usuario' });
+        }
+        console.error('Error al agregar enlace y usuario:', err);
+        res.status(500).json({ error: 'Error al agregar enlace y crear usuario' });
+    } finally {
+        client.release();
     }
 };
 
