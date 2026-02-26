@@ -28,10 +28,7 @@ const CargaGlobal = () => {
                 if (!nombre) return;
                 mapa[nombre] = {
                     nombre: nombre,
-                    principal: 0,
-                    apoyo: 0,
-                    proyectos: new Set(),
-                    detalle: []
+                    proyectos: []
                 };
             });
 
