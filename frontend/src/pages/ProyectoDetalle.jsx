@@ -264,22 +264,6 @@ const TabAtribuciones = ({ proyectoId, unidad, setUnidad, arbol, atribGenerales 
                     )}
                 </div>
 
-                {/* Sub-Unidades (Modo Carpetas) */}
-                {getHijos().length > 0 && (
-                    <div style={{ marginBottom: 40, background: '#fcfcfc', padding: 20, borderRadius: 12, border: '1px solid #f1f5f9' }}>
-                        <h4 style={{ fontSize: 12, color: 'var(--color-texto-suave)', marginBottom: 20, textTransform: 'uppercase', letterSpacing: '0.08em', fontWeight: 800 }}>� Unidades Dependientes</h4>
-                        <div className="folder-grid">
-                            {getHijos().map(h => (
-                                <div key={h.id} className="folder-card" onClick={() => setUnidad(h)}>
-                                    <div className="folder-icon">📂</div>
-                                    <div className="folder-name">{h.nombre}</div>
-                                    <div className="folder-siglas">{h.siglas}</div>
-                                </div>
-                            ))}
-                        </div>
-                    </div>
-                )}
-
                 {/* Atribuciones Específicas */}
                 {unidad ? (
                     <div>

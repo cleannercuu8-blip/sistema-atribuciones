@@ -127,6 +127,14 @@ const actualizar = async (req, res) => {
     const { id } = req.params;
     const { nombre, dependencia_id, responsable, enlaces, fecha_expediente, estado, usuarios_ids, revisores_ids } = req.body;
 
+    const proyCheck = await pool.query('SELECT created_by, responsable FROM proyectos WHERE id = $1', [id]);
+    if (proyCheck.rows.length === 0) return res.status(404).json({ error: 'Proyecto no encontrado' });
+
+    // Solo admin o el responsable asignado pueden editar
+    if (req.user.rol !== 'admin' && proyCheck.rows[0].created_by !== req.user.id && proyCheck.rows[0].responsable !== req.user.nombre) {
+        return res.status(403).json({ error: 'No tienes permiso para editar este proyecto' });
+    }
+
     const client = await pool.connect();
     try {
         await client.query('BEGIN');
@@ -170,6 +178,24 @@ const actualizar = async (req, res) => {
     }
 };
 
+const eliminar = async (req, res) => {
+    const { id } = req.params;
+    try {
+        const proyCheck = await pool.query('SELECT created_by, responsable FROM proyectos WHERE id = $1', [id]);
+        if (proyCheck.rows.length === 0) return res.status(404).json({ error: 'Proyecto no encontrado' });
+
+        if (req.user.rol !== 'admin' && proyCheck.rows[0].created_by !== req.user.id && proyCheck.rows[0].responsable !== req.user.nombre) {
+            return res.status(403).json({ error: 'No tienes permiso para eliminar este proyecto' });
+        }
+
+        await pool.query('DELETE FROM proyectos WHERE id = $1', [id]);
+        res.json({ mensaje: 'Proyecto eliminado correctamente' });
+    } catch (err) {
+        console.error(err);
+        res.status(500).json({ error: 'Error del servidor al eliminar proyecto' });
+    }
+};
+
 // POST /api/proyectos/:id/organigrama  (subir PDF)
 const subirOrganigrama = async (req, res) => {
     const { id } = req.params;
@@ -184,4 +210,4 @@ const subirOrganigrama = async (req, res) => {
     }
 };
 
-module.exports = { listar, obtener, crear, actualizar, subirOrganigrama };
+module.exports = { listar, obtener, crear, actualizar, eliminar, subirOrganigrama };

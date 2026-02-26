@@ -18,6 +18,11 @@ export default function Catalogos() {
     const [formIndividual, setFormIndividual] = useState({ nombre: '', email: '', tipo: 'centralizada' });
     const [agregandoIndividual, setAgregandoIndividual] = useState(false);
 
+    // Estado para edición
+    const [editandoItem, setEditandoItem] = useState(null);
+    const [formEdicion, setFormEdicion] = useState({ nombre: '', email: '', tipo: 'centralizada' });
+    const [guardandoEdicion, setGuardandoEdicion] = useState(false);
+
     const cargarDatos = async () => {
         setCargando(true);
         try {
@@ -58,6 +63,40 @@ export default function Catalogos() {
             alert(err.response?.data?.error || 'Error al agregar registro');
         }
         setAgregandoIndividual(false);
+    };
+
+    const handleAbrirEdicion = (item) => {
+        setEditandoItem(item);
+        setFormEdicion({
+            nombre: item.nombre,
+            email: item.email || '',
+            tipo: item.tipo || 'centralizada'
+        });
+    };
+
+    const handleActualizar = async (e) => {
+        e.preventDefault();
+        setGuardandoEdicion(true);
+        try {
+            await api.put(`/catalogos/${tab}/${editandoItem.id}`, formEdicion);
+            setEditandoItem(null);
+            cargarDatos();
+            alert('✅ Registro actualizado');
+        } catch (err) {
+            alert(err.response?.data?.error || 'Error al actualizar');
+        }
+        setGuardandoEdicion(false);
+    };
+
+    const handleEliminar = async (id) => {
+        if (!window.confirm('¿Estás seguro de eliminar este registro?')) return;
+        try {
+            await api.delete(`/catalogos/${tab}/${id}`);
+            cargarDatos();
+            alert('🗑️ Registro eliminado');
+        } catch (err) {
+            alert(err.response?.data?.error || 'Error al eliminar');
+        }
     };
 
     const handleFileUpload = (e) => {
@@ -221,11 +260,11 @@ export default function Catalogos() {
                     <table>
                         <thead>
                             {tab === 'responsables' || tab === 'avances' ? (
-                                <tr><th>Nombre</th><th>Estado</th><th>Fecha</th></tr>
+                                <tr><th>Nombre</th><th>Estado</th><th>Fecha</th><th style={{ textAlign: 'right' }}>Acciones</th></tr>
                             ) : tab === 'enlaces' ? (
-                                <tr><th>Nombre</th><th>Email</th><th>Estado</th><th>Fecha</th></tr>
+                                <tr><th>Nombre</th><th>Email</th><th>Estado</th><th>Fecha</th><th style={{ textAlign: 'right' }}>Acciones</th></tr>
                             ) : (
-                                <tr><th>Nombre</th><th>Tipo</th><th>Estado</th><th>Fecha</th></tr>
+                                <tr><th>Nombre</th><th>Tipo</th><th>Estado</th><th>Fecha</th><th style={{ textAlign: 'right' }}>Acciones</th></tr>
                             )}
                         </thead>
                         <tbody>
@@ -238,17 +277,78 @@ export default function Catalogos() {
                                             {tab === 'dependencias' && <td><span className="badge badge-normal">{item.tipo}</span></td>}
                                             <td><span className="badge badge-aprobado">Activo</span></td>
                                             <td>{new Date(item.created_at).toLocaleDateString()}</td>
+                                            <td style={{ textAlign: 'right' }}>
+                                                <div style={{ display: 'flex', gap: 8, justifyContent: 'flex-end' }}>
+                                                    <button className="btn btn-outline btn-sm" onClick={() => handleAbrirEdicion(item)}>✏️</button>
+                                                    <button className="btn btn-danger btn-sm" onClick={() => handleEliminar(item.id)}>🗑️</button>
+                                                </div>
+                                            </td>
                                         </tr>
                                     ))}
                             {(tab === 'responsables' ? responsables :
                                 tab === 'enlaces' ? enlaces :
                                     tab === 'dependencias' ? dependencias : avances).length === 0 && (
-                                    <tr><td colSpan={5} style={{ textAlign: 'center', padding: '40px', color: '#999' }}>No hay datos. Usa la carga masiva.</td></tr>
+                                    <tr><td colSpan={6} style={{ textAlign: 'center', padding: '40px', color: '#999' }}>No hay datos. Usa la carga masiva.</td></tr>
                                 )}
                         </tbody>
                     </table>
                 </div>
             </div>
+
+            {editandoItem && (
+                <div className="modal-overlay" onClick={() => setEditandoItem(null)}>
+                    <div className="modal" onClick={e => e.stopPropagation()} style={{ maxWidth: 450 }}>
+                        <div className="modal-header">
+                            <h2 className="modal-title">✏️ Editar {tab.slice(0, -1)}</h2>
+                            <button className="modal-close" onClick={() => setEditandoItem(null)}>×</button>
+                        </div>
+                        <form onSubmit={handleActualizar} style={{ padding: 20 }}>
+                            <div className="form-group">
+                                <label className="form-label">Nombre</label>
+                                <input
+                                    type="text"
+                                    className="form-control"
+                                    value={formEdicion.nombre}
+                                    onChange={e => setFormEdicion({ ...formEdicion, nombre: e.target.value })}
+                                    required
+                                />
+                            </div>
+                            {tab === 'enlaces' && (
+                                <div className="form-group">
+                                    <label className="form-label">Email</label>
+                                    <input
+                                        type="email"
+                                        className="form-control"
+                                        value={formEdicion.email}
+                                        onChange={e => setFormEdicion({ ...formEdicion, email: e.target.value })}
+                                        required
+                                    />
+                                </div>
+                            )}
+                            {tab === 'dependencias' && (
+                                <div className="form-group">
+                                    <label className="form-label">Tipo de Organismo</label>
+                                    <select
+                                        className="form-control"
+                                        value={formEdicion.tipo}
+                                        onChange={e => setFormEdicion({ ...formEdicion, tipo: e.target.value })}
+                                    >
+                                        <option value="centralizada">🏢 Centralizada</option>
+                                        <option value="paraestatal">🏛️ Paraestatal</option>
+                                        <option value="organismo_autonomo">⚖️ Organismo Autónomo</option>
+                                    </select>
+                                </div>
+                            )}
+                            <div style={{ display: 'flex', gap: 10, justifyContent: 'flex-end', marginTop: 20 }}>
+                                <button type="button" className="btn btn-outline" onClick={() => setEditandoItem(null)}>Cancelar</button>
+                                <button type="submit" className="btn btn-primary" disabled={guardandoEdicion}>
+                                    {guardandoEdicion ? '⌛...' : '💾 Guardar Cambios'}
+                                </button>
+                            </div>
+                        </form>
+                    </div>
+                </div>
+            )}
 
             {mostrandoModalCarga && (
                 <div className="modal-overlay" onClick={() => setMostrandoModalCarga(false)}>

@@ -11,9 +11,20 @@ router.get('/dependencias', authMiddleware, catalogosController.listarDependenci
 
 // Gestión (Solo Admin)
 router.post('/responsables', authMiddleware, requireRole('admin'), catalogosController.agregarResponsable);
+router.put('/responsables/:id', authMiddleware, requireRole('admin'), catalogosController.actualizarResponsable);
+router.delete('/responsables/:id', authMiddleware, requireRole('admin'), catalogosController.eliminarResponsable);
+
 router.post('/enlaces', authMiddleware, requireRole('admin'), catalogosController.agregarEnlace);
+router.put('/enlaces/:id', authMiddleware, requireRole('admin'), catalogosController.actualizarEnlace);
+router.delete('/enlaces/:id', authMiddleware, requireRole('admin'), catalogosController.eliminarEnlace);
+
 router.post('/avances', authMiddleware, requireRole('admin'), catalogosController.agregarAvance);
+router.put('/avances/:id', authMiddleware, requireRole('admin'), catalogosController.actualizarAvance);
+router.delete('/avances/:id', authMiddleware, requireRole('admin'), catalogosController.eliminarAvance);
+
 router.post('/dependencias', authMiddleware, requireRole('admin'), catalogosController.agregarDependencia);
+router.put('/dependencias/:id', authMiddleware, requireRole('admin'), catalogosController.actualizarDependencia);
+router.delete('/dependencias/:id', authMiddleware, requireRole('admin'), catalogosController.eliminarDependencia);
 
 router.post('/responsables/masivo', authMiddleware, requireRole('admin'), catalogosController.cargarMasivoResponsables);
 router.post('/enlaces/masivo', authMiddleware, requireRole('admin'), catalogosController.cargarMasivoEnlaces);

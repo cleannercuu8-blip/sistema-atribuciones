@@ -255,6 +255,102 @@ const descargarPlantilla = async (req, res) => {
     res.end();
 };
 
+const actualizarResponsable = async (req, res) => {
+    const { id } = req.params;
+    const { nombre } = req.body;
+    try {
+        const result = await pool.query(
+            'UPDATE cat_responsables SET nombre = $1, updated_at = NOW() WHERE id = $2 RETURNING *',
+            [nombre, id]
+        );
+        res.json(result.rows[0]);
+    } catch (err) {
+        res.status(500).json({ error: 'Error al actualizar responsable' });
+    }
+};
+
+const eliminarResponsable = async (req, res) => {
+    const { id } = req.params;
+    try {
+        await pool.query('DELETE FROM cat_responsables WHERE id = $1', [id]);
+        res.json({ mensaje: 'Responsable eliminado' });
+    } catch (err) {
+        res.status(500).json({ error: 'Error al eliminar responsable' });
+    }
+};
+
+const actualizarEnlace = async (req, res) => {
+    const { id } = req.params;
+    const { nombre, email } = req.body;
+    try {
+        const result = await pool.query(
+            'UPDATE cat_enlaces SET nombre = $1, email = $2, updated_at = NOW() WHERE id = $3 RETURNING *',
+            [nombre, email, id]
+        );
+        res.json(result.rows[0]);
+    } catch (err) {
+        res.status(500).json({ error: 'Error al actualizar enlace' });
+    }
+};
+
+const eliminarEnlace = async (req, res) => {
+    const { id } = req.params;
+    try {
+        await pool.query('DELETE FROM cat_enlaces WHERE id = $1', [id]);
+        res.json({ mensaje: 'Enlace eliminado' });
+    } catch (err) {
+        res.status(500).json({ error: 'Error al eliminar enlace' });
+    }
+};
+
+const actualizarAvance = async (req, res) => {
+    const { id } = req.params;
+    const { nombre } = req.body;
+    try {
+        const result = await pool.query(
+            'UPDATE cat_avances SET nombre = $1, updated_at = NOW() WHERE id = $2 RETURNING *',
+            [nombre, id]
+        );
+        res.json(result.rows[0]);
+    } catch (err) {
+        res.status(500).json({ error: 'Error al actualizar avance' });
+    }
+};
+
+const eliminarAvance = async (req, res) => {
+    const { id } = req.params;
+    try {
+        await pool.query('DELETE FROM cat_avances WHERE id = $1', [id]);
+        res.json({ mensaje: 'Avance eliminado' });
+    } catch (err) {
+        res.status(500).json({ error: 'Error al eliminar avance' });
+    }
+};
+
+const actualizarDependencia = async (req, res) => {
+    const { id } = req.params;
+    const { nombre, tipo } = req.body;
+    try {
+        const result = await pool.query(
+            'UPDATE dependencias SET nombre = $1, tipo = $2, updated_at = NOW() WHERE id = $3 RETURNING *',
+            [nombre, tipo, id]
+        );
+        res.json(result.rows[0]);
+    } catch (err) {
+        res.status(500).json({ error: 'Error al actualizar dependencia' });
+    }
+};
+
+const eliminarDependencia = async (req, res) => {
+    const { id } = req.params;
+    try {
+        await pool.query('DELETE FROM dependencias WHERE id = $1', [id]);
+        res.json({ mensaje: 'Dependencia eliminada' });
+    } catch (err) {
+        res.status(500).json({ error: 'Error al eliminar dependencia' });
+    }
+};
+
 const cargarMasivoGlosario = async (req, res) => {
     const { proyectoId } = req.params;
     const { items } = req.body; // [{acronimo, significado}]
@@ -297,6 +393,14 @@ module.exports = {
     agregarEnlace,
     agregarAvance,
     agregarDependencia,
+    actualizarResponsable,
+    eliminarResponsable,
+    actualizarEnlace,
+    eliminarEnlace,
+    actualizarAvance,
+    eliminarAvance,
+    actualizarDependencia,
+    eliminarDependencia,
     limpiarCatalogo,
     descargarPlantilla
 };

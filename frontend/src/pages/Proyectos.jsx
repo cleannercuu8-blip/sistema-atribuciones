@@ -89,6 +89,22 @@ export default function Proyectos() {
         setMostrarModal(true);
     };
 
+    const handleEliminar = async (e, id) => {
+        e.stopPropagation();
+        if (!window.confirm('⚠️ ¿Estás seguro de eliminar este proyecto y toda su información relacionada? Esta acción es irreversible.')) return;
+        try {
+            await api.delete(`/proyectos/${id}`);
+            cargarDatos();
+            alert('✅ Proyecto eliminado');
+        } catch (err) {
+            alert(err.response?.data?.error || 'Error al eliminar proyecto');
+        }
+    };
+
+    const puedeGestionar = (p) => {
+        return usuario.rol === 'admin' || p.responsable === usuario.nombre || p.creado_por === usuario.nombre;
+    };
+
     const proyFiltrados = proyectos.filter(p =>
         p.nombre.toLowerCase().includes(filtro.toLowerCase()) ||
         p.dependencia_nombre?.toLowerCase().includes(filtro.toLowerCase())
@@ -161,8 +177,11 @@ export default function Proyectos() {
                                         <div style={{ marginTop: 15, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                                             <span style={{ fontSize: 12, color: '#999' }}>ID: {p.id}</span>
                                             <div style={{ display: 'flex', gap: 8 }}>
-                                                {usuario.rol === 'admin' && (
-                                                    <button className="btn btn-outline btn-sm" onClick={(e) => abrirEdicion(e, p)}>✏️ Editar</button>
+                                                {puedeGestionar(p) && (
+                                                    <>
+                                                        <button className="btn btn-outline btn-sm" onClick={(e) => abrirEdicion(e, p)}>✏️</button>
+                                                        <button className="btn btn-danger btn-sm" onClick={(e) => handleEliminar(e, p.id)}>🗑️</button>
+                                                    </>
                                                 )}
                                                 <button className="btn btn-primary btn-sm">Abrir →</button>
                                             </div>
@@ -193,8 +212,11 @@ export default function Proyectos() {
                                         <div style={{ marginTop: 15, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                                             <span style={{ fontSize: 12, color: '#999' }}>ID: {p.id}</span>
                                             <div style={{ display: 'flex', gap: 8 }}>
-                                                {usuario.rol === 'admin' && (
-                                                    <button className="btn btn-outline btn-sm" onClick={(e) => abrirEdicion(e, p)}>✏️ Editar</button>
+                                                {puedeGestionar(p) && (
+                                                    <>
+                                                        <button className="btn btn-outline btn-sm" onClick={(e) => abrirEdicion(e, p)}>✏️</button>
+                                                        <button className="btn btn-danger btn-sm" onClick={(e) => handleEliminar(e, p.id)}>🗑️</button>
+                                                    </>
                                                 )}
                                                 <button className="btn btn-primary btn-sm">Abrir →</button>
                                             </div>

@@ -8,36 +8,60 @@ const CargaGlobal = () => {
 
     const cargarDatos = async () => {
         try {
-            const res = await api.get('/atribuciones/especificas/todas');
-            const atribs = res.data;
+            const [atribsRes, respRes] = await Promise.all([
+                api.get('/atribuciones/especificas/todas'),
+                api.get('/catalogos/responsables')
+            ]);
+            const atribs = atribsRes.data;
+            const catResponsables = respRes.data;
 
             const mapa = {};
+
+            // Inicializar con todos los responsables del catálogo
+            catResponsables.forEach(r => {
+                mapa[r.nombre] = {
+                    nombre: r.nombre,
+                    principal: 0,
+                    apoyo: 0,
+                    proyectos: new Set(),
+                    detalle: []
+                };
+            });
+
             atribs.forEach(a => {
-                if (a.responsable_id) {
-                    if (!mapa[a.responsable_id]) mapa[a.responsable_id] = {
-                        nombre: a.responsable_nombre,
-                        principal: 0,
-                        apoyo: 0,
-                        proyectos: new Set(),
-                        detalle: []
-                    };
-                    mapa[a.responsable_id].principal++;
-                    mapa[a.responsable_id].proyectos.add(a.proyecto_nombre);
-                    mapa[a.responsable_id].detalle.push({ proyecto: a.proyecto_nombre, unidad: a.unidad_siglas, clave: a.clave, rol: 'Principal' });
-                }
-                if (a.apoyo_ids) {
-                    a.apoyo_ids.forEach((id, idx) => {
-                        const nombre = a.apoyo_nombres?.[idx] || 'Usuario';
-                        if (!mapa[id]) mapa[id] = {
-                            nombre,
+                // Principal
+                if (a.responsable_nombre) {
+                    if (!mapa[a.responsable_nombre]) {
+                        mapa[a.responsable_nombre] = {
+                            nombre: a.responsable_nombre,
                             principal: 0,
                             apoyo: 0,
                             proyectos: new Set(),
                             detalle: []
                         };
-                        mapa[id].apoyo++;
-                        mapa[id].proyectos.add(a.proyecto_nombre);
-                        mapa[id].detalle.push({ proyecto: a.proyecto_nombre, unidad: a.unidad_siglas, clave: a.clave, rol: 'Apoyo' });
+                    }
+                    mapa[a.responsable_nombre].principal++;
+                    mapa[a.responsable_nombre].proyectos.add(a.proyecto_nombre);
+                    mapa[a.responsable_nombre].detalle.push({ proyecto: a.proyecto_nombre, unidad: a.unidad_siglas, clave: a.clave, rol: 'Principal' });
+                }
+                // Apoyo
+                if (a.apoyo_ids) {
+                    a.apoyo_ids.forEach((id, idx) => {
+                        const nombre = a.apoyo_nombres?.[idx];
+                        if (nombre) {
+                            if (!mapa[nombre]) {
+                                mapa[nombre] = {
+                                    nombre,
+                                    principal: 0,
+                                    apoyo: 0,
+                                    proyectos: new Set(),
+                                    detalle: []
+                                };
+                            }
+                            mapa[nombre].apoyo++;
+                            mapa[nombre].proyectos.add(a.proyecto_nombre);
+                            mapa[nombre].detalle.push({ proyecto: a.proyecto_nombre, unidad: a.unidad_siglas, clave: a.clave, rol: 'Apoyo' });
+                        }
                     });
                 }
             });

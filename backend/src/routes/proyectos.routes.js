@@ -28,7 +28,8 @@ router.use(authMiddleware);
 router.get('/', ctrl.listar);
 router.post('/', requireRole('admin'), ctrl.crear);
 router.get('/:id', ctrl.obtener);
-router.put('/:id', requireRole('admin'), ctrl.actualizar);
+router.put('/:id', ctrl.actualizar);
+router.delete('/:id', ctrl.eliminar);
 router.post('/:id/organigrama', upload.single('archivo'), ctrl.subirOrganigrama);
 router.put('/:proyectoId/aprobar', requireRole('admin', 'revisor'), revCtrl.aprobarProyecto);
 
