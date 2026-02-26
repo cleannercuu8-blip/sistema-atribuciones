@@ -36,7 +36,7 @@ export default function Proyectos() {
 
     const cargarDatos = async () => {
         try {
-            const [pRes, dRes, rRes, eRes, aRes] = await Promise.all([
+            const [pRes, dRes, rRes, eRes, aRes, stRes] = await Promise.all([
                 api.get('/proyectos'),
                 api.get('/catalogos/dependencias'),
                 api.get('/catalogos/responsables'),

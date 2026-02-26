@@ -79,7 +79,8 @@ const initDB = async () => {
                 nombre VARCHAR(100) NOT NULL UNIQUE,
                 color VARCHAR(20) DEFAULT '#475569',
                 activo BOOLEAN DEFAULT true,
-                created_at TIMESTAMPTZ DEFAULT NOW()
+                created_at TIMESTAMPTZ DEFAULT NOW(),
+                updated_at TIMESTAMPTZ DEFAULT NOW()
             );
         `);
 

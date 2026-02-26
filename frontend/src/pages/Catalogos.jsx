@@ -305,8 +305,7 @@ export default function Catalogos() {
                                                 {tab === 'dependencias' && <td><span className="badge badge-normal">{item.tipo}</span></td>}
                                                 {tab === 'estados-proyecto' && <td>
                                                     <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                                                        <div style={{ width: 16, height: 16, borderRadius: '50%', background: item.color }} />
-                                                        {item.color}
+                                                        <div style={{ width: 24, height: 24, borderRadius: '6px', background: item.color, border: '1px solid #ddd' }} />
                                                     </div>
                                                 </td>}
                                                 <td><span className="badge badge-aprobado">Activo</span></td>
@@ -357,6 +356,18 @@ export default function Catalogos() {
                                         value={formEdicion.email}
                                         onChange={e => setFormEdicion({ ...formEdicion, email: e.target.value })}
                                         required
+                                    />
+                                </div>
+                            )}
+                            {tab === 'estados-proyecto' && (
+                                <div className="form-group">
+                                    <label className="form-label">Color del Estado</label>
+                                    <input
+                                        type="color"
+                                        className="form-control"
+                                        style={{ height: 42, padding: 2 }}
+                                        value={formEdicion.color}
+                                        onChange={e => setFormEdicion({ ...formEdicion, color: e.target.value })}
                                     />
                                 </div>
                             )}
