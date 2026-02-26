@@ -33,6 +33,7 @@ router.put('/:id', requireRole('revisor', 'admin'), ctrl.actualizar);
 router.delete('/:id', requireRole('revisor', 'admin'), ctrl.eliminar);
 router.put('/:id/cerrar', requireRole('revisor', 'admin'), ctrl.cerrarRevision);
 router.put('/observaciones/:id/subsanar', ctrl.subsanarObservacion);
+router.delete('/observaciones/:id', requireRole('revisor', 'admin'), ctrl.eliminarObservacion);
 router.post('/:id/producto-final', requireRole('revisor', 'admin'), upload.single('archivo'), ctrl.subirProductoFinal);
 
 module.exports = router;

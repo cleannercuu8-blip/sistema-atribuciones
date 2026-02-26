@@ -287,4 +287,15 @@ const eliminar = async (req, res) => {
     }
 };
 
-module.exports = { listar, crear, listarObservaciones, crearObservacion, subsanarObservacion, cerrarRevision, aprobarProyecto, subirProductoFinal, actualizar, eliminar };
+const eliminarObservacion = async (req, res) => {
+    const { id } = req.params;
+    try {
+        await pool.query('DELETE FROM observaciones WHERE id = $1', [id]);
+        res.json({ mensaje: 'Observación eliminada correctamente' });
+    } catch (err) {
+        console.error(err);
+        res.status(500).json({ error: 'Error al eliminar observación' });
+    }
+};
+
+module.exports = { listar, crear, listarObservaciones, crearObservacion, subsanarObservacion, cerrarRevision, aprobarProyecto, subirProductoFinal, actualizar, eliminar, eliminarObservacion };
