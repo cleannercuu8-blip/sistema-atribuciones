@@ -48,7 +48,7 @@ const MiniNodoArbol = ({ nodo, onSeleccionar, seleccionado }) => {
                 className={`mini-tree-item ${esActivo ? 'active' : ''}`}
                 onClick={() => onSeleccionar(nodo)}
             >
-                <span className="mini-tree-icon">{nodo.hijos?.length > 0 ? '📂' : '📄'}</span>
+                <span className="mini-tree-icon">📄</span>
                 <span className="mini-tree-label">{nodo.siglas}</span>
             </div>
             {nodo.hijos?.length > 0 && (
@@ -366,7 +366,7 @@ const TabAtribuciones = ({ proyectoId, unidad, setUnidad, arbol, atribGenerales 
                             <div className="form-row">
                                 <div className="form-group">
                                     <label className="form-label">Clave <span className="required">*</span></label>
-                                    <input className="form-control" value={form.clave} onChange={e => setForm({ ...form, clave: e.target.value })} required />
+                                    <input className="form-control" value={form.clave} readOnly style={{ background: '#f1f5f9', cursor: 'not-allowed' }} />
                                 </div>
                                 <div className="form-group">
                                     <label className="form-label">Tipo</label>
@@ -382,35 +382,12 @@ const TabAtribuciones = ({ proyectoId, unidad, setUnidad, arbol, atribGenerales 
                             </div>
                             <div className="form-row">
                                 <div className="form-group">
-                                    <label className="form-label">Responsable Obligatorio</label>
-                                    <select className="form-control" value={form.responsable_id} onChange={e => setForm({ ...form, responsable_id: e.target.value })}>
-                                        <option value="">-- Seleccione --</option>
-                                        {usuarios.map(u => <option key={u.id} value={u.id}>{u.nombre}</option>)}
-                                    </select>
-                                </div>
-                                <div className="form-group">
                                     <label className="form-label">Corresponsabilidad (Siglas)</label>
-                                    <input className="form-control" value={form.corresponsabilidad} onChange={e => setForm({ ...form, corresponsabilidad: e.target.value })} />
-                                </div>
-                            </div>
-                            <div className="form-group">
-                                <label className="form-label">Personal de Apoyo</label>
-                                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 10, maxHeight: 150, overflowY: 'auto', padding: 12, border: '1px solid var(--color-borde)', borderRadius: 8, background: '#f8fafc' }}>
-                                    {usuarios.map(u => (
-                                        <label key={u.id} style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 13, cursor: 'pointer' }}>
-                                            <input type="checkbox" checked={form.apoyo_ids?.includes(u.id)} onChange={e => {
-                                                const ids = [...(form.apoyo_ids || [])];
-                                                if (e.target.checked) ids.push(u.id);
-                                                else { const idx = ids.indexOf(u.id); if (idx > -1) ids.splice(idx, 1); }
-                                                setForm({ ...form, apoyo_ids: ids });
-                                            }} />
-                                            {u.nombre}
-                                        </label>
-                                    ))}
+                                    <input className="form-control" value={form.corresponsabilidad} onChange={e => setForm({ ...form, corresponsabilidad: e.target.value })} placeholder="Ej: SHCP, SEDENA..." />
                                 </div>
                             </div>
                             <div className="form-row">
-                                {atribGenerales.length > 0 && (
+                                {unidad.nivel_numero === 1 && atribGenerales.length > 0 && (
                                     <div className="form-group">
                                         <label className="form-label">Vínculo con Ley</label>
                                         <select className="form-control" value={form.atribucion_general_id} onChange={e => setForm({ ...form, atribucion_general_id: e.target.value })}>
@@ -471,6 +448,8 @@ export default function ProyectoDetalle() {
     const [archivoUnidades, setArchivoUnidades] = useState(null);
     const [previewUnidades, setPreviewUnidades] = useState([]);
     const [cargandoBulk, setCargandoBulk] = useState(false);
+    const [editandoAG, setEditandoAG] = useState(null);
+    const [editandoGlosario, setEditandoGlosario] = useState(null);
 
     const cargar = async () => {
         try {
@@ -527,23 +506,45 @@ export default function ProyectoDetalle() {
     const crearAG = async (e) => {
         e.preventDefault();
         try {
-            await api.post(`/proyectos/${id}/atribuciones-generales`, formAG);
+            if (editandoAG) {
+                await api.put(`/atribuciones-generales/${editandoAG.id}`, formAG);
+            } else {
+                await api.post(`/proyectos/${id}/atribuciones-generales`, formAG);
+            }
             setMostrarModalAG(false);
+            setEditandoAG(null);
             cargar();
         } catch (err) {
             alert(err.response?.data?.error || 'Error');
         }
     };
 
+    const abrirEditarAG = (ag) => {
+        setFormAG({ clave: ag.clave, norma: ag.norma, articulo: ag.articulo, fraccion_parrafo: ag.fraccion_parrafo, texto: ag.texto });
+        setEditandoAG(ag);
+        setMostrarModalAG(true);
+    };
+
     const crearGlosario = async (e) => {
         e.preventDefault();
         try {
-            await api.post(`/proyectos/${id}/glosario`, formGlosario);
+            if (editandoGlosario) {
+                await api.put(`/proyectos/${id}/glosario/${editandoGlosario.id}`, formGlosario);
+            } else {
+                await api.post(`/proyectos/${id}/glosario`, formGlosario);
+            }
             setMostrarModalGlosario(false);
+            setEditandoGlosario(null);
             cargar();
         } catch (err) {
             alert(err.response?.data?.error || 'Error');
         }
+    };
+
+    const abrirEditarGlosario = (g) => {
+        setFormGlosario({ acronimo: g.acronimo, significado: g.significado });
+        setEditandoGlosario(g);
+        setMostrarModalGlosario(true);
     };
 
     const exportar = async () => {
@@ -802,7 +803,8 @@ export default function ProyectoDetalle() {
                                             <td>{ag.fraccion_parrafo || '-'}</td>
                                             <td style={{ maxWidth: 400 }}>{ag.texto}</td>
                                             {puedeEditar && (
-                                                <td>
+                                                <td style={{ display: 'flex', gap: 4 }}>
+                                                    <button className="btn btn-outline btn-icon btn-sm" onClick={() => abrirEditarAG(ag)} title="Editar">✏️</button>
                                                     <button className="btn btn-danger btn-icon btn-sm" onClick={async () => { if (window.confirm('¿Eliminar?')) { await api.delete(`/atribuciones-generales/${ag.id}`); cargar(); } }}>🗑️</button>
                                                 </td>
                                             )}
@@ -839,7 +841,10 @@ export default function ProyectoDetalle() {
                                             <td><strong>{g.acronimo}</strong></td>
                                             <td>{g.significado}</td>
                                             {puedeEditar && (
-                                                <td><button className="btn btn-danger btn-icon btn-sm" onClick={async () => { if (window.confirm('¿Eliminar?')) { await api.delete(`/proyectos/${id}/glosario/${g.id}`); cargar(); } }}>🗑️</button></td>
+                                                <td style={{ display: 'flex', gap: 4 }}>
+                                                    <button className="btn btn-outline btn-icon btn-sm" onClick={() => abrirEditarGlosario(g)} title="Editar">✏️</button>
+                                                    <button className="btn btn-danger btn-icon btn-sm" onClick={async () => { if (window.confirm('¿Eliminar?')) { await api.delete(`/proyectos/${id}/glosario/${g.id}`); cargar(); } }}>🗑️</button>
+                                                </td>
                                             )}
                                         </tr>
                                     ))}
@@ -903,8 +908,8 @@ export default function ProyectoDetalle() {
                 <div className="modal-overlay" onClick={() => setMostrarModalAG(false)}>
                     <div className="modal modal-lg" onClick={e => e.stopPropagation()}>
                         <div className="modal-header">
-                            <h2 className="modal-title">📜 Nueva Atribución de Ley</h2>
-                            <button className="modal-close" onClick={() => setMostrarModalAG(false)}>×</button>
+                            <h2 className="modal-title">{editandoAG ? '✏️ Editar Atribución de Ley' : '📜 Nueva Atribución de Ley'}</h2>
+                            <button className="modal-close" onClick={() => { setMostrarModalAG(false); setEditandoAG(null); }}>×</button>
                         </div>
                         <form onSubmit={crearAG}>
                             <div className="form-row">
@@ -945,8 +950,8 @@ export default function ProyectoDetalle() {
                 <div className="modal-overlay" onClick={() => setMostrarModalGlosario(false)}>
                     <div className="modal" onClick={e => e.stopPropagation()}>
                         <div className="modal-header">
-                            <h2 className="modal-title">📖 Nuevo Acrónimo</h2>
-                            <button className="modal-close" onClick={() => setMostrarModalGlosario(false)}>×</button>
+                            <h2 className="modal-title">{editandoGlosario ? '✏️ Editar Acrónimo' : '📖 Nuevo Acrónimo'}</h2>
+                            <button className="modal-close" onClick={() => { setMostrarModalGlosario(false); setEditandoGlosario(null); }}>×</button>
                         </div>
                         <form onSubmit={crearGlosario}>
                             <div className="form-group">

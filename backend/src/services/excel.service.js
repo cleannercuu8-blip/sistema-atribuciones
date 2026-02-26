@@ -222,20 +222,34 @@ const exportarExcel = async (proyectoId) => {
                 const atribsPorNivel = {};
                 atribsPorNivel[nivel] = { clave: atr.clave, texto: atr.texto };
 
-                // Subir por la jerarquía para llenar los niveles superiores
+                // Subir por la jerarquía para llenar los niveles superiores siguiendo el rastro explicitamente
                 let actual = atr;
                 while (actual.padre_atribucion_id && atriMap[actual.padre_atribucion_id]) {
                     actual = atriMap[actual.padre_atribucion_id];
-                    const n = actual.nivel_numero || (actual.unidad_id ? unidadesMap[actual.unidad_id]?.nivel_numero : null);
-                    if (n !== null) atribsPorNivel[n] = { clave: actual.clave, texto: actual.texto };
+                    // Obtener nivel real
+                    const n = actual.nivel_numero !== undefined ? actual.nivel_numero : (actual.unidad_id ? unidadesMap[actual.unidad_id]?.nivel_numero : null);
+                    if (n !== null) {
+                        atribsPorNivel[n] = { clave: actual.clave, texto: actual.texto };
+                    }
                 }
 
                 // Atribución General (Ley - Nivel 0)
-                if (atr.atribucion_general_id) {
-                    const gen = atriGenerales.find(g => g.id === atr.atribucion_general_id);
-                    if (gen) atribsPorNivel[0] = { clave: gen.clave, texto: gen.texto };
-                } else if (actual.atribucion_general_id) {
-                    const gen = atriGenerales.find(g => g.id === actual.atribucion_general_id);
+                // Se busca el vinculo final de la ley en toda la cadena encontrada
+                let idLey = atr.atribucion_general_id;
+                if (!idLey) {
+                    // Si no tiene vinculo directo, puede que algun padre si lo tenga
+                    let aux = atr;
+                    while (aux.padre_atribucion_id && atriMap[aux.padre_atribucion_id]) {
+                        aux = atriMap[aux.padre_atribucion_id];
+                        if (aux.atribucion_general_id) {
+                            idLey = aux.atribucion_general_id;
+                            break;
+                        }
+                    }
+                }
+
+                if (idLey) {
+                    const gen = atriGenerales.find(g => g.id === idLey);
                     if (gen) atribsPorNivel[0] = { clave: gen.clave, texto: gen.texto };
                 }
 
@@ -243,41 +257,15 @@ const exportarExcel = async (proyectoId) => {
                 let c = 1;
                 for (const nv of cadena) {
                     const data = atribsPorNivel[nv.nivel_numero];
-                    estiloCelda(ws.getCell(`${getColumnLetter(c)}${fila}`), data?.clave);
-                    estiloCelda(ws.getCell(`${getColumnLetter(c + 1)}${fila}`), data?.texto);
+                    estiloCelda(ws.getCell(`${getColumnLetter(c)}${fila}`), data?.clave || '-');
+                    estiloCelda(ws.getCell(`${getColumnLetter(c + 1)}${fila}`), data?.texto || '-');
                     c += 2;
                 }
                 // Corresponsabilidad
-                estiloCelda(ws.getCell(`${getColumnLetter(c)}${fila}`), atr.corresponsabilidad);
+                estiloCelda(ws.getCell(`${getColumnLetter(c)}${fila}`), atr.corresponsabilidad || '-');
                 fila++;
             }
         }
-    }
-
-    // ===== HOJA: CONSOLIDADO FINAL (TODO EL ÁRBOL) =====
-    const wsCons = workbook.addWorksheet('CONSOLIDADO');
-    wsCons.getColumn('A').width = 15;
-    wsCons.getColumn('B').width = 35;
-    wsCons.getColumn('C').width = 15;
-    wsCons.getColumn('D').width = 60;
-    wsCons.getColumn('E').width = 40;
-
-    estiloHeader(wsCons.getCell('A1'), 'REPORTE CONSOLIDADO DE TODAS LAS ATRIBUCIONES');
-    wsCons.mergeCells('A1:E1');
-
-    ['NIVEL', 'UNIDAD', 'CLAVE', 'TEXTO ATRIBUCIÓN', 'CORRESPONSABILIDAD'].forEach((h, i) => {
-        estiloSubHeader(wsCons.getCell(`${getColumnLetter(i + 1)}2`), h);
-    });
-
-    let fCons = 3;
-    for (const atr of atriEspecificas) {
-        const unidad = unidadesMap[atr.unidad_id];
-        wsCons.getCell(`A${fCons}`).value = unidad?.nivel_numero;
-        estiloCelda(wsCons.getCell(`B${fCons}`), unidad?.nombre);
-        estiloCelda(wsCons.getCell(`C${fCons}`), atr.clave);
-        estiloCelda(wsCons.getCell(`D${fCons}`), atr.texto);
-        estiloCelda(wsCons.getCell(`E${fCons}`), atr.corresponsabilidad);
-        fCons++;
     }
 
     return workbook;
