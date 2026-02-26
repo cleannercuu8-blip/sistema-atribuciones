@@ -63,6 +63,12 @@ CREATE TABLE IF NOT EXISTS proyectos (
   estado estado_proyecto DEFAULT 'borrador',
   organigrama_url TEXT,  -- URL del PDF subido a Render
   created_by INTEGER REFERENCES usuarios(id),
+  responsable VARCHAR(200),
+  responsable_apoyo VARCHAR(200),
+  enlaces TEXT,
+  fecha_expediente DATE,
+  estado_id INTEGER REFERENCES cat_estados_proyecto(id),
+  avance_id INTEGER REFERENCES cat_avances(id),
   created_at TIMESTAMPTZ DEFAULT NOW(),
   updated_at TIMESTAMPTZ DEFAULT NOW()
 );

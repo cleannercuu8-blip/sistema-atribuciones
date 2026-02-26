@@ -97,7 +97,12 @@ const initDB = async () => {
             `);
         }
 
-        // 4. Migración de Proyectos para usar catálogo de estados
+        // 4. Migraciones manuales (idempotentes)
+        await pool.query(`
+            ALTER TABLE proyectos ADD COLUMN IF NOT EXISTS responsable_apoyo VARCHAR(200);
+        `);
+
+        // 5. Migración de Proyectos para usar catálogo de estados
         await pool.query(`
             ALTER TABLE proyectos ADD COLUMN IF NOT EXISTS estado_id INTEGER REFERENCES cat_estados_proyecto(id);
         `);

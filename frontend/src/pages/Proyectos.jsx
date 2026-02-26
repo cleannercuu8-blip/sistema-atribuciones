@@ -27,6 +27,7 @@ export default function Proyectos() {
         nombre: '',
         dependencia_id: '',
         responsable: '',
+        responsable_apoyo: '',
         enlaces: '',
         fecha_expediente: '',
         avance_id: '',
@@ -88,6 +89,7 @@ export default function Proyectos() {
             nombre: p.nombre,
             dependencia_id: p.dependencia_id,
             responsable: p.responsable || '',
+            responsable_apoyo: p.responsable_apoyo || '',
             enlaces: p.enlaces || '',
             fecha_expediente: p.fecha_expediente ? p.fecha_expediente.split('T')[0] : '',
             avance_id: p.avance_id || '',
@@ -136,7 +138,7 @@ export default function Proyectos() {
                 {usuario.rol === 'admin' && (
                     <button className="btn btn-primary" onClick={() => {
                         setProyectoEditar(null);
-                        setForm({ nombre: '', dependencia_id: '', responsable: '', enlaces: '', fecha_expediente: '', avance_id: '', estado_id: '' });
+                        setForm({ nombre: '', dependencia_id: '', responsable: '', responsable_apoyo: '', enlaces: '', fecha_expediente: '', avance_id: '', estado_id: '' });
                         setMostrarModal(true);
                     }}>
                         ➕ Nuevo proyecto
@@ -185,6 +187,7 @@ export default function Proyectos() {
                                         </div>
                                         <div style={{ fontSize: 13, color: 'var(--color-texto-suave)' }}>
                                             <div style={{ marginBottom: 4 }}><strong>Responsable:</strong> {p.responsable || 'No asignado'}</div>
+                                            {p.responsable_apoyo && <div style={{ marginBottom: 4 }}><strong>Apoyo:</strong> {p.responsable_apoyo}</div>}
                                             <div style={{ marginBottom: 4 }}><strong>Expediente:</strong> {p.fecha_expediente ? new Date(p.fecha_expediente).toLocaleDateString() : 'N/A'}</div>
                                             <div><strong>Avance:</strong> {p.avance_nombre || 'N/A'}</div>
                                         </div>
@@ -227,6 +230,7 @@ export default function Proyectos() {
                                         </div>
                                         <div style={{ fontSize: 13, color: 'var(--color-texto-suave)' }}>
                                             <div style={{ marginBottom: 4 }}><strong>Responsable:</strong> {p.responsable || 'No asignado'}</div>
+                                            {p.responsable_apoyo && <div style={{ marginBottom: 4 }}><strong>Apoyo:</strong> {p.responsable_apoyo}</div>}
                                             <div style={{ marginBottom: 4 }}><strong>Expediente:</strong> {p.fecha_expediente ? new Date(p.fecha_expediente).toLocaleDateString() : 'N/A'}</div>
                                             <div><strong>Avance:</strong> {p.avance_nombre || 'N/A'}</div>
                                         </div>
@@ -298,7 +302,7 @@ export default function Proyectos() {
                                 </div>
                             </div>
                             <div className="form-group">
-                                <label className="form-label">👨‍💼 Responsable del proyecto</label>
+                                <label className="form-label">👨‍💼 Responsable del proyecto (Líder)</label>
                                 <select
                                     className="form-control"
                                     value={form.responsable}
@@ -306,6 +310,20 @@ export default function Proyectos() {
                                     required
                                 >
                                     <option value="">Seleccione un responsable...</option>
+                                    {catResponsables.map(r => (
+                                        <option key={r.id} value={r.nombre}>{r.nombre}</option>
+                                    ))}
+                                </select>
+                            </div>
+
+                            <div className="form-group">
+                                <label className="form-label">🤝 Responsable Apoyo</label>
+                                <select
+                                    className="form-control"
+                                    value={form.responsable_apoyo}
+                                    onChange={e => setForm({ ...form, responsable_apoyo: e.target.value })}
+                                >
+                                    <option value="">Seleccione un responsable de apoyo...</option>
                                     {catResponsables.map(r => (
                                         <option key={r.id} value={r.nombre}>{r.nombre}</option>
                                     ))}

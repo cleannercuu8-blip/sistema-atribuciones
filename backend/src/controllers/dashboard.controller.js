@@ -3,14 +3,16 @@ const pool = require('../config/db');
 // GET /api/dashboard/stats-innovadoras
 const getStatsInnovadoras = async (req, res) => {
     try {
-        // 1. Balance de Responsabilidades (Conteo por el campo 'responsable' del catálogo en proyectos)
+        // 1. Balance de Responsabilidades (Conteo de Roles de Liderazgo y Apoyo del catálogo)
         const workloadResult = await pool.query(`
-            SELECT 
-                responsable, 
-                COUNT(*)::int as total
-            FROM proyectos
-            WHERE responsable IS NOT NULL AND responsable != ''
-            GROUP BY responsable
+            WITH combined_responsables AS (
+                SELECT responsable as nombre, id as proyecto_id FROM proyectos WHERE responsable IS NOT NULL AND responsable != ''
+                UNION ALL
+                SELECT responsable_apoyo as nombre, id as proyecto_id FROM proyectos WHERE responsable_apoyo IS NOT NULL AND responsable_apoyo != ''
+            )
+            SELECT nombre as responsable, COUNT(*)::int as total
+            FROM combined_responsables
+            GROUP BY nombre
             ORDER BY total DESC
         `);
 
