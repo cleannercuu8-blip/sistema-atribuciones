@@ -11,20 +11,24 @@ const listar = async (req, res) => {
             query = `
         SELECT p.*, d.nombre as dependencia_nombre, d.tipo as dependencia_tipo,
                ep.nombre as estado_nombre, ep.color as estado_color,
+               av.nombre as avance_nombre,
                u.nombre as creado_por
         FROM proyectos p
         JOIN dependencias d ON p.dependencia_id = d.id
         LEFT JOIN cat_estados_proyecto ep ON p.estado_id = ep.id
+        LEFT JOIN cat_avances av ON p.avance_id = av.id
         LEFT JOIN usuarios u ON p.created_by = u.id
         ORDER BY p.created_at DESC`;
         } else {
             query = `
         SELECT p.*, d.nombre as dependencia_nombre, d.tipo as dependencia_tipo,
                ep.nombre as estado_nombre, ep.color as estado_color,
+               av.nombre as avance_nombre,
                u.nombre as creado_por, pu.rol_en_proyecto
         FROM proyectos p
         JOIN dependencias d ON p.dependencia_id = d.id
         LEFT JOIN cat_estados_proyecto ep ON p.estado_id = ep.id
+        LEFT JOIN cat_avances av ON p.avance_id = av.id
         LEFT JOIN usuarios u ON p.created_by = u.id
         JOIN proyecto_usuarios pu ON pu.proyecto_id = p.id AND pu.usuario_id = $1
         ORDER BY p.created_at DESC`;
@@ -83,7 +87,7 @@ const obtener = async (req, res) => {
 
 // POST /api/proyectos
 const crear = async (req, res) => {
-    const { nombre, dependencia_id, responsable, enlaces, fecha_expediente, usuarios_ids, revisores_ids } = req.body;
+    const { nombre, dependencia_id, responsable, enlaces, fecha_expediente, usuarios_ids, revisores_ids, estado_id, avance_id } = req.body;
     if (!nombre || !dependencia_id)
         return res.status(400).json({ error: 'Nombre y dependencia son requeridos' });
 
@@ -91,10 +95,17 @@ const crear = async (req, res) => {
     try {
         await client.query('BEGIN');
 
+        // Resolver estado_id: del formulario o por defecto 'Borrador'
+        let resolvedEstadoId = estado_id || null;
+        if (!resolvedEstadoId) {
+            const defRes = await client.query(`SELECT id FROM cat_estados_proyecto WHERE nombre = 'Borrador' LIMIT 1`);
+            if (defRes.rows.length > 0) resolvedEstadoId = defRes.rows[0].id;
+        }
+
         const proyResult = await client.query(
-            `INSERT INTO proyectos (nombre, dependencia_id, responsable, enlaces, fecha_expediente, created_by, estado_id)
-       VALUES ($1, $2, $3, $4, $5, $6, (SELECT id FROM cat_estados_proyecto WHERE nombre = 'Borrador' LIMIT 1)) RETURNING *`,
-            [nombre, dependencia_id, responsable, enlaces, fecha_expediente, req.user.id]
+            `INSERT INTO proyectos (nombre, dependencia_id, responsable, enlaces, fecha_expediente, created_by, estado_id, avance_id)
+       VALUES ($1, $2, $3, $4, $5, $6, $7, $8) RETURNING *`,
+            [nombre, dependencia_id, responsable, enlaces, fecha_expediente, req.user.id, resolvedEstadoId, avance_id || null]
         );
         const proyecto = proyResult.rows[0];
 
@@ -132,7 +143,7 @@ const crear = async (req, res) => {
 // PUT /api/proyectos/:id
 const actualizar = async (req, res) => {
     const { id } = req.params;
-    const { nombre, dependencia_id, responsable, enlaces, fecha_expediente, estado, usuarios_ids, revisores_ids } = req.body;
+    const { nombre, dependencia_id, responsable, enlaces, fecha_expediente, estado_id, avance_id, usuarios_ids, revisores_ids } = req.body;
 
     const proyCheck = await pool.query('SELECT created_by, responsable FROM proyectos WHERE id = $1', [id]);
     if (proyCheck.rows.length === 0) return res.status(404).json({ error: 'Proyecto no encontrado' });
@@ -148,9 +159,9 @@ const actualizar = async (req, res) => {
 
         await client.query(
             `UPDATE proyectos 
-             SET nombre=$1, dependencia_id=$2, responsable=$3, enlaces=$4, fecha_expediente=$5, estado_id=$6, updated_at=NOW() 
-             WHERE id=$7`,
-            [nombre, dependencia_id, responsable, enlaces, fecha_expediente, req.body.estado_id, id]
+             SET nombre=$1, dependencia_id=$2, responsable=$3, enlaces=$4, fecha_expediente=$5, estado_id=$6, avance_id=$7, updated_at=NOW() 
+             WHERE id=$8`,
+            [nombre, dependencia_id, responsable, enlaces, fecha_expediente, estado_id || null, avance_id || null, id]
         );
 
         if (usuarios_ids !== undefined) {
