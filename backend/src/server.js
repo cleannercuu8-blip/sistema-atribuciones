@@ -114,6 +114,17 @@ const initDB = async () => {
             ALTER TABLE proyectos ALTER COLUMN responsable_apoyo TYPE TEXT;
         `);
 
+        // 5. Migración de Roles de Usuario
+        // Verificamos si la columna rol existe y tiene los valores correctos
+        await pool.query(`
+            DO $$ 
+            BEGIN 
+                IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='usuarios' AND column_name='rol') THEN
+                    ALTER TABLE usuarios ADD COLUMN rol VARCHAR(50) DEFAULT 'revisor';
+                END IF;
+            END $$;
+        `);
+
         // 5. Migración de Proyectos para usar catálogo de estados
         await pool.query(`
             ALTER TABLE proyectos ADD COLUMN IF NOT EXISTS estado_id INTEGER REFERENCES cat_estados_proyecto(id);

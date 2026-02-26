@@ -30,22 +30,22 @@ const AppRoutes = () => {
                     <Layout />
                 </RutaProtegida>
             }>
-                <Route index element={<Dashboard />} />
+                <Route index element={usuario?.rol === 'enlace' ? <Navigate to="/proyectos" replace /> : <Dashboard />} />
                 <Route path="proyectos" element={<Proyectos />} />
                 <Route path="proyectos/:id" element={<ProyectoDetalle />} />
                 <Route path="perfil" element={<Perfil />} />
                 <Route path="catalogos" element={
-                    <RutaProtegida roles={['admin']}>
+                    <RutaProtegida roles={['admin', 'revisor']}>
                         <Catalogos />
                     </RutaProtegida>
                 } />
                 <Route path="carga-trabajo" element={
-                    <RutaProtegida roles={['admin', 'revisor']}>
+                    <RutaProtegida roles={['admin', 'revisor', 'visualizador']}>
                         <CargaGlobal />
                     </RutaProtegida>
                 } />
                 <Route path="revisiones" element={
-                    <RutaProtegida roles={['admin', 'revisor']}>
+                    <RutaProtegida roles={['admin', 'revisor', 'visualizador']}>
                         <Revisiones />
                     </RutaProtegida>
                 } />

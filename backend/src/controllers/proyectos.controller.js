@@ -87,6 +87,9 @@ const obtener = async (req, res) => {
 
 // POST /api/proyectos
 const crear = async (req, res) => {
+    if (req.user.rol === 'visualizador' || req.user.rol === 'enlace') {
+        return res.status(403).json({ error: 'Tu rol no permite crear proyectos' });
+    }
     const { nombre, dependencia_id, responsable, responsable_apoyo, enlaces, fecha_expediente, usuarios_ids, revisores_ids, estado_id, avance_id } = req.body;
     if (!nombre || !dependencia_id)
         return res.status(400).json({ error: 'Nombre y dependencia son requeridos' });
@@ -149,15 +152,29 @@ const crear = async (req, res) => {
 
 // PUT /api/proyectos/:id
 const actualizar = async (req, res) => {
+    if (req.user.rol === 'visualizador') {
+        return res.status(403).json({ error: 'No tienes permiso para editar' });
+    }
     const { id } = req.params;
     const { nombre, dependencia_id, responsable, responsable_apoyo, enlaces, fecha_expediente, estado_id, avance_id, usuarios_ids, revisores_ids } = req.body;
 
-    const proyCheck = await pool.query('SELECT created_by, responsable FROM proyectos WHERE id = $1', [id]);
+    const proyCheck = await pool.query('SELECT created_by, responsable, responsable_apoyo FROM proyectos WHERE id = $1', [id]);
     if (proyCheck.rows.length === 0) return res.status(404).json({ error: 'Proyecto no encontrado' });
 
     // Solo admin o el responsable asignado pueden editar
-    if (req.user.rol !== 'admin' && proyCheck.rows[0].created_by !== req.user.id && proyCheck.rows[0].responsable !== req.user.nombre) {
-        return res.status(403).json({ error: 'No tienes permiso para editar este proyecto' });
+    if (req.user.rol !== 'admin') {
+        const p = proyCheck.rows[0];
+        const isLead = p.responsable === req.user.nombre;
+        const isSupport = p.responsable_apoyo && p.responsable_apoyo.includes(req.user.nombre);
+        const isCreator = p.created_by === req.user.id;
+
+        if (req.user.rol === 'enlace') {
+            if (!isLead && !isSupport) {
+                return res.status(403).json({ error: 'Solo puedes editar tus proyectos asignados' });
+            }
+        } else if (!isCreator && !isLead) { // For other roles that might have edit permissions (e.g., 'revisor' if allowed, or creator)
+            return res.status(403).json({ error: 'No tienes permiso para editar este proyecto' });
+        }
     }
 
     const client = await pool.connect();
@@ -211,13 +228,28 @@ const actualizar = async (req, res) => {
 };
 
 const eliminar = async (req, res) => {
+    if (req.user.rol === 'visualizador') {
+        return res.status(403).json({ error: 'No tienes permiso para eliminar' });
+    }
     const { id } = req.params;
     try {
-        const proyCheck = await pool.query('SELECT created_by, responsable FROM proyectos WHERE id = $1', [id]);
+        const proyCheck = await pool.query('SELECT created_by, responsable, responsable_apoyo, nombre FROM proyectos WHERE id = $1', [id]);
         if (proyCheck.rows.length === 0) return res.status(404).json({ error: 'Proyecto no encontrado' });
 
-        if (req.user.rol !== 'admin' && proyCheck.rows[0].created_by !== req.user.id && proyCheck.rows[0].responsable !== req.user.nombre) {
-            return res.status(403).json({ error: 'No tienes permiso para eliminar este proyecto' });
+        // Para enlace, verificar si es su proyecto
+        if (req.user.rol !== 'admin') {
+            const p = proyCheck.rows[0];
+            const isLead = p.responsable === req.user.nombre;
+            const isSupport = p.responsable_apoyo && p.responsable_apoyo.includes(req.user.nombre);
+            const isCreator = p.created_by === req.user.id;
+
+            if (req.user.rol === 'enlace') {
+                if (!isLead && !isSupport) {
+                    return res.status(403).json({ error: 'Solo puedes eliminar tus proyectos asignados' });
+                }
+            } else if (!isCreator && !isLead) { // For other roles that might have delete permissions (e.g., creator)
+                return res.status(403).json({ error: 'No tienes permiso para eliminar este proyecto' });
+            }
         }
 
         // LOG ACTIVIDAD: Eliminación (Mensaje antes de borrar)

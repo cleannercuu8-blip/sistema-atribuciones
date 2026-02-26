@@ -3,11 +3,11 @@ import { Outlet, NavLink, useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 
 const navItems = [
-    { to: '/', label: 'Reporte General', icon: '📊', roles: ['admin', 'dependencia', 'revisor'], exact: true },
-    { to: '/proyectos', label: 'Proyectos', icon: '📁', roles: ['admin', 'dependencia', 'revisor'] },
-    { to: '/catalogos', label: 'Catálogos', icon: '📚', roles: ['admin'] },
-    { to: '/carga-trabajo', label: 'Carga de Trabajo', icon: '⚖️', roles: ['admin', 'revisor'] },
-    { to: '/revisiones', label: 'Revisiones', icon: '🔍', roles: ['admin', 'revisor'] },
+    { to: '/', label: 'Reporte General', icon: '📊', roles: ['admin', 'revisor', 'visualizador'], exact: true },
+    { to: '/proyectos', label: 'Proyectos', icon: '📁', roles: ['admin', 'revisor', 'visualizador', 'enlace'] },
+    { to: '/catalogos', label: 'Catálogos', icon: '📚', roles: ['admin', 'revisor'] },
+    { to: '/carga-trabajo', label: 'Carga de Trabajo', icon: '⚖️', roles: ['admin', 'revisor', 'visualizador'] },
+    { to: '/revisiones', label: 'Revisiones', icon: '🔍', roles: ['admin', 'revisor', 'visualizador'] },
     { to: '/admin', label: 'Administración', icon: '⚙️', roles: ['admin'] },
 ];
 
@@ -25,7 +25,9 @@ export default function Layout() {
     const getRolLabel = (rol) => {
         if (rol === 'admin') return 'Administrador';
         if (rol === 'revisor') return 'Revisor';
-        return 'Dependencia';
+        if (rol === 'visualizador') return 'Visualizador';
+        if (rol === 'enlace') return 'Enlace';
+        return 'Usuario';
     };
 
     return (

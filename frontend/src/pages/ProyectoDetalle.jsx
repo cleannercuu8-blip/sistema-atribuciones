@@ -191,7 +191,7 @@ const TabAtribuciones = ({ proyectoId, unidad, setUnidad, arbol, atribGenerales 
         } catch { }
     };
 
-    const puedeEditar = usuario.rol === 'admin' || usuario.rol === 'dependencia';
+    const puedeEditar = (usuario.rol === 'admin' || usuario.rol === 'revisor' || usuario.rol === 'enlace') && usuario.rol !== 'visualizador';
 
     // Navegación por carpetas
     const getHijos = () => {
@@ -646,7 +646,7 @@ export default function ProyectoDetalle() {
         setExportando(false);
     };
 
-    const puedeEditar = usuario.rol === 'admin' || usuario.rol === 'dependencia';
+    const puedeEditar = (usuario.rol === 'admin' || usuario.rol === 'revisor' || usuario.rol === 'enlace') && usuario.rol !== 'visualizador';
 
     if (cargando && !proyecto) return (
         <div style={{ padding: '40px', textAlign: 'center' }}>

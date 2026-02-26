@@ -111,7 +111,13 @@ export default function Proyectos() {
     };
 
     const puedeGestionar = (p) => {
-        return usuario.rol === 'admin' || p.responsable === usuario.nombre || p.creado_por === usuario.nombre;
+        if (usuario.rol === 'admin' || usuario.rol === 'revisor') return true;
+        if (usuario.rol === 'visualizador') return false;
+
+        // Para enlace: si es responsable o apoyo
+        const esResponsable = p.responsable === usuario.nombre;
+        const esApoyo = p.responsable_apoyo && p.responsable_apoyo.includes(usuario.nombre);
+        return esResponsable || esApoyo;
     };
 
     const proyFiltrados = proyectos.filter(p =>
@@ -135,7 +141,7 @@ export default function Proyectos() {
                     <h1 style={{ fontSize: 22, fontWeight: 800, color: 'var(--color-primario)' }}>📂 Árbol de Atribuciones</h1>
                     <p style={{ color: 'var(--color-texto-suave)', marginTop: 4 }}>Gestión y organización de proyectos</p>
                 </div>
-                {usuario.rol === 'admin' && (
+                {(usuario.rol === 'admin' || usuario.rol === 'revisor') && (
                     <button className="btn btn-primary" onClick={() => {
                         setProyectoEditar(null);
                         setForm({ nombre: '', dependencia_id: '', responsable: '', responsable_apoyo: '', enlaces: '', fecha_expediente: '', avance_id: '', estado_id: '' });
