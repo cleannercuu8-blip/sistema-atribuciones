@@ -42,7 +42,7 @@ const estiloCelda = (cell, texto, color = null) => {
 };
 
 const estiloCeldaVerde = (cell, texto) => {
-    estiloCelda(cell, texto, 'dcfce7');
+    estiloCelda(cell, texto, '22c55e'); // Verde más intenso (Tailwind success-500 approx)
 };
 
 const exportarExcel = async (proyectoId) => {
@@ -206,17 +206,17 @@ const exportarExcel = async (proyectoId) => {
             ws.getCell('A2').value = `Se deberán capturar las atribuciones específicas. En la columna "NUM. IDENTIFICADOR" seleccione la atribución de su superior jerárquico que corresponda a su atribución específica.`;
             ws.getCell('A2').font = { italic: true, size: 9 };
 
-            // Encabezados de columnas (una columna par/clave, una impar/texto por nivel)
+            // Encabezados de columnas (una columna TEXTO, una CLAVE por nivel)
             let colIdx = 1;
             for (const nv of cadena) {
                 const c1 = getColumnLetter(colIdx);
                 const c2 = getColumnLetter(colIdx + 1);
-                estiloSubHeader(ws.getCell(`${c1}3`), 'CLAVE');
-                estiloSubHeader(ws.getCell(`${c2}3`), nv.nivel_numero === 0
+                estiloSubHeader(ws.getCell(`${c1}3`), nv.nivel_numero === 0
                     ? `ORIGEN DE LA ATRIBUCIÓN`
                     : `ATRIBUCIONES ESPECÍFICAS\n${nv.nombre.toUpperCase()}`);
-                ws.getColumn(colIdx).width = 12;
-                ws.getColumn(colIdx + 1).width = 45;
+                estiloSubHeader(ws.getCell(`${c2}3`), 'CLAVE');
+                ws.getColumn(colIdx).width = 45;
+                ws.getColumn(colIdx + 1).width = 12;
                 colIdx += 2;
             }
             // Columna Corresponsabilidad
@@ -234,13 +234,16 @@ const exportarExcel = async (proyectoId) => {
 
                 // Subir por la jerarquía para llenar los niveles superiores siguiendo el rastro explicitamente
                 let actual = atr;
-                while (actual.padre_atribucion_id && atriMap[String(actual.padre_atribucion_id)]) {
+                // Límite de seguridad para evitar bucles infinitos
+                let safety = 0;
+                while (actual.padre_atribucion_id && atriMap[String(actual.padre_atribucion_id)] && safety < 50) {
                     actual = atriMap[String(actual.padre_atribucion_id)];
-                    // Obtener nivel real
+                    // Obtener nivel real: prioridad al nivel_numero guardado, luego al de la unidad
                     const n = actual.nivel_numero !== undefined ? actual.nivel_numero : (actual.unidad_id ? unidadesMap[String(actual.unidad_id)]?.nivel_numero : null);
                     if (n !== null) {
                         atribsPorNivel[n] = { clave: actual.clave, texto: actual.texto };
                     }
+                    safety++;
                 }
 
                 // Atribución General (Ley - Nivel 0)
@@ -249,12 +252,14 @@ const exportarExcel = async (proyectoId) => {
                 if (!idLey) {
                     // Si no tiene vinculo directo, puede que algun padre si lo tenga
                     let aux = atr;
-                    while (aux.padre_atribucion_id && atriMap[String(aux.padre_atribucion_id)]) {
+                    safety = 0;
+                    while (aux.padre_atribucion_id && atriMap[String(aux.padre_atribucion_id)] && safety < 50) {
                         aux = atriMap[String(aux.padre_atribucion_id)];
                         if (aux.atribucion_general_id) {
                             idLey = aux.atribucion_general_id;
                             break;
                         }
+                        safety++;
                     }
                 }
 
@@ -267,14 +272,16 @@ const exportarExcel = async (proyectoId) => {
                 let c = 1;
                 for (const nv of cadena) {
                     const data = atribsPorNivel[nv.nivel_numero];
-                    estiloCelda(ws.getCell(`${getColumnLetter(c)}${fila}`), data?.clave || '-');
-                    estiloCelda(ws.getCell(`${getColumnLetter(c + 1)}${fila}`), data?.texto || '-');
+                    // Orden: TEXTO primero, luego CLAVE
+                    estiloCelda(ws.getCell(`${getColumnLetter(c)}${fila}`), data?.texto || '-');
+                    estiloCelda(ws.getCell(`${getColumnLetter(c + 1)}${fila}`), data?.clave || '-');
                     c += 2;
                 }
                 // Corresponsabilidad (Verde si se está "bajando", es decir, si es el padre de otra atribución)
                 const cellCorrValue = ws.getCell(`${getColumnLetter(c)}${fila}`);
                 if (idsConHijos.has(String(atr.id))) {
-                    estiloCeldaVerde(cellCorrValue, atr.corresponsabilidad || '-');
+                    // Sin guión si está coloreado y vacío
+                    estiloCeldaVerde(cellCorrValue, atr.corresponsabilidad || '');
                 } else {
                     estiloCelda(cellCorrValue, atr.corresponsabilidad || '-');
                 }
