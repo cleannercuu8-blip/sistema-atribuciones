@@ -1,8 +1,9 @@
-import React, { useEffect, useState } from 'react';
+﻿import React, { useEffect, useState, useRef } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import api from '../services/api';
 import { useAuth } from '../context/AuthContext';
 import DashboardCarga from '../components/DashboardCarga';
+import * as XLSX from 'xlsx';
 
 // ==================== COMPONENTE ÁRBOL VISUAL ====================
 const NodoArbol = ({ nodo, nivel = 0, onSeleccionar, seleccionado }) => {
@@ -460,6 +461,9 @@ export default function ProyectoDetalle() {
     const [bulkTextUnidades, setBulkTextUnidades] = useState('');
     const [mostrarBulkGlosario, setMostrarBulkGlosario] = useState(false);
     const [bulkTextGlosario, setBulkTextGlosario] = useState('');
+    const [archivoUnidades, setArchivoUnidades] = useState(null);
+    const [previewUnidades, setPreviewUnidades] = useState([]);
+    const [cargandoBulk, setCargandoBulk] = useState(false);
 
     const cargar = async () => {
         try {
@@ -548,21 +552,55 @@ export default function ProyectoDetalle() {
         setExportando(false);
     };
 
+    // Descarga la plantilla de unidades como Excel
+    const descargarPlantillaUnidades = () => {
+        const wb = XLSX.utils.book_new();
+        const data = [
+            ['Nombre de la Unidad Administrativa', 'Siglas', 'Siglas del Superior (dejar vacío si es raíz)'],
+            ['Secretaría de Finanzas', 'SF', ''],
+            ['Dirección General de Presupuesto', 'DGP', 'SF'],
+            ['Departamento de Análisis', 'DA', 'DGP']
+        ];
+        const ws = XLSX.utils.aoa_to_sheet(data);
+        ws['!cols'] = [{ wch: 50 }, { wch: 20 }, { wch: 30 }];
+        XLSX.utils.book_append_sheet(wb, ws, 'Unidades');
+        XLSX.writeFile(wb, 'plantilla_unidades_administrativas.xlsx');
+    };
+
+    const handleArchivoUnidades = (e) => {
+        const file = e.target.files[0];
+        if (!file) return;
+        setArchivoUnidades(file);
+        const reader = new FileReader();
+        reader.onload = (evt) => {
+            const wb = XLSX.read(evt.target.result, { type: 'binary' });
+            const ws = wb.Sheets[wb.SheetNames[0]];
+            const rows = XLSX.utils.sheet_to_json(ws, { header: 1 }).slice(1); // skip header
+            const parsed = rows
+                .filter(r => r[0] && r[1])
+                .map(r => ({
+                    nombre: String(r[0]).trim(),
+                    siglas: String(r[1]).trim(),
+                    padre_siglas: r[2] ? String(r[2]).trim() : '',
+                    nivel_numero: r[2] ? 2 : 1
+                }));
+            setPreviewUnidades(parsed);
+        };
+        reader.readAsBinaryString(file);
+    };
+
     const guardarBulkUnidades = async () => {
-        const lineas = bulkTextUnidades.split('\n').map(l => l.trim()).filter(l => l.length > 0);
-        if (lineas.length === 0) return;
-        setExportando(true);
+        if (previewUnidades.length === 0) return;
+        setCargandoBulk(true);
         try {
-            const items = lineas.map(l => {
-                const p = l.split('|');
-                return { nombre: p[0]?.trim(), siglas: p[1]?.trim(), padre_siglas: p[2]?.trim(), nivel_numero: 1 };
-            });
-            await api.post(`/proyectos/${id}/unidades/bulk`, { items });
+            await api.post(`/proyectos/${id}/unidades/masivo`, { items: previewUnidades });
             setMostrarBulkUnidades(false);
-            setBulkTextUnidades('');
+            setArchivoUnidades(null);
+            setPreviewUnidades([]);
             cargar();
+            alert(`✅ ${previewUnidades.length} unidades cargadas correctamente`);
         } catch (err) { alert('Error: ' + (err.response?.data?.error || err.message)); }
-        setExportando(false);
+        setCargandoBulk(false);
     };
 
     const guardarBulkGlosario = async () => {
@@ -920,26 +958,73 @@ export default function ProyectoDetalle() {
                 </div>
             )}
 
-            {/* MODALES CARGA MASIVA (Unificados en ProyectoDetalle) */}
+            {/* MODAL CARGA MASIVA UNIDADES (Excel) */}
             {mostrarBulkUnidades && (
-                <div className="modal-overlay" onClick={() => setMostrarBulkUnidades(false)}>
-                    <div className="modal modal-lg" onClick={e => e.stopPropagation()}>
+                <div className="modal-overlay" onClick={() => { setMostrarBulkUnidades(false); setArchivoUnidades(null); setPreviewUnidades([]); }}>
+                    <div className="modal modal-lg" onClick={e => e.stopPropagation()} style={{ maxWidth: 700 }}>
                         <div className="modal-header">
                             <h2 className="modal-title">🌳 Carga Masiva de Unidades</h2>
-                            <button className="modal-close" onClick={() => setMostrarBulkUnidades(false)}>×</button>
+                            <button className="modal-close" onClick={() => { setMostrarBulkUnidades(false); setArchivoUnidades(null); setPreviewUnidades([]); }}></button>
                         </div>
                         <div style={{ padding: '0 24px 24px' }}>
-                            <p style={{ fontSize: 13, color: '#64748b', marginBottom: 15 }}>Formato: <strong>Nombre de la Unidad|SIGLAS|SIGLAS_PADRE</strong> (Una por línea)</p>
-                            <textarea className="form-control" rows={12} value={bulkTextUnidades} onChange={e => setBulkTextUnidades(e.target.value)} placeholder="Ej:&#10;Dirección General|DG|TITULAR&#10;Departamento de Tecnologías|DT|DG" />
-                            <div style={{ display: 'flex', gap: 10, justifyContent: 'flex-end', marginTop: 16 }}>
-                                <button className="btn btn-outline" onClick={() => setMostrarBulkUnidades(false)}>Cancelar</button>
-                                <button className="btn btn-primary" onClick={guardarBulkUnidades} disabled={exportando}>
-                                    {exportando ? '⌛ Procesando...' : '🚀 Cargar Estructura'}
+                            <div style={{ background: '#f0f9ff', border: '1px solid #bae6fd', borderRadius: 10, padding: '14px 16px', marginBottom: 20 }}>
+                                <p style={{ fontSize: 13, fontWeight: 700, color: '#0369a1', margin: '0 0 6px' }}> Instrucciones</p>
+                                <ul style={{ fontSize: 13, color: '#0c4a6e', margin: '0 0 0 16px', padding: 0 }}>
+                                    <li><strong>Columna A</strong>: Nombre completo de la Unidad Administrativa</li>
+                                    <li><strong>Columna B</strong>: Siglas únicas (p. ej. DGP)</li>
+                                    <li><strong>Columna C</strong>: Siglas del superior (vacío si es raíz)</li>
+                                </ul>
+                            </div>
+                            <div style={{ display: 'flex', gap: 12, marginBottom: 20, flexWrap: 'wrap' }}>
+                                <button type="button" className="btn btn-outline" onClick={descargarPlantillaUnidades}>
+                                     Descargar Plantilla Excel
+                                </button>
+                                <label style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '8px 16px', borderRadius: 8, cursor: 'pointer', background: 'var(--color-primario)', color: '#fff', fontSize: 14, fontWeight: 600 }}>
+                                     {archivoUnidades ? archivoUnidades.name : 'Seleccionar archivo Excel'}
+                                    <input type="file" accept=".xlsx,.xls" style={{ display: 'none' }} onChange={handleArchivoUnidades} />
+                                </label>
+                            </div>
+                            {previewUnidades.length > 0 && (
+                                <div>
+                                    <p style={{ fontSize: 13, fontWeight: 700, color: '#374151', marginBottom: 10 }}>
+                                        Vista previa: <span style={{ color: 'var(--color-primario)' }}>{previewUnidades.length} unidades detectadas</span>
+                                    </p>
+                                    <div style={{ maxHeight: 260, overflowY: 'auto', border: '1px solid #e5e7eb', borderRadius: 8 }}>
+                                        <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 13 }}>
+                                            <thead>
+                                                <tr style={{ background: '#f8fafc' }}>
+                                                    <th style={{ padding: '8px 12px', textAlign: 'left', borderBottom: '1px solid #e5e7eb' }}>Nombre</th>
+                                                    <th style={{ padding: '8px 12px', textAlign: 'left', borderBottom: '1px solid #e5e7eb', width: 80 }}>Siglas</th>
+                                                    <th style={{ padding: '8px 12px', textAlign: 'left', borderBottom: '1px solid #e5e7eb', width: 110 }}>Superior</th>
+                                                </tr>
+                                            </thead>
+                                            <tbody>
+                                                {previewUnidades.map((u, i) => (
+                                                    <tr key={i} style={{ borderBottom: '1px solid #f1f5f9' }}>
+                                                        <td style={{ padding: '7px 12px' }}>{u.nombre}</td>
+                                                        <td style={{ padding: '7px 12px' }}>
+                                                            <span style={{ background: '#dbeafe', color: '#1d4ed8', padding: '2px 8px', borderRadius: 6, fontWeight: 700, fontSize: 11 }}>{u.siglas}</span>
+                                                        </td>
+                                                        <td style={{ padding: '7px 12px', color: u.padre_siglas ? '#374151' : '#9ca3af', fontStyle: u.padre_siglas ? 'normal' : 'italic' }}>
+                                                            {u.padre_siglas || '(raíz)'}
+                                                        </td>
+                                                    </tr>
+                                                ))}
+                                            </tbody>
+                                        </table>
+                                    </div>
+                                </div>
+                            )}
+                            <div style={{ display: 'flex', gap: 10, justifyContent: 'flex-end', marginTop: 20 }}>
+                                <button className="btn btn-outline" onClick={() => { setMostrarBulkUnidades(false); setArchivoUnidades(null); setPreviewUnidades([]); }}>Cancelar</button>
+                                <button className="btn btn-primary" onClick={guardarBulkUnidades} disabled={cargandoBulk || previewUnidades.length === 0}>
+                                    {cargandoBulk ? ' Cargando...' : ` Cargar ${previewUnidades.length} unidades`}
                                 </button>
                             </div>
                         </div>
                     </div>
                 </div>
+            )}
             )}
 
             {mostrarBulkGlosario && (
