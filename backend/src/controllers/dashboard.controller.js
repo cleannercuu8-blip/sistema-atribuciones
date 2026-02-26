@@ -3,19 +3,22 @@ const pool = require('../config/db');
 // GET /api/dashboard/stats-innovadoras
 const getStatsInnovadoras = async (req, res) => {
     try {
-        // 1. Balance de Responsabilidades (Consolidado de proyectos y atribuciones)
+        // 1. Balance de Responsabilidades (Consolidado de proyectos por usuario)
         const workloadResult = await pool.query(`
+            WITH user_projects AS (
+                -- Proyectos creados por el usuario
+                SELECT created_by as usuario_id, id as proyecto_id FROM proyectos
+                UNION
+                -- Proyectos asignados para revisión
+                SELECT usuario_id, proyecto_id FROM proyecto_revisores
+            )
             SELECT 
                 u.nombre as responsable, 
-                (COALESCE(p_count.total, 0) + COALESCE(ae_count.total, 0))::int as total
+                COUNT(up.proyecto_id)::int as total
             FROM usuarios u
-            LEFT JOIN (
-                SELECT created_by, COUNT(*) as total FROM proyectos GROUP BY created_by
-            ) p_count ON u.id = p_count.created_by
-            LEFT JOIN (
-                SELECT responsable_id, COUNT(*) as total FROM atribuciones_especificas WHERE activo = true GROUP BY responsable_id
-            ) ae_count ON u.id = ae_count.responsable_id
-            WHERE (COALESCE(p_count.total, 0) + COALESCE(ae_count.total, 0)) > 0
+            JOIN user_projects up ON u.id = up.usuario_id
+            WHERE u.activo = true
+            GROUP BY u.nombre
             ORDER BY total DESC
         `);
 

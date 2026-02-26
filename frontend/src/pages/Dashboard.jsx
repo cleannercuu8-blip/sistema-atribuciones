@@ -158,7 +158,7 @@ export default function Dashboard() {
                                         <div key={idx}>
                                             <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 6, fontSize: 13 }}>
                                                 <span style={{ fontWeight: 600, color: '#334155' }}>{w.responsable}</span>
-                                                <span style={{ fontWeight: 800, color: 'var(--color-primario)' }}>{w.total} items</span>
+                                                <span style={{ fontWeight: 800, color: 'var(--color-primario)' }}>{w.total} proy.</span>
                                             </div>
                                             <div style={{ height: 8, background: '#f1f5f9', borderRadius: 4, overflow: 'hidden' }}>
                                                 <div style={{
