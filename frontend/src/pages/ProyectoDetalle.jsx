@@ -6,7 +6,7 @@ import DashboardCarga from '../components/DashboardCarga';
 import * as XLSX from 'xlsx';
 
 // ==================== COMPONENTE ÁRBOL VISUAL ====================
-const NodoArbol = ({ nodo, nivel = 0, onSeleccionar, seleccionado }) => {
+const NodoArbol = ({ nodo, nivel = 0, onSeleccionar, seleccionado, puedeEditar, onEditar, onEliminar }) => {
     const [expandido, setExpandido] = useState(true);
     const colores = ['#1a3a5c', '#4a7db5', '#2e86de', '#27ae60', '#f39c12', '#8e44ad', '#e74c3c'];
     const color = colores[nivel % colores.length];
@@ -21,11 +21,17 @@ const NodoArbol = ({ nodo, nivel = 0, onSeleccionar, seleccionado }) => {
                 <span className="tree-node-chip" style={{ background: color }}>{nodo.siglas}</span>
                 <span style={{ fontSize: 13, color: 'var(--color-texto)', flex: 1, whiteSpace: 'normal', wordBreak: 'break-word', display: 'inline-block', verticalAlign: 'middle' }}>{nodo.nombre}</span>
                 <span className="nivel-chip" style={{ flexShrink: 0 }}>Nivel {nodo.nivel_numero}</span>
+                {puedeEditar && (
+                    <div style={{ display: 'flex', gap: 4, marginLeft: 8 }} onClick={e => e.stopPropagation()}>
+                        <button className="btn btn-icon btn-sm" onClick={() => onEditar(nodo)} title="Editar">✏️</button>
+                        <button className="btn btn-danger btn-icon btn-sm" onClick={() => onEliminar(nodo.id)} title="Eliminar">🗑️</button>
+                    </div>
+                )}
             </div>
             {expandido && nodo.hijos?.length > 0 && (
                 <div className="tree-children">
                     {nodo.hijos.map(hijo => (
-                        <NodoArbol key={hijo.id} nodo={hijo} nivel={nivel + 1} onSeleccionar={onSeleccionar} seleccionado={seleccionado} />
+                        <NodoArbol key={hijo.id} nodo={hijo} nivel={nivel + 1} onSeleccionar={onSeleccionar} seleccionado={seleccionado} puedeEditar={puedeEditar} onEditar={onEditar} onEliminar={onEliminar} />
                     ))}
                 </div>
             )}
@@ -455,6 +461,7 @@ export default function ProyectoDetalle() {
     const [formGlosario, setFormGlosario] = useState({ acronimo: '', significado: '' });
     const [unidadesPlanas, setUnidadesPlanas] = useState([]);
     const [exportando, setExportando] = useState(false);
+    const [editandoUnidad, setEditandoUnidad] = useState(null);
     const [mostrarBulkAG, setMostrarBulkAG] = useState(false);
     const [bulkTextAG, setBulkTextAG] = useState('');
     const [mostrarBulkUnidades, setMostrarBulkUnidades] = useState(false);
@@ -488,11 +495,32 @@ export default function ProyectoDetalle() {
     const crearUnidad = async (e) => {
         e.preventDefault();
         try {
-            await api.post(`/proyectos/${id}/unidades`, { ...formUnidad, padre_id: formUnidad.padre_id || null });
+            if (editandoUnidad) {
+                await api.put(`/unidades/${editandoUnidad.id}`, { ...formUnidad, padre_id: formUnidad.padre_id || null });
+            } else {
+                await api.post(`/proyectos/${id}/unidades`, { ...formUnidad, padre_id: formUnidad.padre_id || null });
+            }
             setMostrarModalUnidad(false);
+            setEditandoUnidad(null);
             cargar();
         } catch (err) {
-            alert(err.response?.data?.error || 'Error al crear unidad');
+            alert(err.response?.data?.error || 'Error al procesar unidad');
+        }
+    };
+
+    const abrirEditarUnidad = (u) => {
+        setFormUnidad({ nombre: u.nombre, siglas: u.siglas, nivel_numero: u.nivel_numero, padre_id: u.padre_id || '' });
+        setEditandoUnidad(u);
+        setMostrarModalUnidad(true);
+    };
+
+    const eliminarUnidad = async (unidadId) => {
+        if (!window.confirm('¿Estás seguro de eliminar esta unidad? Si tiene subordinados no podrá eliminarse.')) return;
+        try {
+            await api.delete(`/unidades/${unidadId}`);
+            cargar();
+        } catch (err) {
+            alert(err.response?.data?.error || 'Error al eliminar');
         }
     };
 
@@ -556,13 +584,13 @@ export default function ProyectoDetalle() {
     const descargarPlantillaUnidades = () => {
         const wb = XLSX.utils.book_new();
         const data = [
-            ['Nombre de la Unidad Administrativa', 'Siglas', 'Siglas del Superior (dejar vacío si es raíz)'],
-            ['Secretaría de Finanzas', 'SF', ''],
-            ['Dirección General de Presupuesto', 'DGP', 'SF'],
-            ['Departamento de Análisis', 'DA', 'DGP']
+            ['Nombre de la Unidad Administrativa', 'Siglas', 'Siglas del Superior (dejar vacío si es raíz)', 'Nivel'],
+            ['Secretaría de Finanzas', 'SF', '', 1],
+            ['Dirección General de Presupuesto', 'DGP', 'SF', 2],
+            ['Departamento de Análisis', 'DA', 'DGP', 3]
         ];
         const ws = XLSX.utils.aoa_to_sheet(data);
-        ws['!cols'] = [{ wch: 50 }, { wch: 20 }, { wch: 30 }];
+        ws['!cols'] = [{ wch: 50 }, { wch: 20 }, { wch: 30 }, { wch: 10 }];
         XLSX.utils.book_append_sheet(wb, ws, 'Unidades');
         XLSX.writeFile(wb, 'plantilla_unidades_administrativas.xlsx');
     };
@@ -582,7 +610,7 @@ export default function ProyectoDetalle() {
                     nombre: String(r[0]).trim(),
                     siglas: String(r[1]).trim(),
                     padre_siglas: r[2] ? String(r[2]).trim() : '',
-                    nivel_numero: r[2] ? 2 : 1
+                    nivel_numero: r[3] ? parseInt(r[3]) : (r[2] ? 2 : 1)
                 }));
             setPreviewUnidades(parsed);
         };
@@ -701,7 +729,7 @@ export default function ProyectoDetalle() {
                                                 catch { alert('Error al subir PDF'); }
                                             }} />
                                         </label>
-                                        <button className="btn btn-primary btn-sm" onClick={() => { setFormUnidad({ nombre: '', siglas: '', nivel_numero: 1, padre_id: '' }); setMostrarModalUnidad(true); }} id="btn-agregar-unidad">
+                                        <button className="btn btn-primary btn-sm" onClick={() => { setFormUnidad({ nombre: '', siglas: '', nivel_numero: 1, padre_id: '' }); setEditandoUnidad(null); setMostrarModalUnidad(true); }} id="btn-agregar-unidad">
                                             ➕ Agregar una
                                         </button>
                                     </div>
@@ -717,7 +745,15 @@ export default function ProyectoDetalle() {
                         ) : (
                             <div className="tree">
                                 {arbol.map(nodo => (
-                                    <NodoArbol key={nodo.id} nodo={nodo} onSeleccionar={setUnidadSeleccionada} seleccionado={unidadSeleccionada} />
+                                    <NodoArbol
+                                        key={nodo.id}
+                                        nodo={nodo}
+                                        onSeleccionar={setUnidadSeleccionada}
+                                        seleccionado={unidadSeleccionada}
+                                        puedeEditar={puedeEditar}
+                                        onEditar={abrirEditarUnidad}
+                                        onEliminar={eliminarUnidad}
+                                    />
                                 ))}
                             </div>
                         )}
@@ -824,8 +860,8 @@ export default function ProyectoDetalle() {
                 <div className="modal-overlay" onClick={() => setMostrarModalUnidad(false)}>
                     <div className="modal" onClick={e => e.stopPropagation()}>
                         <div className="modal-header">
-                            <h2 className="modal-title">➕ Nueva Unidad Administrativa</h2>
-                            <button className="modal-close" onClick={() => setMostrarModalUnidad(false)}>×</button>
+                            <h2 className="modal-title">{editandoUnidad ? '✏️ Editar Unidad Administrativa' : '➕ Nueva Unidad Administrativa'}</h2>
+                            <button className="modal-close" onClick={() => { setMostrarModalUnidad(false); setEditandoUnidad(null); }}>×</button>
                         </div>
                         <form onSubmit={crearUnidad}>
                             <div className="form-group">
@@ -852,8 +888,10 @@ export default function ProyectoDetalle() {
                                 </select>
                             </div>
                             <div style={{ display: 'flex', gap: 10, justifyContent: 'flex-end', marginTop: 16 }}>
-                                <button type="button" className="btn btn-outline" onClick={() => setMostrarModalUnidad(false)}>Cancelar</button>
-                                <button type="submit" className="btn btn-primary" id="btn-guardar-unidad">✅ Crear unidad</button>
+                                <button type="button" className="btn btn-outline" onClick={() => { setMostrarModalUnidad(false); setEditandoUnidad(null); }}>Cancelar</button>
+                                <button type="submit" className="btn btn-primary" id="btn-guardar-unidad">
+                                    {editandoUnidad ? '💾 Guardar cambios' : '✅ Crear unidad'}
+                                </button>
                             </div>
                         </form>
                     </div>
@@ -973,14 +1011,15 @@ export default function ProyectoDetalle() {
                                     <li><strong>Columna A</strong>: Nombre completo de la Unidad Administrativa</li>
                                     <li><strong>Columna B</strong>: Siglas únicas (p. ej. DGP)</li>
                                     <li><strong>Columna C</strong>: Siglas del superior (vacío si es raíz)</li>
+                                    <li><strong>Columna D</strong>: Nivel jerárquico (número, p. ej. 1, 2, 3)</li>
                                 </ul>
                             </div>
                             <div style={{ display: 'flex', gap: 12, marginBottom: 20, flexWrap: 'wrap' }}>
                                 <button type="button" className="btn btn-outline" onClick={descargarPlantillaUnidades}>
-                                     Descargar Plantilla Excel
+                                    Descargar Plantilla Excel
                                 </button>
                                 <label style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '8px 16px', borderRadius: 8, cursor: 'pointer', background: 'var(--color-primario)', color: '#fff', fontSize: 14, fontWeight: 600 }}>
-                                     {archivoUnidades ? archivoUnidades.name : 'Seleccionar archivo Excel'}
+                                    {archivoUnidades ? archivoUnidades.name : 'Seleccionar archivo Excel'}
                                     <input type="file" accept=".xlsx,.xls" style={{ display: 'none' }} onChange={handleArchivoUnidades} />
                                 </label>
                             </div>
@@ -996,6 +1035,7 @@ export default function ProyectoDetalle() {
                                                     <th style={{ padding: '8px 12px', textAlign: 'left', borderBottom: '1px solid #e5e7eb' }}>Nombre</th>
                                                     <th style={{ padding: '8px 12px', textAlign: 'left', borderBottom: '1px solid #e5e7eb', width: 80 }}>Siglas</th>
                                                     <th style={{ padding: '8px 12px', textAlign: 'left', borderBottom: '1px solid #e5e7eb', width: 110 }}>Superior</th>
+                                                    <th style={{ padding: '8px 12px', textAlign: 'left', borderBottom: '1px solid #e5e7eb', width: 60 }}>Nivel</th>
                                                 </tr>
                                             </thead>
                                             <tbody>
@@ -1007,6 +1047,9 @@ export default function ProyectoDetalle() {
                                                         </td>
                                                         <td style={{ padding: '7px 12px', color: u.padre_siglas ? '#374151' : '#9ca3af', fontStyle: u.padre_siglas ? 'normal' : 'italic' }}>
                                                             {u.padre_siglas || '(raíz)'}
+                                                        </td>
+                                                        <td style={{ padding: '7px 12px', textAlign: 'center' }}>
+                                                            <span style={{ fontWeight: 700, color: '#64748b' }}>{u.nivel_numero}</span>
                                                         </td>
                                                     </tr>
                                                 ))}
@@ -1024,7 +1067,6 @@ export default function ProyectoDetalle() {
                         </div>
                     </div>
                 </div>
-            )}
             )}
 
             {mostrarBulkGlosario && (
