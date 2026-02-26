@@ -115,10 +115,17 @@ const initDB = async () => {
         `);
 
         // 5. Migración de Roles de Usuario
-        // Verificamos si la columna rol existe y tiene los valores correctos
         await pool.query(`
             DO $$ 
             BEGIN 
+                -- Convertir la columna de ENUM a VARCHAR si es necesario para permitir nuevos valores
+                IF EXISTS (
+                    SELECT 1 FROM information_schema.columns 
+                    WHERE table_name='usuarios' AND column_name='rol' AND data_type='USER-DEFINED'
+                ) THEN
+                    ALTER TABLE usuarios ALTER COLUMN rol TYPE VARCHAR(50) USING rol::VARCHAR;
+                END IF;
+
                 IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='usuarios' AND column_name='rol') THEN
                     ALTER TABLE usuarios ADD COLUMN rol VARCHAR(50) DEFAULT 'revisor';
                 END IF;
