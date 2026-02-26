@@ -6,8 +6,9 @@ import DashboardCarga from '../components/DashboardCarga';
 import * as XLSX from 'xlsx';
 
 // ==================== COMPONENTE ÁRBOL VISUAL ====================
-const NodoArbol = ({ nodo, nivel = 0, onSeleccionar, seleccionado, puedeEditar, onEditar, onEliminar }) => {
+const NodoArbol = ({ nodo, nivel = 0, onSeleccionar, seleccionado, puedeEditar, onEditar, onEliminar, revisionActiva, onObservar }) => {
     const [expandido, setExpandido] = useState(true);
+    const hasChildren = nodo.hijos && nodo.hijos.length > 0;
     const colores = ['#1a3a5c', '#4a7db5', '#2e86de', '#27ae60', '#f39c12', '#8e44ad', '#e74c3c'];
     const color = colores[nivel % colores.length];
 
@@ -17,7 +18,7 @@ const NodoArbol = ({ nodo, nivel = 0, onSeleccionar, seleccionado, puedeEditar, 
                 className={`tree-node-header ${seleccionado?.id === nodo.id ? 'selected' : ''}`}
                 onClick={() => { onSeleccionar(nodo); setExpandido(!expandido); }}
             >
-                <span style={{ fontSize: 12, color: '#999', minWidth: 20 }}>{nodo.hijos?.length > 0 ? (expandido ? '▼' : '▶') : '•'}</span>
+                <span style={{ fontSize: 12, color: '#999', minWidth: 20 }}>{hasChildren ? (expandido ? '▼' : '▶') : '•'}</span>
                 <span className="tree-node-chip" style={{ background: color }}>{nodo.siglas}</span>
                 <span style={{ fontSize: 13, color: 'var(--color-texto)', flex: 1, whiteSpace: 'normal', wordBreak: 'break-word', display: 'inline-block', verticalAlign: 'middle' }}>{nodo.nombre}</span>
                 <span className="nivel-chip" style={{ flexShrink: 0 }}>Nivel {nodo.nivel_numero}</span>
@@ -27,11 +28,16 @@ const NodoArbol = ({ nodo, nivel = 0, onSeleccionar, seleccionado, puedeEditar, 
                         <button className="btn btn-danger btn-icon btn-sm" onClick={() => onEliminar(nodo.id)} title="Eliminar">🗑️</button>
                     </div>
                 )}
+                {revisionActiva && (
+                    <div style={{ display: 'flex', gap: 4, marginLeft: 8 }} onClick={e => e.stopPropagation()}>
+                        <button className="btn btn-warning btn-icon btn-sm" onClick={() => onObservar(nodo)} title="Observar">🚩</button>
+                    </div>
+                )}
             </div>
-            {expandido && nodo.hijos?.length > 0 && (
+            {expandido && hasChildren && (
                 <div className="tree-children">
                     {nodo.hijos.map(hijo => (
-                        <NodoArbol key={hijo.id} nodo={hijo} nivel={nivel + 1} onSeleccionar={onSeleccionar} seleccionado={seleccionado} puedeEditar={puedeEditar} onEditar={onEditar} onEliminar={onEliminar} />
+                        <NodoArbol key={hijo.id} nodo={hijo} nivel={nivel + 1} onSeleccionar={onSeleccionar} seleccionado={seleccionado} puedeEditar={puedeEditar} onEditar={onEditar} onEliminar={onEliminar} revisionActiva={revisionActiva} onObservar={onObservar} />
                     ))}
                 </div>
             )}
@@ -63,7 +69,7 @@ const MiniNodoArbol = ({ nodo, onSeleccionar, seleccionado }) => {
 };
 
 // ==================== COMPONENTE ATRIBUCIONES ====================
-const TabAtribuciones = ({ proyectoId, unidad, setUnidad, arbol, atribGenerales, puedeEditarExterno }) => {
+const TabAtribuciones = ({ proyectoId, unidad, setUnidad, arbol, atribGenerales, puedeEditarExterno, revisionActiva, onObservar }) => {
     const { usuario } = useAuth();
     const [atribs, setAtribs] = useState([]);
     const [cargando, setCargando] = useState(false);
@@ -314,12 +320,17 @@ const TabAtribuciones = ({ proyectoId, unidad, setUnidad, arbol, atribGenerales,
                                                 </div>
                                                 <p style={{ fontSize: 15, color: '#1e293b', lineHeight: 1.6, fontWeight: 500 }}>{a.texto}</p>
                                             </div>
-                                            {puedeEditar && (
-                                                <div style={{ display: 'flex', gap: 8, flexShrink: 0, alignItems: 'flex-start' }}>
-                                                    <button className="btn btn-outline btn-icon btn-sm" onClick={() => abrirForm(a)} title="Editar" style={{ width: 36, height: 36 }}>✏️</button>
-                                                    <button className="btn btn-danger btn-icon btn-sm" onClick={() => eliminar(a.id)} title="Eliminar" style={{ width: 36, height: 36 }}>🗑️</button>
-                                                </div>
-                                            )}
+                                            <div style={{ display: 'flex', gap: 8, flexShrink: 0, alignItems: 'flex-start' }}>
+                                                {puedeEditar && (
+                                                    <>
+                                                        <button className="btn btn-outline btn-icon btn-sm" onClick={() => abrirForm(a)} title="Editar" style={{ width: 36, height: 36 }}>✏️</button>
+                                                        <button className="btn btn-danger btn-icon btn-sm" onClick={() => eliminar(a.id)} title="Eliminar" style={{ width: 36, height: 36 }}>🗑️</button>
+                                                    </>
+                                                )}
+                                                {revisionActiva && (
+                                                    <button className="btn btn-warning btn-icon btn-sm" onClick={() => onObservar(a)} title="Observar" style={{ width: 36, height: 36 }}>🚩</button>
+                                                )}
+                                            </div>
                                         </div>
                                     ))}
                                 </div>
@@ -448,6 +459,12 @@ export default function ProyectoDetalle() {
     const [cargandoBulk, setCargandoBulk] = useState(false);
     const [editandoAG, setEditandoAG] = useState(null);
     const [editandoGlosario, setEditandoGlosario] = useState(null);
+
+    // Modo Revisión
+    const [revisionActiva, setRevisionActiva] = useState(null); // ID de la revisión si estamos revisando
+    const [mostrarModalObsRapida, setMostrarModalObsRapida] = useState(false);
+    const [atribParaObservar, setAtribParaObservar] = useState(null);
+    const [formObsRapida, setFormObsRapida] = useState({ texto_observacion: '' });
 
     const cargar = async () => {
         try {
@@ -644,6 +661,22 @@ export default function ProyectoDetalle() {
         setExportando(false);
     };
 
+    const handleCrearObsRapida = async (e) => {
+        e.preventDefault();
+        try {
+            await api.post(`/revisiones/${revisionActiva}/observaciones`, {
+                ...formObsRapida,
+                atribucion_especifica_id: atribParaObservar.id
+            });
+            setMostrarModalObsRapida(false);
+            setAtribParaObservar(null);
+            setFormObsRapida({ texto_observacion: '' });
+            alert('✅ Observación guardada');
+            // No recargamos todo el árbol para no perder contexto, 
+            // pero la observación ya está en BD.
+        } catch (err) { alert(err.response?.data?.error || 'Error'); }
+    };
+
     const puedeEditar = (() => {
         if (usuario.rol === 'admin' || usuario.rol === 'revisor') return true;
         if (usuario.rol === 'visualizador') return false;
@@ -706,7 +739,7 @@ export default function ProyectoDetalle() {
                     { id: 'ley', label: '📜 Atrib. Generales (Ley)' },
                     { id: 'atribuciones', label: '📝 Atribuciones' },
                     { id: 'glosario', label: '📖 Glosario' },
-                    { id: 'revisiones', label: '🔍 Revisiones' }
+                    { id: 'revisiones', label: '🔍 Revisiones' + (revisionActiva ? ' (ACTIVA)' : '') }
                 ].map(t => (
                     <button key={t.id} className={`tab-btn ${tab === t.id ? 'active' : ''}`} onClick={() => setTab(t.id)}>
                         {t.label}
@@ -762,6 +795,8 @@ export default function ProyectoDetalle() {
                                         puedeEditar={puedeEditar}
                                         onEditar={abrirEditarUnidad}
                                         onEliminar={eliminarUnidad}
+                                        revisionActiva={revisionActiva}
+                                        onObservar={(u) => { setAtribParaObservar(u); setMostrarModalObsRapida(true); }}
                                     />
                                 ))}
                             </div>
@@ -780,6 +815,8 @@ export default function ProyectoDetalle() {
                         setUnidad={setUnidadSeleccionada}
                         atribGenerales={atribGenerales}
                         puedeEditarExterno={puedeEditar}
+                        revisionActiva={revisionActiva}
+                        onObservar={(a) => { setAtribParaObservar(a); setMostrarModalObsRapida(true); }}
                     />
                 </div>
             )}
@@ -866,7 +903,45 @@ export default function ProyectoDetalle() {
 
             {/* ===== TAB: REVISIONES ===== */}
             {tab === 'revisiones' && (
-                <TabRevisiones proyectoId={id} usuario={usuario} />
+                <TabRevisiones
+                    proyectoId={id}
+                    usuario={usuario}
+                    revisionActiva={revisionActiva}
+                    setRevisionActiva={setRevisionActiva}
+                    setTab={setTab}
+                />
+            )}
+
+            {/* Modal de Observación Rápida desde el Árbol */}
+            {mostrarModalObsRapida && (
+                <div className="modal-overlay" onClick={() => setMostrarModalObsRapida(false)}>
+                    <div className="modal" onClick={e => e.stopPropagation()}>
+                        <div className="modal-header">
+                            <h2 className="modal-title">🚩 Observar Atribución</h2>
+                            <button className="modal-close" onClick={() => setMostrarModalObsRapida(false)}>×</button>
+                        </div>
+                        <div style={{ padding: '0 20px 10px', fontSize: 13, color: '#64748b' }}>
+                            <strong>Atribución:</strong> {atribParaObservar?.clave} - {atribParaObservar?.texto}
+                        </div>
+                        <form onSubmit={handleCrearObsRapida}>
+                            <div className="form-group">
+                                <label className="form-label">Texto de la Observación <span className="required">*</span></label>
+                                <textarea
+                                    className="form-control"
+                                    rows={5}
+                                    value={formObsRapida.texto_observacion}
+                                    onChange={e => setFormObsRapida({ ...formObsRapida, texto_observacion: e.target.value })}
+                                    required
+                                    placeholder="Explique qué debe corregirse..."
+                                />
+                            </div>
+                            <div style={{ display: 'flex', gap: 10, justifyContent: 'flex-end', marginTop: 16 }}>
+                                <button type="button" className="btn btn-outline" onClick={() => setMostrarModalObsRapida(false)}>Cancelar</button>
+                                <button type="submit" className="btn btn-danger">💾 Guardar y Capturar Snapshot</button>
+                            </div>
+                        </form>
+                    </div>
+                </div>
             )}
 
             {/* Modal: Nueva Unidad */}
@@ -1108,7 +1183,7 @@ export default function ProyectoDetalle() {
 }
 
 // ==================== TAB REVISIONES ====================
-const TabRevisiones = ({ proyectoId, usuario }) => {
+const TabRevisiones = ({ proyectoId, usuario, revisionActiva, setRevisionActiva, setTab }) => {
     const [revisiones, setRevisiones] = useState([]);
     const [seleccionada, setSeleccionada] = useState(null);
     const [observaciones, setObservaciones] = useState([]);
@@ -1133,6 +1208,15 @@ const TabRevisiones = ({ proyectoId, usuario }) => {
     const seleccionarRevision = (rev) => {
         setSeleccionada(rev);
         cargarObservaciones(rev.id);
+    };
+
+    const crearRevision = async (e) => {
+        e.preventDefault();
+        try {
+            await api.post(`/proyectos/${proyectoId}/revisiones`, formRev);
+            setMostrarFormRev(false);
+            cargarRevisiones();
+        } catch { alert('Error al crear revisión'); }
     };
 
     const eliminarRevision = async (revId) => {
@@ -1232,6 +1316,11 @@ const TabRevisiones = ({ proyectoId, usuario }) => {
                                 <div style={{ display: 'flex', gap: 8 }}>
                                     {esRevisor && seleccionada.estado === 'abierta' && (
                                         <>
+                                            {revisionActiva === seleccionada.id ? (
+                                                <button className="btn btn-danger btn-sm" onClick={() => setRevisionActiva(null)}>⏹️ Salir Modo Revisión</button>
+                                            ) : (
+                                                <button className="btn btn-warning btn-sm" onClick={() => { setRevisionActiva(seleccionada.id); setTab('atribuciones'); }}>🔍 Entrar Modo Revisión</button>
+                                            )}
                                             <button className="btn btn-primary btn-sm" onClick={() => { setFormObs({ texto_observacion: '' }); setMostrarFormObs(true); }}>➕ Observación</button>
                                             <button className="btn btn-success btn-sm" onClick={cerrarRevision}>✅ Cerrar sin Word</button>
                                         </>
@@ -1360,6 +1449,7 @@ const TabRevisiones = ({ proyectoId, usuario }) => {
 // ==================== CARD OBSERVACIÓN ====================
 const ObservacionCard = ({ obs, esDependencia, esRevisor, onSubsanar, onEditar, onEliminar }) => {
     const [mostrarForm, setMostrarForm] = useState(false);
+    const [mostrarComparativa, setMostrarComparativa] = useState(false);
     const [respuesta, setRespuesta] = useState('');
 
     const handleSubsanar = async (e) => {
@@ -1369,9 +1459,9 @@ const ObservacionCard = ({ obs, esDependencia, esRevisor, onSubsanar, onEditar, 
     };
 
     return (
-        <div style={{ border: `1px solid ${obs.estado === 'pendiente' ? '#fca5a5' : '#a7f3d0'}`, borderRadius: 8, padding: 16, marginBottom: 16, background: obs.estado === 'pendiente' ? '#fff5f5' : '#f0fdf4', position: 'relative' }}>
+        <div style={{ border: `1px solid ${obs.estado === 'pendiente' ? '#fca5a5' : '#a7f3d0'}`, borderRadius: 8, padding: 16, marginBottom: 16, background: obs.estado === 'pendiente' ? '#fff5f5' : '#f0fdf4', position: 'relative', boxShadow: '0 2px 4px rgba(0,0,0,0.05)' }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 10 }}>
-                <span className={`badge badge-${obs.estado}`}>{obs.estado === 'pendiente' ? '⏳ Pendiente' : '✅ Subsanada'}</span>
+                <span className={`badge badge-${obs.estado}`} style={{ fontSize: 11 }}>{obs.estado === 'pendiente' ? '⏳ Pendiente' : '✅ Subsanada'}</span>
                 <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
                     <span style={{ fontSize: 11, color: '#999' }}>{new Date(obs.created_at).toLocaleDateString('es-MX')}</span>
                     {esRevisor && obs.estado === 'pendiente' && (
@@ -1382,20 +1472,76 @@ const ObservacionCard = ({ obs, esDependencia, esRevisor, onSubsanar, onEditar, 
                     )}
                 </div>
             </div>
-            <p style={{ fontSize: 14, color: 'var(--color-texto)', marginBottom: 10, lineHeight: 1.5 }}>{obs.texto_observacion}</p>
-            {obs.respuesta && (
-                <div style={{ fontSize: 13, color: '#166534', background: '#dcfce7', padding: '10px 14px', borderRadius: 8, border: '1px solid #bbf7d0' }}>
-                    <strong>✅ Respuesta:</strong> {obs.respuesta}
+
+            {/* Contexto de la Atribución */}
+            {obs.atribucion_clave && (
+                <div style={{ marginBottom: 12, padding: '8px 12px', background: 'rgba(0,0,0,0.03)', borderRadius: 6, borderLeft: '3px solid var(--color-primario)' }}>
+                    <div style={{ fontSize: 11, fontWeight: 700, color: 'var(--color-primario)', marginBottom: 2 }}>{obs.atribucion_clave}</div>
+                    <div style={{ fontSize: 12, color: 'var(--color-texto)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{obs.atribucion_texto}</div>
                 </div>
             )}
-            {obs.estado === 'pendiente' && esDependencia && !mostrarForm && (
-                <button className="btn btn-success btn-sm" style={{ marginTop: 10 }} onClick={() => setMostrarForm(true)}>✅ Responder / Subsanar</button>
+
+            <p style={{ fontSize: 14, color: 'var(--color-texto)', marginBottom: 10, lineHeight: 1.5, fontWeight: 500 }}>
+                <span style={{ color: '#ef4444', marginRight: 4 }}>🚩</span>
+                {obs.texto_observacion}
+            </p>
+
+            {/* Comparativa de Versiones */}
+            {obs.valor_original && (
+                <div style={{ marginTop: 15 }}>
+                    <button
+                        className="btn btn-outline btn-xs"
+                        onClick={() => setMostrarComparativa(!mostrarComparativa)}
+                        style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 11 }}
+                    >
+                        {mostrarComparativa ? '🔼 Ocultar Comparativa' : '📑 Ver Comparativa de Cambios'}
+                    </button>
+
+                    {mostrarComparativa && (
+                        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10, marginTop: 10 }}>
+                            <div style={{ padding: 10, background: '#fee2e2', borderRadius: 6, border: '1px solid #fecaca' }}>
+                                <div style={{ fontSize: 10, fontWeight: 700, color: '#991b1b', marginBottom: 6, textTransform: 'uppercase' }}>🔴 Versión Original (Snapshot)</div>
+                                <div style={{ fontSize: 12, color: '#991b1b', lineHeight: 1.4 }}>{obs.valor_original}</div>
+                            </div>
+                            <div style={{ padding: 10, background: obs.estado === 'subsanada' ? '#dcfce7' : '#f1f5f9', borderRadius: 6, border: `1px solid ${obs.estado === 'subsanada' ? '#bbf7d0' : '#e2e8f0'}` }}>
+                                <div style={{ fontSize: 10, fontWeight: 700, color: obs.estado === 'subsanada' ? '#166534' : '#475569', marginBottom: 6, textTransform: 'uppercase' }}>
+                                    {obs.estado === 'subsanada' ? '🟢 Versión Corregida' : '⚪ Versión Actual'}
+                                </div>
+                                <div style={{ fontSize: 12, color: obs.estado === 'subsanada' ? '#15803d' : '#475569', lineHeight: 1.4 }}>
+                                    {obs.valor_subsanado || obs.atribucion_texto || 'Sin cambios registrados'}
+                                </div>
+                            </div>
+                        </div>
+                    )}
+                </div>
             )}
+
+            {obs.respuesta && (
+                <div style={{ fontSize: 13, color: '#166534', background: '#dcfce7', padding: '10px 14px', borderRadius: 8, border: '1px solid #bbf7d0', marginTop: 12 }}>
+                    <strong>✅ Respuesta del Enlace:</strong> {obs.respuesta}
+                </div>
+            )}
+
+            {obs.estado === 'pendiente' && esDependencia && !mostrarForm && (
+                <button className="btn btn-success btn-sm" style={{ marginTop: 12, width: '100%' }} onClick={() => setMostrarForm(true)}>✍️ Responder / Subsanar</button>
+            )}
+
             {mostrarForm && (
-                <form onSubmit={handleSubsanar} style={{ marginTop: 12 }}>
-                    <textarea className="form-control" rows={3} value={respuesta} onChange={e => setRespuesta(e.target.value)} placeholder="Describa cómo se subsanó la observación..." required style={{ marginBottom: 10 }} />
+                <form onSubmit={handleSubsanar} style={{ marginTop: 12, borderTop: '1px solid #e2e8f0', paddingTop: 12 }}>
+                    <div className="form-group">
+                        <label className="form-label" style={{ fontSize: 12 }}>Respuesta / Justificación</label>
+                        <textarea
+                            className="form-control"
+                            rows={3}
+                            value={respuesta}
+                            onChange={e => setRespuesta(e.target.value)}
+                            placeholder="Describa cómo se atendió esta observación..."
+                            required
+                            style={{ marginBottom: 10, fontSize: 13 }}
+                        />
+                    </div>
                     <div style={{ display: 'flex', gap: 8 }}>
-                        <button type="submit" className="btn btn-success btn-sm">Confirmar</button>
+                        <button type="submit" className="btn btn-success btn-sm">Confirmar Subsanación</button>
                         <button type="button" className="btn btn-outline btn-sm" onClick={() => setMostrarForm(false)}>Cancelar</button>
                     </div>
                 </form>

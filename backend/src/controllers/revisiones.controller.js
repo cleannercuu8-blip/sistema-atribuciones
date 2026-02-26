@@ -107,13 +107,22 @@ const crearObservacion = async (req, res) => {
     const { atribucion_especifica_id, unidad_id, texto_observacion } = req.body;
     if (!texto_observacion) return res.status(400).json({ error: 'El texto de la observación es requerido' });
     try {
+        let valor_original = null;
+        if (atribucion_especifica_id) {
+            const aRes = await pool.query('SELECT texto FROM atribuciones_especificas WHERE id = $1', [atribucion_especifica_id]);
+            if (aRes.rows.length > 0) {
+                valor_original = aRes.rows[0].texto;
+            }
+        }
+
         const result = await pool.query(
-            `INSERT INTO observaciones (revision_id, atribucion_especifica_id, unidad_id, texto_observacion)
-       VALUES ($1,$2,$3,$4) RETURNING *`,
-            [id, atribucion_especifica_id || null, unidad_id || null, texto_observacion]
+            `INSERT INTO observaciones (revision_id, atribucion_especifica_id, unidad_id, texto_observacion, valor_original)
+       VALUES ($1,$2,$3,$4,$5) RETURNING *`,
+            [id, atribucion_especifica_id || null, unidad_id || null, texto_observacion, valor_original]
         );
         res.status(201).json(result.rows[0]);
     } catch (err) {
+        console.error('Error en crearObservacion:', err);
         res.status(500).json({ error: 'Error del servidor' });
     }
 };
@@ -123,27 +132,40 @@ const subsanarObservacion = async (req, res) => {
     const { id } = req.params;
     const { respuesta } = req.body;
     try {
+        // Cargar observación para ver si tiene atribución asociada
+        const obsCheck = await pool.query('SELECT atribucion_especifica_id, revision_id FROM observaciones WHERE id = $1', [id]);
+        if (obsCheck.rows.length === 0) return res.status(404).json({ error: 'Observación no encontrada' });
+
+        let valor_subsanado = null;
+        const atribId = obsCheck.rows[0].atribucion_especifica_id;
+        if (atribId) {
+            const aRes = await pool.query('SELECT texto FROM atribuciones_especificas WHERE id = $1', [atribId]);
+            if (aRes.rows.length > 0) {
+                valor_subsanado = aRes.rows[0].texto;
+            }
+        }
+
         const result = await pool.query(
-            `UPDATE observaciones SET estado='subsanada', respuesta=$1, updated_at=NOW() WHERE id=$2 RETURNING *`,
-            [respuesta, id]
+            `UPDATE observaciones SET estado='subsanada', respuesta=$1, valor_subsanado=$2, updated_at=NOW() WHERE id=$3 RETURNING *`,
+            [respuesta, valor_subsanado, id]
         );
-        if (result.rows.length === 0) return res.status(404).json({ error: 'Observación no encontrada' });
 
         // Verificar si todas las observaciones de la revisión están subsanadas
-        const obs = result.rows[0];
+        const revisionId = obsCheck.rows[0].revision_id;
         const pendientes = await pool.query(
             `SELECT COUNT(*) as total FROM observaciones WHERE revision_id = $1 AND estado = 'pendiente'`,
-            [obs.revision_id]
+            [revisionId]
         );
         if (parseInt(pendientes.rows[0].total) === 0) {
             // Cerrar revisión automáticamente
             await pool.query(
                 `UPDATE revisiones SET estado='cerrada', fecha_cierre=NOW() WHERE id=$1`,
-                [obs.revision_id]
+                [revisionId]
             );
         }
         res.json(result.rows[0]);
     } catch (err) {
+        console.error('Error en subsanarObservacion:', err);
         res.status(500).json({ error: 'Error del servidor' });
     }
 };

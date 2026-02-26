@@ -98,10 +98,12 @@ export default function Admin() {
         setMostrarModalD(true);
     };
 
-    const desactivarUsuario = async (id) => {
-        if (!window.confirm('¿Desactivar este usuario?')) return;
-        await api.delete(`/usuarios/${id}`);
-        cargar();
+    const eliminarUsuario = async (id) => {
+        if (!window.confirm('¿Eliminar definitivamente este usuario?')) return;
+        try {
+            await api.delete(`/usuarios/${id}`);
+            cargar();
+        } catch { alert('Error al eliminar'); }
     };
 
     return (
@@ -135,16 +137,16 @@ export default function Admin() {
                             </thead>
                             <tbody>
                                 {usuarios.map(u => (
-                                    <tr key={u.id} style={{ opacity: u.activo ? 1 : 0.5 }}>
+                                    <tr key={u.id}>
                                         <td><strong>{u.nombre}</strong></td>
                                         <td>{u.email}</td>
                                         <td><span className={`badge badge-${u.rol}`}>{getRolLabel(u.rol)}</span></td>
-                                        <td><span className={`badge ${u.activo ? 'badge-aprobado' : 'badge-pendiente'}`}>{u.activo ? 'Activo' : 'Inactivo'}</span></td>
+                                        <td><span className="badge badge-aprobado">Activo</span></td>
                                         <td>
                                             <div style={{ display: 'flex', gap: 4 }}>
                                                 <button className="btn btn-outline btn-icon btn-sm" onClick={() => abrirModalU(u)}>✏️</button>
-                                                {u.id !== usuario?.id && u.activo && (
-                                                    <button className="btn btn-danger btn-icon btn-sm" onClick={() => desactivarUsuario(u.id)}>🗑️</button>
+                                                {u.id !== usuario?.id && (
+                                                    <button className="btn btn-danger btn-icon btn-sm" onClick={() => eliminarUsuario(u.id)}>🗑️</button>
                                                 )}
                                             </div>
                                         </td>
@@ -265,15 +267,6 @@ export default function Admin() {
                                     </select>
                                 </div>
                             </div>
-                            {editandoU && (
-                                <div className="form-group">
-                                    <label className="form-label">Estado</label>
-                                    <select className="form-control" value={formU.activo} onChange={e => setFormU({ ...formU, activo: e.target.value === 'true' })}>
-                                        <option value="true">Activo</option>
-                                        <option value="false">Inactivo</option>
-                                    </select>
-                                </div>
-                            )}
                             <div style={{ display: 'flex', gap: 10, justifyContent: 'flex-end', marginTop: 16 }}>
                                 <button type="button" className="btn btn-outline" onClick={() => setMostrarModalU(false)}>Cancelar</button>
                                 <button type="submit" className="btn btn-primary" id="btn-guardar-usuario">✅ {editandoU ? 'Actualizar' : 'Crear'} usuario</button>

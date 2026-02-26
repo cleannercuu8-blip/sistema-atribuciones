@@ -63,15 +63,29 @@ const actualizar = async (req, res) => {
     }
 };
 
-// DELETE /api/usuarios/:id  (desactivar, no borrar)
-const desactivar = async (req, res) => {
+// DELETE /api/usuarios/:id
+const eliminar = async (req, res) => {
     const { id } = req.params;
     try {
-        await pool.query('UPDATE usuarios SET activo = false WHERE id = $1', [id]);
-        res.json({ mensaje: 'Usuario desactivado' });
+        // Intentar borrado físico
+        try {
+            const result = await pool.query('DELETE FROM usuarios WHERE id = $1 RETURNING id', [id]);
+            if (result.rows.length > 0) {
+                return res.json({ mensaje: 'Usuario eliminado físicamente' });
+            }
+        } catch (dbErr) {
+            // Si falla por FK (23503 es el código de error para violación de llave foránea en PG)
+            if (dbErr.code === '23503') {
+                await pool.query('UPDATE usuarios SET activo = false WHERE id = $1', [id]);
+                return res.json({ mensaje: 'Usuario ocultado (tiene historial relacionado)' });
+            }
+            throw dbErr;
+        }
+        res.status(404).json({ error: 'Usuario no encontrado' });
     } catch (err) {
+        console.error(err);
         res.status(500).json({ error: 'Error del servidor' });
     }
 };
 
-module.exports = { listar, crear, actualizar, desactivar };
+module.exports = { listar, crear, actualizar, eliminar };

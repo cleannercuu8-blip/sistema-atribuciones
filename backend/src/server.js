@@ -157,6 +157,14 @@ const initDB = async () => {
         `);
         console.log('🔹 Migración de soporte para Word completada');
 
+        // Migración para snapshots de observaciones
+        await pool.query(`
+            ALTER TABLE observaciones 
+            ADD COLUMN IF NOT EXISTS valor_original TEXT,
+            ADD COLUMN IF NOT EXISTS valor_subsanado TEXT;
+        `);
+        console.log('🔹 Migración de snapshots de observaciones completada');
+
         // Asegurar UNIQUE en dependencias para permitir ON CONFLICT
         await pool.query(`
             DO $$ 
