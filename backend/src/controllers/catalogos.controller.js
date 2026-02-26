@@ -30,12 +30,14 @@ const listarEnlaces = async (req, res) => {
 };
 
 const obtenerEnlace = async (req, res) => {
+    const { id } = req.params;
     try {
-        const result = await pool.query('SELECT * FROM cat_enlaces WHERE id = $1', [req.params.id]);
-        if (result.rows.length === 0) return res.status(404).json({ error: 'No encontrado' });
+        const result = await pool.query('SELECT * FROM cat_enlaces WHERE id = $1', [id]);
+        if (result.rows.length === 0) return res.status(404).json({ error: 'Enlace no encontrado' });
         res.json(result.rows[0]);
     } catch (err) {
-        res.status(500).json({ error: 'Error del servidor' });
+        console.error('Error en obtenerEnlace:', err);
+        res.status(500).json({ error: 'Error del servidor al obtener enlace', detalle: err.message });
     }
 };
 
@@ -247,17 +249,20 @@ const limpiarCatalogo = async (req, res) => {
         'responsables': 'cat_responsables',
         'enlaces': 'cat_enlaces',
         'avances': 'cat_avances',
-        'dependencias': 'dependencias'
+        'dependencias': 'dependencias',
+        'estados-proyecto': 'cat_estados_proyecto'
     };
 
     const tabla = mapaTablas[tipo];
-    if (!tabla) return res.status(400).json({ error: 'Tipo de catálogo inválido' });
+    if (!tabla) return res.status(400).json({ error: 'Tipo de catálogo inválido: ' + tipo });
 
     try {
+        console.log(`🧹 Limpiando catálogo: ${tipo} (tabla: ${tabla})`);
         await pool.query(`TRUNCATE TABLE ${tabla} RESTART IDENTITY CASCADE`);
         res.json({ mensaje: `Catálogo de ${tipo} limpiado correctamente` });
     } catch (err) {
-        res.status(500).json({ error: 'Error al limpiar catálogo' });
+        console.error(`❌ Error al limpiar catálogo ${tipo}:`, err);
+        res.status(500).json({ error: 'Error al limpiar catálogo', detalle: err.message });
     }
 };
 
@@ -439,6 +444,17 @@ const eliminarEstadoProyecto = async (req, res) => {
     }
 };
 
+const obtenerEstadoProyecto = async (req, res) => {
+    try {
+        const result = await pool.query('SELECT * FROM cat_estados_proyecto WHERE id = $1', [req.params.id]);
+        if (result.rows.length === 0) return res.status(404).json({ error: 'Estado no encontrado' });
+        res.json(result.rows[0]);
+    } catch (err) {
+        console.error('Error en obtenerEstadoProyecto:', err);
+        res.status(500).json({ error: 'Error del servidor al obtener estado', detalle: err.message });
+    }
+};
+
 const cargarMasivoGlosario = async (req, res) => {
     const { proyectoId } = req.params;
     const { items } = req.body; // [{acronimo, significado}]
@@ -497,6 +513,7 @@ module.exports = {
     obtenerEnlace,
     obtenerAvance,
     obtenerDependencia,
+    obtenerEstadoProyecto,
     limpiarCatalogo,
     descargarPlantilla
 };

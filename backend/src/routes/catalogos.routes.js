@@ -15,6 +15,9 @@ router.get('/dependencias/:id', authMiddleware, catalogosController.obtenerDepen
 router.get('/estados-proyecto', authMiddleware, catalogosController.listarEstadosProyecto);
 
 // Gestión (Solo Admin)
+router.delete('/:tipo/limpiar', authMiddleware, requireRole('admin'), catalogosController.limpiarCatalogo);
+router.get('/plantilla/:tipo', authMiddleware, requireRole('admin'), catalogosController.descargarPlantilla);
+
 router.post('/responsables', authMiddleware, requireRole('admin'), catalogosController.agregarResponsable);
 router.put('/responsables/:id', authMiddleware, requireRole('admin'), catalogosController.actualizarResponsable);
 router.delete('/responsables/:id', authMiddleware, requireRole('admin'), catalogosController.eliminarResponsable);
@@ -26,7 +29,6 @@ router.delete('/enlaces/:id', authMiddleware, requireRole('admin'), catalogosCon
 router.post('/avances', authMiddleware, requireRole('admin'), catalogosController.agregarAvance);
 router.put('/avances/:id', authMiddleware, requireRole('admin'), catalogosController.actualizarAvance);
 router.post('/dependencias/masivo', authMiddleware, requireRole('admin'), catalogosController.cargarMasivoDependencias);
-router.delete('/:tipo/limpiar', authMiddleware, requireRole('admin'), catalogosController.limpiarCatalogo);
-router.get('/plantilla/:tipo', authMiddleware, requireRole('admin'), catalogosController.descargarPlantilla);
+router.get('/estados-proyecto/:id', authMiddleware, catalogosController.obtenerEstadoProyecto);
 
 module.exports = router;
