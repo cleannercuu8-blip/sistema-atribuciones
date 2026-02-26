@@ -6,7 +6,7 @@ import DashboardCarga from '../components/DashboardCarga';
 import * as XLSX from 'xlsx';
 
 // ==================== COMPONENTE ÁRBOL VISUAL ====================
-const NodoArbol = ({ nodo, nivel = 0, onSeleccionar, seleccionado, puedeEditar, onEditar, onEliminar, revisionActiva, onObservar }) => {
+const NodoArbol = ({ nodo, nivel = 0, onSeleccionar, seleccionado, puedeEditar, onEditar, onEliminar, revisionActiva, onObservar, esRevisor }) => {
     const [expandido, setExpandido] = useState(true);
     const hasChildren = nodo.hijos && nodo.hijos.length > 0;
     const colores = ['#1a3a5c', '#4a7db5', '#2e86de', '#27ae60', '#f39c12', '#8e44ad', '#e74c3c'];
@@ -28,7 +28,7 @@ const NodoArbol = ({ nodo, nivel = 0, onSeleccionar, seleccionado, puedeEditar, 
                         <button className="btn btn-danger btn-icon btn-sm" onClick={() => onEliminar(nodo.id)} title="Eliminar">🗑️</button>
                     </div>
                 )}
-                {revisionActiva && (
+                {revisionActiva && esRevisor && (
                     <div style={{ display: 'flex', gap: 4, marginLeft: 8 }} onClick={e => e.stopPropagation()}>
                         <button className="btn btn-warning btn-icon btn-sm" onClick={() => onObservar(nodo)} title="Observar">🚩</button>
                     </div>
@@ -37,7 +37,7 @@ const NodoArbol = ({ nodo, nivel = 0, onSeleccionar, seleccionado, puedeEditar, 
             {expandido && hasChildren && (
                 <div className="tree-children">
                     {nodo.hijos.map(hijo => (
-                        <NodoArbol key={hijo.id} nodo={hijo} nivel={nivel + 1} onSeleccionar={onSeleccionar} seleccionado={seleccionado} puedeEditar={puedeEditar} onEditar={onEditar} onEliminar={onEliminar} revisionActiva={revisionActiva} onObservar={onObservar} />
+                        <NodoArbol key={hijo.id} nodo={hijo} nivel={nivel + 1} onSeleccionar={onSeleccionar} seleccionado={seleccionado} puedeEditar={puedeEditar} onEditar={onEditar} onEliminar={onEliminar} revisionActiva={revisionActiva} onObservar={onObservar} esRevisor={esRevisor} />
                     ))}
                 </div>
             )}
@@ -327,7 +327,7 @@ const TabAtribuciones = ({ proyectoId, unidad, setUnidad, arbol, atribGenerales,
                                                         <button className="btn btn-danger btn-icon btn-sm" onClick={() => eliminar(a.id)} title="Eliminar" style={{ width: 36, height: 36 }}>🗑️</button>
                                                     </>
                                                 )}
-                                                {revisionActiva && (
+                                                {revisionActiva && (usuario.rol === 'admin' || usuario.rol === 'revisor') && (
                                                     <button className="btn btn-warning btn-icon btn-sm" onClick={() => onObservar(a)} title="Observar" style={{ width: 36, height: 36 }}>🚩</button>
                                                 )}
                                             </div>
@@ -797,6 +797,7 @@ export default function ProyectoDetalle() {
                                         onEliminar={eliminarUnidad}
                                         revisionActiva={revisionActiva}
                                         onObservar={(u) => { setAtribParaObservar(u); setMostrarModalObsRapida(true); }}
+                                        esRevisor={usuario?.rol === 'admin' || usuario?.rol === 'revisor'}
                                     />
                                 ))}
                             </div>
@@ -1272,7 +1273,7 @@ const TabRevisiones = ({ proyectoId, usuario, revisionActiva, setRevisionActiva,
     };
 
     const esRevisor = usuario.rol === 'admin' || usuario.rol === 'revisor';
-    const esDependencia = usuario.rol === 'dependencia';
+    const esEnlace = usuario.rol === 'enlace' || usuario.rol === 'dependencia';
 
     return (
         <div>
@@ -1376,18 +1377,22 @@ const TabRevisiones = ({ proyectoId, usuario, revisionActiva, setRevisionActiva,
                             )}
 
                             <div style={{ marginTop: 24 }}>
-                                {observaciones.map(o => (
-                                    <ObservacionCard key={o.id} obs={o} esDependencia={esDependencia} esRevisor={esRevisor} onSubsanar={subsanar} onEditar={() => abrirFormEditarObs(o)} onEliminar={() => eliminarObservacion(o.id)} />
-                                ))}
+                                {observaciones.length === 0 ? (
+                                    <div className="empty-state"><div className="empty-icon">📋</div><h3>Sin observaciones</h3></div>
+                                ) : (
+                                    observaciones.map(o => (
+                                        <ObservacionCard
+                                            key={o.id}
+                                            obs={o}
+                                            esEnlace={esEnlace}
+                                            esRevisor={esRevisor}
+                                            onSubsanar={subsanar}
+                                            onEditar={() => abrirFormEditarObs(o)}
+                                            onEliminar={() => eliminarObservacion(o.id)}
+                                        />
+                                    ))
+                                )}
                             </div>
-
-                            {observaciones.length === 0 ? (
-                                <div className="empty-state"><div className="empty-icon">📋</div><h3>Sin observaciones</h3></div>
-                            ) : (
-                                observaciones.map(obs => (
-                                    <ObservacionCard key={obs.id} obs={obs} esDependencia={esDependencia} onSubsanar={subsanar} />
-                                ))
-                            )}
                         </div>
                     )}
                 </div>
@@ -1447,7 +1452,7 @@ const TabRevisiones = ({ proyectoId, usuario, revisionActiva, setRevisionActiva,
 }
 
 // ==================== CARD OBSERVACIÓN ====================
-const ObservacionCard = ({ obs, esDependencia, esRevisor, onSubsanar, onEditar, onEliminar }) => {
+const ObservacionCard = ({ obs, esEnlace, esRevisor, onSubsanar, onEditar, onEliminar }) => {
     const [mostrarForm, setMostrarForm] = useState(false);
     const [mostrarComparativa, setMostrarComparativa] = useState(false);
     const [respuesta, setRespuesta] = useState('');
@@ -1522,7 +1527,7 @@ const ObservacionCard = ({ obs, esDependencia, esRevisor, onSubsanar, onEditar, 
                 </div>
             )}
 
-            {obs.estado === 'pendiente' && esDependencia && !mostrarForm && (
+            {obs.estado === 'pendiente' && esEnlace && !mostrarForm && (
                 <button className="btn btn-success btn-sm" style={{ marginTop: 12, width: '100%' }} onClick={() => setMostrarForm(true)}>✍️ Responder / Subsanar</button>
             )}
 
