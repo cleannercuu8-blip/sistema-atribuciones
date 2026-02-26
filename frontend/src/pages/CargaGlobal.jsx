@@ -8,21 +8,25 @@ const CargaGlobal = () => {
 
     const cargarDatos = async () => {
         try {
+            // Usamos Promise.allSettled o manejamos errores individuales para que un fallo no bloquee todo
             const [atribsRes, respRes, proyRes] = await Promise.all([
-                api.get('/atribuciones/especificas/todas'),
-                api.get('/catalogos/responsables'),
-                api.get('/proyectos')
+                api.get('/atribuciones-generales/especificas/todas').catch(e => ({ data: [] })),
+                api.get('/catalogos/responsables').catch(e => ({ data: [] })),
+                api.get('/proyectos').catch(e => ({ data: [] }))
             ]);
-            const atribs = atribsRes.data;
-            const catResponsables = respRes.data;
-            const proyectos = proyRes.data;
+
+            const atribs = atribsRes.data || [];
+            const catResponsables = respRes.data || [];
+            const proyectos = proyRes.data || [];
 
             const mapa = {};
 
-            // 1. Inicializar con todos los responsables del catálogo para asegurar que todos aparezcan
+            // 1. Inicializar con todos los responsables del catálogo
             catResponsables.forEach(r => {
-                mapa[r.nombre] = {
-                    nombre: r.nombre,
+                const nombre = r.nombre?.trim();
+                if (!nombre) return;
+                mapa[nombre] = {
+                    nombre: nombre,
                     principal: 0,
                     apoyo: 0,
                     proyectos: new Set(),
@@ -30,56 +34,69 @@ const CargaGlobal = () => {
                 };
             });
 
-            // 2. Agregar información de los proyectos para ver qué responsable tiene asignado qué proyecto
+            // 2. Agregar información de los proyectos por responsable
             proyectos.forEach(p => {
-                if (p.responsable) {
-                    if (!mapa[p.responsable]) {
-                        mapa[p.responsable] = {
-                            nombre: p.responsable,
+                const rNombre = p.responsable?.trim();
+                if (rNombre) {
+                    if (!mapa[rNombre]) {
+                        mapa[rNombre] = {
+                            nombre: rNombre,
                             principal: 0,
                             apoyo: 0,
                             proyectos: new Set(),
                             detalle: []
                         };
                     }
-                    mapa[p.responsable].proyectos.add(p.nombre);
+                    mapa[rNombre].proyectos.add(p.nombre);
                 }
             });
 
             // 3. Contabilizar atribuciones específicas
             atribs.forEach(a => {
                 // Principal
-                if (a.responsable_nombre) {
-                    if (!mapa[a.responsable_nombre]) {
-                        mapa[a.responsable_nombre] = {
-                            nombre: a.responsable_nombre,
+                const pNombre = a.responsable_nombre?.trim();
+                if (pNombre) {
+                    if (!mapa[pNombre]) {
+                        mapa[pNombre] = {
+                            nombre: pNombre,
                             principal: 0,
                             apoyo: 0,
                             proyectos: new Set(),
                             detalle: []
                         };
                     }
-                    mapa[a.responsable_nombre].principal++;
-                    mapa[a.responsable_nombre].proyectos.add(a.proyecto_nombre);
-                    mapa[a.responsable_nombre].detalle.push({ proyecto: a.proyecto_nombre, unidad: a.unidad_siglas, clave: a.clave, rol: 'Principal' });
+                    mapa[pNombre].principal++;
+                    mapa[pNombre].proyectos.add(a.proyecto_nombre);
+                    mapa[pNombre].detalle.push({
+                        proyecto: a.proyecto_nombre,
+                        unidad: a.unidad_siglas,
+                        clave: a.clave,
+                        rol: 'Principal'
+                    });
                 }
+
                 // Apoyo
                 if (a.apoyo_ids) {
                     a.apoyo_ids.forEach((id, idx) => {
-                        const nombre = a.apoyo_nombres?.[idx];
-                        if (nombre) {
-                            if (!mapa[nombre]) {
-                                mapa[nombre] = {
-                                    nombre,
+                        const sNombre = a.apoyo_nombres?.[idx]?.trim();
+                        if (sNombre) {
+                            if (!mapa[sNombre]) {
+                                mapa[sNombre] = {
+                                    nombre: sNombre,
                                     principal: 0,
                                     apoyo: 0,
                                     proyectos: new Set(),
                                     detalle: []
                                 };
                             }
-                            mapa[nombre].apoyo++;
-                            mapa[nombre].proyectos.add(a.proyecto_nombre);
-                            mapa[nombre].detalle.push({ proyecto: a.proyecto_nombre, unidad: a.unidad_siglas, clave: a.clave, rol: 'Apoyo' });
+                            mapa[sNombre].apoyo++;
+                            mapa[sNombre].proyectos.add(a.proyecto_nombre);
+                            mapa[sNombre].detalle.push({
+                                proyecto: a.proyecto_nombre,
+                                unidad: a.unidad_siglas,
+                                clave: a.clave,
+                                rol: 'Apoyo'
+                            });
                         }
                     });
                 }

@@ -103,7 +103,7 @@ const listarTodasEspecificas = async (req, res) => {
       JOIN unidades_administrativas ua ON ae.unidad_id = ua.id
       JOIN proyectos p ON ae.proyecto_id = p.id
       LEFT JOIN usuarios u ON ae.responsable_id = u.id
-      WHERE ae.activo = true AND p.activo = true
+      WHERE ae.activo = true
       ORDER BY p.nombre ASC, ua.nivel_numero ASC, ae.clave ASC`;
         const result = await pool.query(query);
         res.json(result.rows);
