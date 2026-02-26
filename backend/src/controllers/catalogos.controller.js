@@ -380,7 +380,7 @@ const actualizarEstadoProyecto = async (req, res) => {
     const { nombre, color } = req.body;
     try {
         const result = await pool.query(
-            'UPDATE cat_estados_proyecto SET nombre = $1, color = $2 WHERE id = $3 RETURNING *',
+            'UPDATE cat_estados_proyecto SET nombre = $1, color = $2, updated_at = NOW() WHERE id = $3 RETURNING *',
             [nombre, color, id]
         );
         res.json(result.rows[0]);

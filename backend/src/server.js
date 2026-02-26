@@ -109,6 +109,11 @@ const initDB = async () => {
             WHERE estado_id IS NULL AND estado IS NOT NULL;
         `);
 
+        // Migración: agregar updated_at a cat_estados_proyecto si no existe
+        await pool.query(`
+            ALTER TABLE cat_estados_proyecto ADD COLUMN IF NOT EXISTS updated_at TIMESTAMPTZ DEFAULT NOW();
+        `);
+
         console.log('🔹 Catálogo de estados y migración de proyectos lista');
 
         // Migración para documentos de Word en Revisiones
@@ -173,6 +178,53 @@ if (process.env.DB_INIT === 'true') {
 } else {
     console.log('✅ Saltando inicialización automática de BD (Ambiente estable)');
 }
+
+// Migraciones ligeras que SIEMPRE corren al iniciar (seguras con IF NOT EXISTS / IF NOT EXISTS)
+const runSafeMigrations = async () => {
+    try {
+        // Asegurar que la tabla de estados existe
+        await pool.query(`
+            CREATE TABLE IF NOT EXISTS cat_estados_proyecto (
+                id SERIAL PRIMARY KEY,
+                nombre VARCHAR(100) NOT NULL UNIQUE,
+                color VARCHAR(20) DEFAULT '#475569',
+                activo BOOLEAN DEFAULT true,
+                created_at TIMESTAMPTZ DEFAULT NOW(),
+                updated_at TIMESTAMPTZ DEFAULT NOW()
+            );
+        `);
+
+        // Agregar columna updated_at si no existe (para BD creadas antes)
+        await pool.query(`
+            ALTER TABLE cat_estados_proyecto ADD COLUMN IF NOT EXISTS updated_at TIMESTAMPTZ DEFAULT NOW();
+        `);
+
+        // Insertar estados por defecto si la tabla está vacía
+        const cnt = await pool.query('SELECT count(*) FROM cat_estados_proyecto');
+        if (parseInt(cnt.rows[0].count) === 0) {
+            await pool.query(`
+                INSERT INTO cat_estados_proyecto (nombre, color) VALUES
+                ('Activo', '#22c55e'),
+                ('En Pausa', '#f59e0b'),
+                ('Cerrado por inactividad', '#ef4444'),
+                ('Dictaminado', '#3b82f6'),
+                ('Borrador', '#64748b')
+                ON CONFLICT (nombre) DO NOTHING;
+            `);
+        }
+
+        // Asegurar columna estado_id en proyectos
+        await pool.query(`
+            ALTER TABLE proyectos ADD COLUMN IF NOT EXISTS estado_id INTEGER REFERENCES cat_estados_proyecto(id);
+        `);
+
+        console.log('✅ Migraciones ligeras aplicadas correctamente');
+    } catch (err) {
+        console.error('⚠️ Error en migraciones ligeras:', err.message);
+    }
+};
+
+runSafeMigrations();
 
 // ============================================
 // RUTAS API

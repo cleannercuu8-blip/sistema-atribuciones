@@ -54,7 +54,9 @@ export default function Proyectos() {
                 const uRes = await api.get('/usuarios');
                 setUsuarios(uRes.data.filter(u => u.activo && u.rol !== 'admin'));
             }
-        } catch { }
+        } catch (err) {
+            console.error('Error cargando datos de proyectos:', err);
+        }
         setCargando(false);
     };
 
