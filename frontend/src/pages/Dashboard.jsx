@@ -124,7 +124,7 @@ export default function Dashboard() {
                                             <td style={{ padding: '16px 20px', color: '#64748b', fontSize: 13 }}>{p.dependencia_nombre}</td>
                                             <td style={{ padding: '16px 20px' }}>
                                                 <span className={`badge badge-${p.estado}`} style={{ fontSize: 11, padding: '4px 10px', borderRadius: 6 }}>
-                                                    {p.estado === 'borrador' ? '✏️ Borrador'
+                                                    {p.estado === 'borrador' ? '✏️ Redacción'
                                                         : p.estado === 'en_revision' ? '🔍 En revisión'
                                                             : '✅ Aprobado'}
                                                 </span>
@@ -158,7 +158,7 @@ export default function Dashboard() {
                                         <div key={idx}>
                                             <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 6, fontSize: 13 }}>
                                                 <span style={{ fontWeight: 600, color: '#334155' }}>{w.responsable}</span>
-                                                <span style={{ fontWeight: 800, color: 'var(--color-primario)' }}>{w.total} atr.</span>
+                                                <span style={{ fontWeight: 800, color: 'var(--color-primario)' }}>{w.total} items</span>
                                             </div>
                                             <div style={{ height: 8, background: '#f1f5f9', borderRadius: 4, overflow: 'hidden' }}>
                                                 <div style={{
@@ -174,9 +174,6 @@ export default function Dashboard() {
                                 })}
                             </div>
                         )}
-                    </div>
-                    <div style={{ background: '#f8fafc', padding: '12px 20px', borderTop: '1px solid #f1f5f9', borderBottomLeftRadius: 12, borderBottomRightRadius: 12 }}>
-                        <p style={{ fontSize: 11, color: '#64748b', fontStyle: 'italic' }}>Top 5 personas con mayor carga de atribuciones.</p>
                     </div>
                 </div>
             </div>

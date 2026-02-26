@@ -3,15 +3,20 @@ const pool = require('../config/db');
 // GET /api/dashboard/stats-innovadoras
 const getStatsInnovadoras = async (req, res) => {
     try {
-        // 1. Balance de Responsabilidades (Atribuciones por responsable)
+        // 1. Balance de Responsabilidades (Consolidado de proyectos y atribuciones)
         const workloadResult = await pool.query(`
-            SELECT u.nombre as responsable, COUNT(ae.id)::int as total
-            FROM atribuciones_especificas ae
-            JOIN usuarios u ON ae.responsable_id = u.id
-            WHERE ae.activo = true
-            GROUP BY u.nombre
+            SELECT 
+                u.nombre as responsable, 
+                (COALESCE(p_count.total, 0) + COALESCE(ae_count.total, 0))::int as total
+            FROM usuarios u
+            LEFT JOIN (
+                SELECT created_by, COUNT(*) as total FROM proyectos GROUP BY created_by
+            ) p_count ON u.id = p_count.created_by
+            LEFT JOIN (
+                SELECT responsable_id, COUNT(*) as total FROM atribuciones_especificas WHERE activo = true GROUP BY responsable_id
+            ) ae_count ON u.id = ae_count.responsable_id
+            WHERE (COALESCE(p_count.total, 0) + COALESCE(ae_count.total, 0)) > 0
             ORDER BY total DESC
-            LIMIT 5
         `);
 
         // 2. Feed de Validaciones Recientes (Observaciones y cambios de estado)
