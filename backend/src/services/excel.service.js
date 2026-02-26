@@ -206,17 +206,17 @@ const exportarExcel = async (proyectoId) => {
             ws.getCell('A2').value = `Se deberán capturar las atribuciones específicas. En la columna "NUM. IDENTIFICADOR" seleccione la atribución de su superior jerárquico que corresponda a su atribución específica.`;
             ws.getCell('A2').font = { italic: true, size: 9 };
 
-            // Encabezados de columnas (una columna TEXTO, una CLAVE por nivel)
+            // Encabezados de columnas (una columna CLAVE, una TEXTO por nivel)
             let colIdx = 1;
             for (const nv of cadena) {
                 const c1 = getColumnLetter(colIdx);
                 const c2 = getColumnLetter(colIdx + 1);
-                estiloSubHeader(ws.getCell(`${c1}3`), nv.nivel_numero === 0
+                estiloSubHeader(ws.getCell(`${c1}3`), 'CLAVE');
+                estiloSubHeader(ws.getCell(`${c2}3`), nv.nivel_numero === 0
                     ? `ORIGEN DE LA ATRIBUCIÓN`
                     : `ATRIBUCIONES ESPECÍFICAS\n${nv.nombre.toUpperCase()}`);
-                estiloSubHeader(ws.getCell(`${c2}3`), 'CLAVE');
-                ws.getColumn(colIdx).width = 45;
-                ws.getColumn(colIdx + 1).width = 12;
+                ws.getColumn(colIdx).width = 12;
+                ws.getColumn(colIdx + 1).width = 45;
                 colIdx += 2;
             }
             // Columna Corresponsabilidad
@@ -272,9 +272,9 @@ const exportarExcel = async (proyectoId) => {
                 let c = 1;
                 for (const nv of cadena) {
                     const data = atribsPorNivel[nv.nivel_numero];
-                    // Orden: TEXTO primero, luego CLAVE
-                    estiloCelda(ws.getCell(`${getColumnLetter(c)}${fila}`), data?.texto || '-');
-                    estiloCelda(ws.getCell(`${getColumnLetter(c + 1)}${fila}`), data?.clave || '-');
+                    // Orden: CLAVE primero, luego TEXTO
+                    estiloCelda(ws.getCell(`${getColumnLetter(c)}${fila}`), data?.clave || '-');
+                    estiloCelda(ws.getCell(`${getColumnLetter(c + 1)}${fila}`), data?.texto || '-');
                     c += 2;
                 }
                 // Corresponsabilidad (Verde si se está "bajando", es decir, si es el padre de otra atribución)
