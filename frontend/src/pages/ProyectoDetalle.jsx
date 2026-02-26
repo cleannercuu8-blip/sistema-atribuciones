@@ -63,7 +63,7 @@ const MiniNodoArbol = ({ nodo, onSeleccionar, seleccionado }) => {
 };
 
 // ==================== COMPONENTE ATRIBUCIONES ====================
-const TabAtribuciones = ({ proyectoId, unidad, setUnidad, arbol, atribGenerales }) => {
+const TabAtribuciones = ({ proyectoId, unidad, setUnidad, arbol, atribGenerales, puedeEditarExterno }) => {
     const { usuario } = useAuth();
     const [atribs, setAtribs] = useState([]);
     const [cargando, setCargando] = useState(false);
@@ -191,7 +191,8 @@ const TabAtribuciones = ({ proyectoId, unidad, setUnidad, arbol, atribGenerales 
         } catch { }
     };
 
-    const puedeEditar = (usuario.rol === 'admin' || usuario.rol === 'revisor' || usuario.rol === 'enlace') && usuario.rol !== 'visualizador';
+    const puedeEditarLocal = (usuario.rol === 'admin' || usuario.rol === 'revisor' || usuario.rol === 'enlace') && usuario.rol !== 'visualizador';
+    const puedeEditar = puedeEditarExterno !== undefined ? puedeEditarExterno : puedeEditarLocal;
 
     // Navegación por carpetas
     const getHijos = () => {
@@ -639,14 +640,24 @@ export default function ProyectoDetalle() {
                 if (p.length < 2) continue;
                 await api.post(`/proyectos/${id}/glosario`, { acronimo: p[0].trim(), significado: p[1].trim() });
             }
-            setMostrarBulkGlosario(false);
-            setBulkTextGlosario('');
-            cargar();
         } catch (err) { alert('Error en carga masiva Glosario'); }
         setExportando(false);
     };
 
-    const puedeEditar = (usuario.rol === 'admin' || usuario.rol === 'revisor' || usuario.rol === 'enlace') && usuario.rol !== 'visualizador';
+    const puedeEditar = (() => {
+        if (usuario.rol === 'admin' || usuario.rol === 'revisor') return true;
+        if (usuario.rol === 'visualizador') return false;
+        if (!proyecto) return false;
+
+        const matchesName = (str) => str === usuario.nombre || (str && str.includes(usuario.nombre));
+        const matchesEmail = (str) => str === usuario.email || (str && str.includes(usuario.email));
+
+        const esResponsable = matchesName(proyecto.responsable) || matchesEmail(proyecto.responsable);
+        const esApoyo = matchesName(proyecto.responsable_apoyo) || matchesEmail(proyecto.responsable_apoyo);
+        const esEnlaceAsignado = matchesName(proyecto.enlaces) || matchesEmail(proyecto.enlaces);
+
+        return esResponsable || esApoyo || esEnlaceAsignado;
+    })();
 
     if (cargando && !proyecto) return (
         <div style={{ padding: '40px', textAlign: 'center' }}>
@@ -768,6 +779,7 @@ export default function ProyectoDetalle() {
                         unidad={unidadSeleccionada}
                         setUnidad={setUnidadSeleccionada}
                         atribGenerales={atribGenerales}
+                        puedeEditarExterno={puedeEditar}
                     />
                 </div>
             )}

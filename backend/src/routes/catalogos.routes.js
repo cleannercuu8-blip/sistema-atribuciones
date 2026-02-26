@@ -5,9 +5,13 @@ const { authMiddleware, requireRole } = require('../middleware/auth');
 
 // Listar (Disponible para todos los autenticados para que puedan usar los selectores)
 router.get('/responsables', authMiddleware, catalogosController.listarResponsables);
+router.get('/responsables/:id', authMiddleware, catalogosController.obtenerResponsable);
 router.get('/enlaces', authMiddleware, catalogosController.listarEnlaces);
+router.get('/enlaces/:id', authMiddleware, catalogosController.obtenerEnlace);
 router.get('/avances', authMiddleware, catalogosController.listarAvances);
+router.get('/avances/:id', authMiddleware, catalogosController.obtenerAvance);
 router.get('/dependencias', authMiddleware, catalogosController.listarDependencias);
+router.get('/dependencias/:id', authMiddleware, catalogosController.obtenerDependencia);
 router.get('/estados-proyecto', authMiddleware, catalogosController.listarEstadosProyecto);
 
 // Gestión (Solo Admin)

@@ -10,12 +10,32 @@ const listarResponsables = async (req, res) => {
     }
 };
 
+const obtenerResponsable = async (req, res) => {
+    try {
+        const result = await pool.query('SELECT * FROM cat_responsables WHERE id = $1', [req.params.id]);
+        if (result.rows.length === 0) return res.status(404).json({ error: 'No encontrado' });
+        res.json(result.rows[0]);
+    } catch (err) {
+        res.status(500).json({ error: 'Error del servidor' });
+    }
+};
+
 const listarEnlaces = async (req, res) => {
     try {
         const result = await pool.query('SELECT * FROM cat_enlaces ORDER BY nombre ASC');
         res.json(result.rows);
     } catch (err) {
         res.status(500).json({ error: 'Error al listar enlaces' });
+    }
+};
+
+const obtenerEnlace = async (req, res) => {
+    try {
+        const result = await pool.query('SELECT * FROM cat_enlaces WHERE id = $1', [req.params.id]);
+        if (result.rows.length === 0) return res.status(404).json({ error: 'No encontrado' });
+        res.json(result.rows[0]);
+    } catch (err) {
+        res.status(500).json({ error: 'Error del servidor' });
     }
 };
 
@@ -28,12 +48,32 @@ const listarAvances = async (req, res) => {
     }
 };
 
+const obtenerAvance = async (req, res) => {
+    try {
+        const result = await pool.query('SELECT * FROM cat_avances WHERE id = $1', [req.params.id]);
+        if (result.rows.length === 0) return res.status(404).json({ error: 'No encontrado' });
+        res.json(result.rows[0]);
+    } catch (err) {
+        res.status(500).json({ error: 'Error del servidor' });
+    }
+};
+
 const listarDependencias = async (req, res) => {
     try {
         const result = await pool.query('SELECT * FROM dependencias ORDER BY nombre ASC');
         res.json(result.rows);
     } catch (err) {
         res.status(500).json({ error: 'Error al listar dependencias' });
+    }
+};
+
+const obtenerDependencia = async (req, res) => {
+    try {
+        const result = await pool.query('SELECT * FROM dependencias WHERE id = $1', [req.params.id]);
+        if (result.rows.length === 0) return res.status(404).json({ error: 'No encontrado' });
+        res.json(result.rows[0]);
+    } catch (err) {
+        res.status(500).json({ error: 'Error del servidor' });
     }
 };
 
@@ -453,6 +493,10 @@ module.exports = {
     agregarEstadoProyecto,
     actualizarEstadoProyecto,
     eliminarEstadoProyecto,
+    obtenerResponsable,
+    obtenerEnlace,
+    obtenerAvance,
+    obtenerDependencia,
     limpiarCatalogo,
     descargarPlantilla
 };

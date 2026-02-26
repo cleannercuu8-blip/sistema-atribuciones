@@ -114,10 +114,15 @@ export default function Proyectos() {
         if (usuario.rol === 'admin' || usuario.rol === 'revisor') return true;
         if (usuario.rol === 'visualizador') return false;
 
-        // Para enlace: si es responsable o apoyo
-        const esResponsable = p.responsable === usuario.nombre;
-        const esApoyo = p.responsable_apoyo && p.responsable_apoyo.includes(usuario.nombre);
-        return esResponsable || esApoyo;
+        // Para enlace: si es responsable, apoyo o persona enlace asignada
+        const matchesName = (str) => str === usuario.nombre || (str && str.includes(usuario.nombre));
+        const matchesEmail = (str) => str === usuario.email || (str && str.includes(usuario.email));
+
+        const esResponsable = matchesName(p.responsable) || matchesEmail(p.responsable);
+        const esApoyo = matchesName(p.responsable_apoyo) || matchesEmail(p.responsable_apoyo);
+        const esEnlaceAsignado = matchesName(p.enlaces) || matchesEmail(p.enlaces);
+
+        return esResponsable || esApoyo || esEnlaceAsignado;
     };
 
     const proyFiltrados = proyectos.filter(p =>

@@ -7,7 +7,8 @@ const listar = async (req, res) => {
         let query;
         let params = [];
 
-        if (req.user.rol === 'admin' || req.user.rol === 'revisor') {
+        // Admin, Revisor y Visualizador ven todo el catálogo de proyectos
+        if (req.user.rol === 'admin' || req.user.rol === 'revisor' || req.user.rol === 'visualizador') {
             query = `
         SELECT p.*, d.nombre as dependencia_nombre, d.tipo as dependencia_tipo,
                ep.nombre as estado_nombre, ep.color as estado_color,
@@ -19,7 +20,27 @@ const listar = async (req, res) => {
         LEFT JOIN cat_avances av ON p.avance_id = av.id
         LEFT JOIN usuarios u ON p.created_by = u.id
         ORDER BY p.created_at DESC`;
+        } else if (req.user.rol === 'enlace') {
+            // El enlace solo ve proyectos donde está asignado (por nombre o por email)
+            // Buscamos en responsable, responsable_apoyo y la columna enlaces (donde se guarda el nombre del enlace)
+            query = `
+        SELECT p.*, d.nombre as dependencia_nombre, d.tipo as dependencia_tipo,
+               ep.nombre as estado_nombre, ep.color as estado_color,
+               av.nombre as avance_nombre,
+               u.nombre as creado_por
+        FROM proyectos p
+        JOIN dependencias d ON p.dependencia_id = d.id
+        LEFT JOIN cat_estados_proyecto ep ON p.estado_id = ep.id
+        LEFT JOIN cat_avances av ON p.avance_id = av.id
+        LEFT JOIN usuarios u ON p.created_by = u.id
+        WHERE 
+            p.responsable = $1 OR p.responsable = $2 OR
+            p.responsable_apoyo LIKE '%' || $1 || '%' OR p.responsable_apoyo LIKE '%' || $2 || '%' OR
+            p.enlaces = $1 OR p.enlaces = $2
+        ORDER BY p.created_at DESC`;
+            params = [req.user.nombre, req.user.email];
         } else {
+            // Cualquier otro rol (como dependencia antigua) ve solo sus proyectos asignados en proyecto_usuarios
             query = `
         SELECT p.*, d.nombre as dependencia_nombre, d.tipo as dependencia_tipo,
                ep.nombre as estado_nombre, ep.color as estado_color,
