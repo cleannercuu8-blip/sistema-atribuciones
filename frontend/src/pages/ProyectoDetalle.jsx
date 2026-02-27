@@ -1183,8 +1183,6 @@ export default function ProyectoDetalle() {
     );
 }
 
-
-export default ProyectoDetalle;
 // ==================== TAB REVISIONES (SISTEMA EXCEL) ====================
 const TabRevisiones = ({ proyectoId, usuario, revisionActiva, setRevisionActiva, setTab }) => {
     const [cargando, setCargando] = useState(false);
