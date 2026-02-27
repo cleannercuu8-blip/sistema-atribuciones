@@ -1183,373 +1183,166 @@ export default function ProyectoDetalle() {
     );
 }
 
-// ==================== TAB REVISIONES ====================
+
+export default ProyectoDetalle;
+// ==================== TAB REVISIONES (SISTEMA EXCEL) ====================
 const TabRevisiones = ({ proyectoId, usuario, revisionActiva, setRevisionActiva, setTab }) => {
-    const [revisiones, setRevisiones] = useState([]);
-    const [seleccionada, setSeleccionada] = useState(null);
-    const [observaciones, setObservaciones] = useState([]);
-    const [mostrarFormRev, setMostrarFormRev] = useState(false);
-    const [formRev, setFormRev] = useState({ dias_habiles_plazo: 10, notas: '' });
-    const [formObs, setFormObs] = useState({ texto_observacion: '' });
-    const [mostrarFormObs, setMostrarFormObs] = useState(false);
-    const [editandoObs, setEditandoObs] = useState(null);
-
-    const cargarRevisiones = async () => {
-        const res = await api.get(`/proyectos/${proyectoId}/revisiones`);
-        setRevisiones(res.data);
-    };
-
-    const cargarObservaciones = async (revId) => {
-        const res = await api.get(`/revisiones/${revId}/observaciones`);
-        setObservaciones(res.data);
-    };
-
-    useEffect(() => { cargarRevisiones(); }, []);
-
-    const seleccionarRevision = (rev) => {
-        setSeleccionada(rev);
-        cargarObservaciones(rev.id);
-    };
-
-    const crearRevision = async (e) => {
-        e.preventDefault();
-        try {
-            await api.post(`/proyectos/${proyectoId}/revisiones`, formRev);
-            setMostrarFormRev(false);
-            cargarRevisiones();
-        } catch { alert('Error al crear revisión'); }
-    };
-
-    const eliminarRevision = async (revId) => {
-        if (!window.confirm('¿Eliminar esta revisión y todas sus observaciones?')) return;
-        try {
-            await api.delete(`/revisiones/${revId}`);
-            if (seleccionada?.id === revId) setSeleccionada(null);
-            cargarRevisiones();
-        } catch { alert('Error al eliminar revisión'); }
-    };
-
-    const eliminarObservacion = async (obsId) => {
-        if (!window.confirm('¿Eliminar esta observación?')) return;
-        try {
-            await api.delete(`/revisiones/observaciones/${obsId}`);
-            cargarObservaciones(seleccionada.id);
-            cargarRevisiones();
-        } catch { alert('Error al eliminar observación'); }
-    };
-
-    const abrirFormEditarObs = (obs) => {
-        setFormObs({ texto_observacion: obs.texto_observacion });
-        setEditandoObs(obs);
-        setMostrarFormObs(true);
-    };
-
-    const crearObservacion = async (e) => {
-        e.preventDefault();
-        try {
-            if (editandoObs) {
-                await api.put(`/revisiones/observaciones/${editandoObs.id}`, formObs);
-            } else {
-                await api.post(`/revisiones/${seleccionada.id}/observaciones`, formObs);
-            }
-            setMostrarFormObs(false);
-            setEditandoObs(null);
-            cargarObservaciones(seleccionada.id);
-            cargarRevisiones();
-        } catch (err) { alert(err.response?.data?.error || 'Error'); }
-    };
-
-    const subsanar = async (obsId, respuesta) => {
-        await api.put(`/revisiones/observaciones/${obsId}/subsanar`, { respuesta });
-        cargarObservaciones(seleccionada.id);
-        cargarRevisiones();
-    };
-
-    const cerrarRevision = async () => {
-        if (!window.confirm('¿Cerrar esta revisión?')) return;
-        await api.put(`/revisiones/${seleccionada.id}/cerrar`);
-        setSeleccionada(null);
-        cargarRevisiones();
-    };
+    const [cargando, setCargando] = useState(false);
+    const [cambiosDetectados, setCambiosDetectados] = useState([]);
+    const [archivoSubido, setArchivoSubido] = useState(null);
 
     const esRevisor = usuario.rol === 'admin' || usuario.rol === 'revisor';
-    const esEnlace = usuario.rol === 'enlace' || usuario.rol === 'dependencia';
+    const esDependencia = usuario.rol === 'enlace' || usuario.rol === 'dependencia';
+
+    const descargarExcel = async () => {
+        setCargando(true);
+        try {
+            const res = await api.get(`/proyectos/${proyectoId}/revision-excel/exportar`, { responseType: 'blob' });
+            const url = window.URL.createObjectURL(new Blob([res.data]));
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = `Revision_Proyecto_${proyectoId}.xlsx`;
+            a.click();
+        } catch (err) {
+            alert('Error al descargar el archivo de Excel.');
+        }
+        setCargando(false);
+    };
+
+    const handleSubirExcel = async (e) => {
+        const file = e.target.files[0];
+        if (!file) return;
+
+        setCargando(true);
+        const fd = new FormData();
+        fd.append('archivo', file);
+
+        try {
+            const res = await api.post(`/proyectos/${proyectoId}/revision-excel/importar`, fd, {
+                headers: { 'Content-Type': 'multipart/form-data' }
+            });
+            setCambiosDetectados(res.data.cambios);
+            setArchivoSubido(file.name);
+            if (res.data.cambios && res.data.cambios.length === 0) {
+                alert('No se detectaron diferencias en el archivo subido.');
+            }
+        } catch (err) {
+            alert(err.response?.data?.error || 'Error procesando el archivo Excel.');
+        }
+        setCargando(false);
+        e.target.value = null; // reset input
+    };
+
+    const aplicarCambios = async () => {
+        if (!window.confirm(`¿Estás seguro de registrar permanentemente estos ${cambiosDetectados.length} cambios en el sistema?`)) return;
+
+        setCargando(true);
+        try {
+            await api.post(`/proyectos/${proyectoId}/revision-excel/aplicar`, { cambios: cambiosDetectados });
+            alert('✅ Cambios aplicados con éxito en la base de datos.');
+            setCambiosDetectados([]);
+            setArchivoSubido(null);
+        } catch (err) {
+            alert('Error al aplicar los cambios.');
+        }
+        setCargando(false);
+    };
 
     return (
         <div>
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16 }}>
-                <h3 style={{ fontSize: 15, fontWeight: 700, color: 'var(--color-primario)' }}>🔍 Historial de Revisiones</h3>
-                {esRevisor && <button className="btn btn-primary btn-sm" onClick={() => setMostrarFormRev(true)} id="btn-nueva-revision">➕ Nueva revisión</button>}
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 20 }}>
+                <div>
+                    <h3 style={{ fontSize: 18, fontWeight: 700, color: 'var(--color-primario)' }}>🔍 Gestión de Revisiones (Flujo Excel)</h3>
+                    <p style={{ fontSize: 13, color: 'var(--color-texto-suave)', marginTop: 4 }}>
+                        El sistema ahora utiliza un flujo ágil basado en archivos de Excel para realizar comparaciones exactas.
+                    </p>
+                </div>
             </div>
 
-            {revisiones.length === 0 ? (
-                <div className="empty-state card"><div className="empty-icon">🔍</div><h3>Sin revisiones</h3><p>No se han iniciado revisiones en este proyecto</p></div>
-            ) : (
-                <div style={{ display: 'grid', gridTemplateColumns: seleccionada ? '300px 1fr' : '1fr', gap: 20 }}>
-                    <div>
-                        {revisiones.map(rev => (
-                            <div key={rev.id} className="card" style={{ cursor: 'pointer', borderLeft: `4px solid ${rev.estado === 'abierta' ? 'var(--color-acento)' : 'var(--color-exito)'}`, marginBottom: 12, padding: 16, position: 'relative' }}
-                                onClick={() => seleccionarRevision(rev)}>
-                                {esRevisor && (
-                                    <button className="btn-close" style={{ position: 'absolute', top: 8, right: 8, color: '#999', fontSize: 12 }} onClick={(e) => { e.stopPropagation(); eliminarRevision(rev.id); }}>🗑️</button>
-                                )}
-                                <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 6 }}>
-                                    <strong style={{ color: 'var(--color-primario)' }}>Revisión #{rev.numero_revision}</strong>
-                                    <span className={`badge badge-${rev.estado}`}>{rev.estado}</span>
-                                </div>
-                                <div style={{ fontSize: 12, color: 'var(--color-texto-suave)', display: 'grid', gap: 2 }}>
-                                    <span>👤 Revisor: {rev.revisor_nombre}</span>
-                                    <span>📅 Plazo: {rev.dias_habiles_plazo} días</span>
-                                    {rev.fecha_limite && <span>⌛ Límite: {new Date(rev.fecha_limite).toLocaleDateString('es-MX')}</span>}
-                                </div>
-                                <div style={{ fontSize: 11, marginTop: 8, display: 'flex', gap: 6 }}>
-                                    <span className="badge" style={{ background: '#fee2e2', color: '#991b1b' }}>{rev.obs_pendientes} ⏳</span>
-                                    <span className="badge" style={{ background: '#f1f5f9', color: '#475569' }}>{rev.obs_total} total</span>
-                                </div>
-                            </div>
-                        ))}
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(300px, 1fr))', gap: 20, marginBottom: 30 }}>
+
+                {/* Panel Revisor (Admin) */}
+                {(esRevisor || true) && (
+                    <div className="card" style={{ borderTop: '4px solid var(--color-primario)' }}>
+                        <h4 style={{ fontSize: 15, fontWeight: 700, marginBottom: 12 }}>1. Descargar Documento</h4>
+                        <p style={{ fontSize: 13, color: '#64748b', marginBottom: 20, lineHeight: 1.5 }}>
+                            Genera un Excel protegido con todas las unidades y atribuciones actuales. Se lo puedes enviar a la Dependencia por correo para que trabajen en la columna "Nueva Propuesta".
+                        </p>
+                        <button className="btn btn-primary" onClick={descargarExcel} disabled={cargando} style={{ width: '100%' }}>
+                            {cargando ? '⏳ Generando documento...' : '📤 Exportar Excel para Revisión'}
+                        </button>
+                    </div>
+                )}
+
+                {/* Panel Dependencia */}
+                <div className="card" style={{ borderTop: '4px solid var(--color-exito)' }}>
+                    <h4 style={{ fontSize: 15, fontWeight: 700, marginBottom: 12 }}>2. Importar Subsanaciones</h4>
+                    <p style={{ fontSize: 13, color: '#64748b', marginBottom: 20, lineHeight: 1.5 }}>
+                        Sube aquí el archivo Excel modificado. El sistema lo leerá y detectará automáticamente qué textos fueron alterados para que puedas verificar visualmente los cambios antes de guardarlos.
+                    </p>
+                    <label className={`btn btn-success ${cargando ? 'disabled' : ''}`} style={{ width: '100%', cursor: cargando ? 'not-allowed' : 'pointer', textAlign: 'center', display: 'block' }}>
+                        {cargando ? '⏳ Leyendo Excel...' : '📥 Subir Excel Modificado'}
+                        <input type="file" accept=".xlsx" style={{ display: 'none' }} onChange={handleSubirExcel} disabled={cargando} />
+                    </label>
+                </div>
+            </div>
+
+            {/* Panel de Diferencias (Diff) */}
+            {archivoSubido && (
+                <div className="card" style={{ border: '2px dashed var(--color-primario)' }}>
+                    <div className="card-header" style={{ borderBottom: '1px solid #e2e8f0', paddingBottom: 16, marginBottom: 16 }}>
+                        <h4 style={{ fontSize: 16, fontWeight: 700, color: 'var(--color-primario)' }}>
+                            📑 Verificador de Cambios Detectados
+                        </h4>
+                        <span className="badge badge-en_revision">{cambiosDetectados.length} modificaciones encontradas</span>
                     </div>
 
-                    {seleccionada && (
-                        <div className="card">
-                            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16 }}>
-                                <h3 style={{ fontSize: 14, fontWeight: 700 }}>Revisión #{seleccionada.numero_revision} — Observaciones</h3>
-                                <div style={{ display: 'flex', gap: 8 }}>
-                                    {esRevisor && seleccionada.estado === 'abierta' && (
-                                        <>
-                                            {revisionActiva === seleccionada.id ? (
-                                                <button className="btn btn-danger btn-sm" onClick={() => setRevisionActiva(null)}>⏹️ Salir Modo Revisión</button>
-                                            ) : (
-                                                <button className="btn btn-warning btn-sm" onClick={() => { setRevisionActiva(seleccionada.id); setTab('atribuciones'); }}>🔍 Entrar Modo Revisión</button>
+                    {cambiosDetectados.length === 0 ? (
+                        <div className="empty-state" style={{ minHeight: 150, padding: 20 }}>
+                            <div style={{ fontSize: 40, marginBottom: 10 }}>✅</div>
+                            <h5 style={{ fontSize: 15 }}>No hay alteraciones detectadas</h5>
+                            <p style={{ fontSize: 13 }}>El archivo parece no tener cambios o no modificó la columna "Nueva Propuesta".</p>
+                            <button className="btn btn-outline btn-sm" style={{ marginTop: 15 }} onClick={() => setArchivoSubido(null)}>Subir otro archivo</button>
+                        </div>
+                    ) : (
+                        <div>
+                            <p style={{ fontSize: 13, color: '#475569', marginBottom: 16 }}>
+                                Revisa con cuidado las alteraciones detectadas en el documento Excel <strong>({archivoSubido})</strong>.
+                                Lo que aparece en rojo será reemplazado por lo que está en verde.
+                            </p>
+
+                            <div style={{ display: 'flex', flexDirection: 'column', gap: 16, maxHeight: '50vh', overflowY: 'auto', paddingRight: 10, marginBottom: 20 }}>
+                                {cambiosDetectados.map((c, i) => (
+                                    <div key={i} style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16, background: '#f8fafc', padding: 16, borderRadius: 8, border: '1px solid #cbd5e1' }}>
+                                        <div>
+                                            <div style={{ fontSize: 11, fontWeight: 800, color: '#991b1b', textTransform: 'uppercase', marginBottom: 6 }}>🔴 Sistema actual (Se eliminará)</div>
+                                            <del style={{ fontSize: 13, color: '#7f1d1d', lineHeight: 1.5 }}>{c.texto_original || '(Sin texto original)'}</del>
+
+                                            {c.observacion && (
+                                                <div style={{ marginTop: 10, padding: 8, background: '#fef3c7', borderRadius: 6, border: '1px solid #fde68a', fontSize: 12, color: '#92400e' }}>
+                                                    <strong>📝 Observación del Excel:</strong> <br />{c.observacion}
+                                                </div>
                                             )}
-                                            <button className="btn btn-primary btn-sm" onClick={() => { setFormObs({ texto_observacion: '' }); setMostrarFormObs(true); }}>➕ Observación</button>
-                                            <button className="btn btn-success btn-sm" onClick={cerrarRevision}>✅ Cerrar sin Word</button>
-                                        </>
-                                    )}
-                                </div>
-                            </div>
-
-                            {esRevisor && seleccionada.estado === 'abierta' && (
-                                <div style={{ padding: '16px', background: '#f8fafc', borderRadius: '8px', border: '1px dashed #cbd5e1', marginBottom: '20px' }}>
-                                    <h4 style={{ fontSize: '13px', fontWeight: '700', marginBottom: '10px' }}>📤 Entregar Producto Final (.docx)</h4>
-                                    <div style={{ display: 'flex', gap: '10px', alignItems: 'center' }}>
-                                        <input
-                                            type="file"
-                                            accept=".docx"
-                                            className="form-control"
-                                            style={{ flex: 1 }}
-                                            onChange={async (e) => {
-                                                const file = e.target.files[0];
-                                                if (!file) return;
-                                                if (!window.confirm('¿Subir este archivo como producto final y CERRAR la revisión?')) return;
-
-                                                const fd = new FormData();
-                                                fd.append('archivo', file);
-                                                try {
-                                                    await api.post(`/revisiones/${seleccionada.id}/producto-final`, fd, {
-                                                        headers: { 'Content-Type': 'multipart/form-data' }
-                                                    });
-                                                    alert('✅ Producto final subido y revisión cerrada.');
-                                                    setSeleccionada(null);
-                                                    cargarRevisiones();
-                                                } catch (err) {
-                                                    alert(err.response?.data?.error || 'Error al subir producto');
-                                                }
-                                            }}
-                                        />
+                                        </div>
+                                        <div>
+                                            <div style={{ fontSize: 11, fontWeight: 800, color: '#166534', textTransform: 'uppercase', marginBottom: 6 }}>🟢 Propuesta del Excel (Se guardará)</div>
+                                            <div style={{ fontSize: 13, color: '#14532d', lineHeight: 1.5, background: '#dcfce7', padding: '6px 10px', borderRadius: 4 }}>{c.texto_propuesto}</div>
+                                        </div>
                                     </div>
-                                    <p style={{ fontSize: '11px', color: '#64748b', marginTop: '6px' }}>Nota: Al subir el archivo, la revisión se marcará como <strong>cerrada</strong> automáticamente.</p>
-                                </div>
-                            )}
+                                ))}
+                            </div>
 
-                            {seleccionada.producto_word && (
-                                <div style={{ padding: '12px', background: '#f0fdf4', borderRadius: '8px', border: '1px solid #bbf7d0', marginBottom: '20px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                                    <span style={{ fontSize: '13px', color: '#166534' }}>📄 <strong>Producto Final:</strong> {seleccionada.producto_word}</span>
-                                    <a
-                                        href={`${import.meta.env.VITE_API_URL || ''}/uploads/productos/${seleccionada.producto_word}`}
-                                        className="btn btn-outline btn-sm"
-                                        target="_blank"
-                                        rel="noreferrer"
-                                    >
-                                        📥 Descargar
-                                    </a>
-                                </div>
-                            )}
-
-                            <div style={{ marginTop: 24 }}>
-                                {observaciones.length === 0 ? (
-                                    <div className="empty-state"><div className="empty-icon">📋</div><h3>Sin observaciones</h3></div>
-                                ) : (
-                                    observaciones.map(o => (
-                                        <ObservacionCard
-                                            key={o.id}
-                                            obs={o}
-                                            esEnlace={esEnlace}
-                                            esRevisor={esRevisor}
-                                            onSubsanar={subsanar}
-                                            onEditar={() => abrirFormEditarObs(o)}
-                                            onEliminar={() => eliminarObservacion(o.id)}
-                                        />
-                                    ))
-                                )}
+                            <div style={{ borderTop: '1px solid #e2e8f0', paddingTop: 16, display: 'flex', justifyContent: 'flex-end', gap: 12 }}>
+                                <button className="btn btn-outline" onClick={() => { setCambiosDetectados([]); setArchivoSubido(null); }}>
+                                    ❌ Descartar y Limpiar
+                                </button>
+                                <button className="btn btn-primary" onClick={aplicarCambios} disabled={cargando}>
+                                    {cargando ? '⏳ Guardando...' : '✅ Aprobar y Actualizar Sistema'}
+                                </button>
                             </div>
                         </div>
                     )}
                 </div>
-            )}
-
-            {/* Modal nueva revisión */}
-            {mostrarFormRev && (
-                <div className="modal-overlay" onClick={() => setMostrarFormRev(false)}>
-                    <div className="modal" onClick={e => e.stopPropagation()}>
-                        <div className="modal-header">
-                            <h2 className="modal-title">➕ Nueva Revisión</h2>
-                            <button className="modal-close" onClick={() => setMostrarFormRev(false)}>×</button>
-                        </div>
-                        <form onSubmit={crearRevision}>
-                            <div className="form-group">
-                                <label className="form-label">Días hábiles para subsanación</label>
-                                <input type="number" className="form-control" min="1" value={formRev.dias_habiles_plazo} onChange={e => setFormRev({ ...formRev, dias_habiles_plazo: parseInt(e.target.value) })} />
-                                <small style={{ color: 'var(--color-texto-suave)', fontSize: 12 }}>Por defecto: 10 días hábiles</small>
-                            </div>
-                            <div className="form-group">
-                                <label className="form-label">Notas iniciales</label>
-                                <textarea className="form-control" rows={3} value={formRev.notas} onChange={e => setFormRev({ ...formRev, notas: e.target.value })} placeholder="Notas generales de esta revisión..." />
-                            </div>
-                            <div style={{ display: 'flex', gap: 10, justifyContent: 'flex-end', marginTop: 16 }}>
-                                <button type="button" className="btn btn-outline" onClick={() => setMostrarFormRev(false)}>Cancelar</button>
-                                <button type="submit" className="btn btn-primary">📋 Crear revisión</button>
-                            </div>
-                        </form>
-                    </div>
-                </div>
-            )}
-
-            {/* Modal nueva observación */}
-            {mostrarFormObs && (
-                <div className="modal-overlay" onClick={() => setMostrarFormObs(false)}>
-                    <div className="modal" onClick={e => e.stopPropagation()}>
-                        <div className="modal-header">
-                            <h2 className="modal-title">📝 Nueva Observación</h2>
-                            <button className="modal-close" onClick={() => setMostrarFormObs(false)}>×</button>
-                        </div>
-                        <form onSubmit={crearObservacion}>
-                            <div className="form-group">
-                                <label className="form-label">Observación <span className="required">*</span></label>
-                                <textarea className="form-control" rows={5} value={formObs.texto_observacion} onChange={e => setFormObs({ ...formObs, texto_observacion: e.target.value })} required placeholder="Describa la observación..." />
-                            </div>
-                            <div style={{ display: 'flex', gap: 10, justifyContent: 'flex-end', marginTop: 16 }}>
-                                <button type="button" className="btn btn-outline" onClick={() => setMostrarFormObs(false)}>Cancelar</button>
-                                <button type="submit" className="btn btn-primary">💾 Guardar observación</button>
-                            </div>
-                        </form>
-                    </div>
-                </div>
-            )}
-
-        </div>
-    );
-}
-
-// ==================== CARD OBSERVACIÓN ====================
-const ObservacionCard = ({ obs, esEnlace, esRevisor, onSubsanar, onEditar, onEliminar }) => {
-    const [mostrarForm, setMostrarForm] = useState(false);
-    const [mostrarComparativa, setMostrarComparativa] = useState(false);
-    const [respuesta, setRespuesta] = useState('');
-
-    const handleSubsanar = async (e) => {
-        e.preventDefault();
-        await onSubsanar(obs.id, respuesta);
-        setMostrarForm(false);
-    };
-
-    return (
-        <div style={{ border: `1px solid ${obs.estado === 'pendiente' ? '#fca5a5' : '#a7f3d0'}`, borderRadius: 8, padding: 16, marginBottom: 16, background: obs.estado === 'pendiente' ? '#fff5f5' : '#f0fdf4', position: 'relative', boxShadow: '0 2px 4px rgba(0,0,0,0.05)' }}>
-            <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 10 }}>
-                <span className={`badge badge-${obs.estado}`} style={{ fontSize: 11 }}>{obs.estado === 'pendiente' ? '⏳ Pendiente' : '✅ Subsanada'}</span>
-                <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
-                    <span style={{ fontSize: 11, color: '#999' }}>{new Date(obs.created_at).toLocaleDateString('es-MX')}</span>
-                    {esRevisor && obs.estado === 'pendiente' && (
-                        <div style={{ display: 'flex', gap: 4 }}>
-                            <button className="btn btn-outline btn-xs" onClick={onEditar} title="Editar">✏️</button>
-                            <button className="btn btn-danger btn-xs" onClick={onEliminar} title="Eliminar">🗑️</button>
-                        </div>
-                    )}
-                </div>
-            </div>
-
-            {/* Contexto de la Atribución */}
-            {obs.atribucion_clave && (
-                <div style={{ marginBottom: 12, padding: '8px 12px', background: 'rgba(0,0,0,0.03)', borderRadius: 6, borderLeft: '3px solid var(--color-primario)' }}>
-                    <div style={{ fontSize: 11, fontWeight: 700, color: 'var(--color-primario)', marginBottom: 2 }}>{obs.atribucion_clave}</div>
-                    <div style={{ fontSize: 12, color: 'var(--color-texto)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{obs.atribucion_texto}</div>
-                </div>
-            )}
-
-            <p style={{ fontSize: 14, color: 'var(--color-texto)', marginBottom: 10, lineHeight: 1.5, fontWeight: 500 }}>
-                <span style={{ color: '#ef4444', marginRight: 4 }}>🚩</span>
-                {obs.texto_observacion}
-            </p>
-
-            {/* Comparativa de Versiones */}
-            {obs.valor_original && (
-                <div style={{ marginTop: 15 }}>
-                    <button
-                        className="btn btn-outline btn-xs"
-                        onClick={() => setMostrarComparativa(!mostrarComparativa)}
-                        style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 11 }}
-                    >
-                        {mostrarComparativa ? '🔼 Ocultar Comparativa' : '📑 Ver Comparativa de Cambios'}
-                    </button>
-
-                    {mostrarComparativa && (
-                        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10, marginTop: 10 }}>
-                            <div style={{ padding: 10, background: '#fee2e2', borderRadius: 6, border: '1px solid #fecaca' }}>
-                                <div style={{ fontSize: 10, fontWeight: 700, color: '#991b1b', marginBottom: 6, textTransform: 'uppercase' }}>🔴 Versión Original (Snapshot)</div>
-                                <div style={{ fontSize: 12, color: '#991b1b', lineHeight: 1.4 }}>{obs.valor_original}</div>
-                            </div>
-                            <div style={{ padding: 10, background: obs.estado === 'subsanada' ? '#dcfce7' : '#f1f5f9', borderRadius: 6, border: `1px solid ${obs.estado === 'subsanada' ? '#bbf7d0' : '#e2e8f0'}` }}>
-                                <div style={{ fontSize: 10, fontWeight: 700, color: obs.estado === 'subsanada' ? '#166534' : '#475569', marginBottom: 6, textTransform: 'uppercase' }}>
-                                    {obs.estado === 'subsanada' ? '🟢 Versión Corregida' : '⚪ Versión Actual'}
-                                </div>
-                                <div style={{ fontSize: 12, color: obs.estado === 'subsanada' ? '#15803d' : '#475569', lineHeight: 1.4 }}>
-                                    {obs.valor_subsanado || obs.atribucion_texto || 'Sin cambios registrados'}
-                                </div>
-                            </div>
-                        </div>
-                    )}
-                </div>
-            )}
-
-            {obs.respuesta && (
-                <div style={{ fontSize: 13, color: '#166534', background: '#dcfce7', padding: '10px 14px', borderRadius: 8, border: '1px solid #bbf7d0', marginTop: 12 }}>
-                    <strong>✅ Respuesta del Enlace:</strong> {obs.respuesta}
-                </div>
-            )}
-
-            {obs.estado === 'pendiente' && esEnlace && !mostrarForm && (
-                <button className="btn btn-success btn-sm" style={{ marginTop: 12, width: '100%' }} onClick={() => setMostrarForm(true)}>✍️ Responder / Subsanar</button>
-            )}
-
-            {mostrarForm && (
-                <form onSubmit={handleSubsanar} style={{ marginTop: 12, borderTop: '1px solid #e2e8f0', paddingTop: 12 }}>
-                    <div className="form-group">
-                        <label className="form-label" style={{ fontSize: 12 }}>Respuesta / Justificación</label>
-                        <textarea
-                            className="form-control"
-                            rows={3}
-                            value={respuesta}
-                            onChange={e => setRespuesta(e.target.value)}
-                            placeholder="Describa cómo se atendió esta observación..."
-                            required
-                            style={{ marginBottom: 10, fontSize: 13 }}
-                        />
-                    </div>
-                    <div style={{ display: 'flex', gap: 8 }}>
-                        <button type="submit" className="btn btn-success btn-sm">Confirmar Subsanación</button>
-                        <button type="button" className="btn btn-outline btn-sm" onClick={() => setMostrarForm(false)}>Cancelar</button>
-                    </div>
-                </form>
             )}
         </div>
     );

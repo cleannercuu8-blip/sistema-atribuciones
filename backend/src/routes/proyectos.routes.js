@@ -8,6 +8,7 @@ const atribCtrl = require('../controllers/atribuciones.controller');
 const revCtrl = require('../controllers/revisiones.controller');
 const emailService = require('../services/email.service');
 const excelService = require('../services/excel.service');
+const excelRevCtrl = require('../controllers/revisiones-excel.controller');
 const { authMiddleware, requireRole } = require('../middleware/auth');
 const pool = require('../config/db');
 
@@ -21,6 +22,17 @@ const storage = multer.diskStorage({
     }
 });
 const upload = multer({ storage, limits: { fileSize: 20 * 1024 * 1024 } });
+
+// Configurar multer para Excel
+const storageExcel = multer.diskStorage({
+    destination: (req, file, cb) => {
+        cb(null, path.join(__dirname, '../../uploads')); // Guardar en uploads temporalmente
+    },
+    filename: (req, file, cb) => {
+        cb(null, `revision-${req.params.proyectoId}-${Date.now()}.xlsx`);
+    }
+});
+const uploadExcel = multer({ storage: storageExcel, limits: { fileSize: 50 * 1024 * 1024 } });
 
 router.use(authMiddleware);
 
@@ -107,5 +119,10 @@ router.get('/:proyectoId/exportar', async (req, res) => {
         res.status(500).json({ error: 'Error al generar el Excel' });
     }
 });
+
+// === REVISIÓN POR EXCEL ===
+router.get('/:proyectoId/revision-excel/exportar', excelRevCtrl.exportarExcel);
+router.post('/:proyectoId/revision-excel/importar', uploadExcel.single('archivo'), excelRevCtrl.importarExcel);
+router.post('/:proyectoId/revision-excel/aplicar', excelRevCtrl.aplicarCambios);
 
 module.exports = router;
