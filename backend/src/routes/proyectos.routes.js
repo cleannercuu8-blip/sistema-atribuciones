@@ -122,7 +122,9 @@ router.get('/:proyectoId/exportar', async (req, res) => {
 
 // === REVISIÓN POR EXCEL ===
 router.get('/:proyectoId/revision-excel/exportar', excelRevCtrl.exportarExcel);
+router.get('/:proyectoId/revision-excel/historial', excelRevCtrl.listarHistorial);
 router.post('/:proyectoId/revision-excel/importar', uploadExcel.single('archivo'), excelRevCtrl.importarExcel);
 router.post('/:proyectoId/revision-excel/aplicar', excelRevCtrl.aplicarCambios);
 
 module.exports = router;
+

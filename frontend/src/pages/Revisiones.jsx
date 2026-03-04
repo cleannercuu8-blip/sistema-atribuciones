@@ -1,86 +1,485 @@
 import React, { useEffect, useState } from 'react';
 import api from '../services/api';
+import { useAuth } from '../context/AuthContext';
 
-export default function Revisiones() {
-    const [proyectos, setProyectos] = useState([]);
-    const [cargando, setCargando] = useState(true);
+// ── Config visual por tipo de cambio ──────────────────────────────────────────
+const TIPO_CONFIG = {
+    atribucion_especifica: { icono: '🔵', etiqueta: 'Atribución Específica', color: '#eff6ff', colorBorde: '#93c5fd', colorHeader: '#1d4ed8' },
+    glosario: { icono: '📖', etiqueta: 'Glosario', color: '#f0fdf4', colorBorde: '#6ee7b7', colorHeader: '#15803d' },
+    atribucion_general: { icono: '📜', etiqueta: 'Atrib. General (Ley)', color: '#faf5ff', colorBorde: '#c084fc', colorHeader: '#7e22ce' },
+    corresponsabilidad: { icono: '🔗', etiqueta: 'Corresponsabilidad', color: '#fff7ed', colorBorde: '#fdba74', colorHeader: '#c2410c' },
+};
 
-    useEffect(() => {
-        const cargar = async () => {
-            try {
-                const res = await api.get('/proyectos');
-                // Mostrar solo los que están en revisión
-                setProyectos(res.data.filter(p => p.estado === 'en_revision' || true));
-            } catch { }
-            setCargando(false);
-        };
-        cargar();
-    }, []);
-
-    if (cargando) return <div className="loading-container"><div className="spinner" /></div>;
+// ── Tarjeta individual de cambio ──────────────────────────────────────────────
+function TarjetaCambio({ c, onToggle }) {
+    const cfg = TIPO_CONFIG[c.tipo] || TIPO_CONFIG['atribucion_especifica'];
+    const esCorrsp = c.tipo === 'corresponsabilidad';
+    const esGlosario = c.tipo === 'glosario';
+    const esAG = c.tipo === 'atribucion_general';
 
     return (
-        <div>
-            <div style={{ marginBottom: 24 }}>
-                <h1 style={{ fontSize: 22, fontWeight: 800, color: 'var(--color-primario)' }}>🔍 Panel de Revisiones</h1>
-                <p style={{ color: 'var(--color-texto-suave)', marginTop: 4 }}>Proyectos con revisiones activas</p>
+        <div style={{
+            border: c._aceptado ? `1.5px solid #86efac` : `1.5px dashed #fca5a5`,
+            borderRadius: 10, padding: 16,
+            background: c._aceptado ? cfg.color : '#fff8f8',
+            opacity: c._aceptado ? 1 : 0.65,
+            transition: 'all 0.2s ease',
+        }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12, flexWrap: 'wrap', gap: 8 }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
+                    <span style={{ background: cfg.color, color: cfg.colorHeader, border: `1px solid ${cfg.colorBorde}`, borderRadius: 20, padding: '2px 10px', fontSize: 11, fontWeight: 800 }}>
+                        {cfg.icono} {cfg.etiqueta}
+                    </span>
+                    {esCorrsp && (
+                        <span style={{ background: '#fef9c3', color: '#92400e', border: '1px solid #fde047', borderRadius: 20, padding: '2px 10px', fontSize: 11, fontWeight: 700 }}>
+                            ⚠️ Cambia jerarquía
+                        </span>
+                    )}
+                    <span style={{ fontSize: 12, color: '#64748b' }}>Cambio #{c._idx + 1} · ID: {c.id} · {c.hoja}</span>
+                </div>
+                <button onClick={() => onToggle(c._idx)} style={{
+                    padding: '5px 18px', borderRadius: 8, border: 'none', cursor: 'pointer',
+                    fontWeight: 700, fontSize: 13, minWidth: 130, color: 'white', transition: 'background 0.2s',
+                    background: c._aceptado ? '#16a34a' : '#dc2626',
+                }} title={c._aceptado ? 'Clic para rechazar' : 'Clic para aceptar'}>
+                    {c._aceptado ? '✅ Aceptado' : '❌ Rechazado'}
+                </button>
             </div>
 
-            {proyectos.filter(p => p.estado === 'en_revision').length === 0 ? (
-                <div className="empty-state card">
-                    <div className="empty-icon">✅</div>
-                    <h3>No hay revisiones activas</h3>
-                    <p>Todos los proyectos están al día</p>
+            {c.observacion ? (
+                <div style={{ background: '#fef9c3', border: '1px solid #fde047', borderRadius: 8, padding: '10px 14px', marginBottom: 12 }}>
+                    <div style={{ fontSize: 11, fontWeight: 800, color: '#92400e', textTransform: 'uppercase', marginBottom: 4 }}>📝 Observación del Revisor</div>
+                    <p style={{ fontSize: 13, color: '#78350f', lineHeight: 1.5, margin: 0 }}>{c.observacion}</p>
                 </div>
             ) : (
-                <div>
-                    {proyectos.filter(p => p.estado === 'en_revision').map(p => (
-                        <div key={p.id} className="card" style={{ borderLeft: '4px solid var(--color-advertencia)', marginBottom: 12 }}>
-                            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                                <div>
-                                    <h3 style={{ fontSize: 15, fontWeight: 700, marginBottom: 4 }}>{p.nombre}</h3>
-                                    <p style={{ fontSize: 13, color: 'var(--color-texto-suave)' }}>🏢 {p.dependencia_nombre}</p>
-                                </div>
-                                <a className="btn btn-primary btn-sm" href={`/proyectos/${p.id}`}>Ir al proyecto →</a>
-                            </div>
-                        </div>
-                    ))}
+                <div style={{ background: '#f8fafc', border: '1px dashed #cbd5e1', borderRadius: 8, padding: '8px 14px', marginBottom: 12 }}>
+                    <span style={{ fontSize: 12, color: '#94a3b8', fontStyle: 'italic' }}>Sin observación capturada en el Excel</span>
                 </div>
             )}
 
-            <div className="card" style={{ marginTop: 20 }}>
-                <div className="card-header">
-                    <span className="card-title">📋 Todos los proyectos</span>
+            {esCorrsp ? (
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
+                    <div style={{ background: '#fef2f2', borderRadius: 8, padding: '10px 14px' }}>
+                        <div style={{ fontSize: 11, fontWeight: 800, color: '#991b1b', textTransform: 'uppercase', marginBottom: 6 }}>🔴 Relación actual</div>
+                        <p style={{ fontSize: 13, color: '#7f1d1d', margin: 0 }}>Clave: <strong>{c.clave_actual || '(sin asignación)'}</strong></p>
+                    </div>
+                    <div style={{ background: '#fff7ed', borderRadius: 8, padding: '10px 14px' }}>
+                        <div style={{ fontSize: 11, fontWeight: 800, color: '#c2410c', textTransform: 'uppercase', marginBottom: 6 }}>🟠 Nueva relación</div>
+                        <p style={{ fontSize: 13, color: '#7c2d12', margin: 0 }}>Clave: <strong>{c.clave_propuesta || '(sin asignación)'}</strong></p>
+                        <p style={{ fontSize: 11, color: '#9a3412', marginTop: 6, marginBottom: 0, fontStyle: 'italic' }}>Se actualizará el vínculo hasta la Ley automáticamente.</p>
+                    </div>
                 </div>
-                <div className="table-responsive">
-                    <table>
-                        <thead>
-                            <tr>
-                                <th>Proyecto</th>
-                                <th>Dependencia</th>
-                                <th>Estado</th>
-                                <th>Creado</th>
-                                <th></th>
-                            </tr>
-                        </thead>
-                        <tbody>
-                            {proyectos.map(p => (
-                                <tr key={p.id}>
-                                    <td><strong>{p.nombre}</strong></td>
-                                    <td>{p.dependencia_nombre}</td>
-                                    <td>
-                                        <span className={`badge badge-${p.estado}`}>
-                                            {p.estado === 'borrador' ? '✏️ Borrador' : p.estado === 'en_revision' ? '🔍 En revisión' : '✅ Aprobado'}
-                                        </span>
+            ) : (
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
+                    <div style={{ background: '#fef2f2', borderRadius: 8, padding: '10px 14px' }}>
+                        <div style={{ fontSize: 11, fontWeight: 800, color: '#991b1b', textTransform: 'uppercase', marginBottom: 6 }}>
+                            🔴 {esGlosario ? 'Significado actual' : esAG ? 'Texto actual (Ley)' : 'Texto actual'}
+                        </div>
+                        <del style={{ fontSize: 13, color: '#7f1d1d', lineHeight: 1.6 }}>{c.texto_original || '(vacío)'}</del>
+                    </div>
+                    <div style={{ background: '#f0fdf4', borderRadius: 8, padding: '10px 14px' }}>
+                        <div style={{ fontSize: 11, fontWeight: 800, color: '#166534', textTransform: 'uppercase', marginBottom: 6 }}>
+                            🟢 {esGlosario ? 'Nuevo significado' : esAG ? 'Nuevo texto (Ley)' : 'Propuesta'}
+                        </div>
+                        <p style={{ fontSize: 13, color: '#14532d', lineHeight: 1.6, margin: 0 }}>{c.texto_propuesto}</p>
+                    </div>
+                </div>
+            )}
+        </div>
+    );
+}
+
+// ── Historial de versiones Excel ──────────────────────────────────────────────
+function HistorialVersiones({ proyectoId }) {
+    const [historial, setHistorial] = useState([]);
+    const [cargando, setCargando] = useState(false);
+    const [expandido, setExpandido] = useState(null);
+
+    useEffect(() => {
+        if (!proyectoId) return;
+        setCargando(true);
+        api.get(`/proyectos/${proyectoId}/revision-excel/historial`)
+            .then(r => setHistorial(r.data))
+            .catch(() => setHistorial([]))
+            .finally(() => setCargando(false));
+    }, [proyectoId]);
+
+    if (cargando) return <div style={{ padding: 20, textAlign: 'center', color: '#64748b' }}>⏳ Cargando historial...</div>;
+    if (historial.length === 0) return (
+        <div style={{ padding: 24, textAlign: 'center', color: '#94a3b8', fontStyle: 'italic', fontSize: 14 }}>
+            📂 Aún no se han subido Excels de revisión para este proyecto.
+        </div>
+    );
+
+    return (
+        <div>
+            <div className="table-responsive">
+                <table>
+                    <thead>
+                        <tr>
+                            <th>#</th>
+                            <th>Fecha</th>
+                            <th>Archivo</th>
+                            <th>Detectados</th>
+                            <th>Aplicados</th>
+                            <th>Usuario</th>
+                            <th></th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {historial.map((h, i) => (
+                            <React.Fragment key={h.id}>
+                                <tr>
+                                    <td style={{ color: '#64748b', fontSize: 12 }}>{historial.length - i}</td>
+                                    <td style={{ fontSize: 12, whiteSpace: 'nowrap' }}>
+                                        {new Date(h.created_at).toLocaleString('es-MX', { dateStyle: 'short', timeStyle: 'short' })}
                                     </td>
-                                    <td style={{ fontSize: 12, color: 'var(--color-texto-suave)' }}>{new Date(p.created_at).toLocaleDateString('es-MX')}</td>
-                                    <td><a className="btn btn-outline btn-sm" href={`/proyectos/${p.id}`}>Abrir</a></td>
+                                    <td style={{ maxWidth: 200, fontSize: 13 }}>
+                                        <span title={h.nombre_archivo}>📄 {h.nombre_archivo || 'archivo.xlsx'}</span>
+                                    </td>
+                                    <td style={{ textAlign: 'center' }}>
+                                        <span style={{ background: '#e2e8f0', color: '#475569', borderRadius: 12, padding: '2px 10px', fontWeight: 700, fontSize: 12 }}>{h.total_cambios}</span>
+                                    </td>
+                                    <td style={{ textAlign: 'center' }}>
+                                        <span style={{ background: '#dcfce7', color: '#166534', borderRadius: 12, padding: '2px 10px', fontWeight: 700, fontSize: 12 }}>{h.cambios_aplicados}</span>
+                                    </td>
+                                    <td style={{ fontSize: 12, color: '#475569' }}>{h.usuario_nombre || '-'}</td>
+                                    <td>
+                                        <button
+                                            className="btn btn-outline btn-sm"
+                                            onClick={() => setExpandido(expandido === h.id ? null : h.id)}
+                                            style={{ fontSize: 11 }}
+                                        >
+                                            {expandido === h.id ? '▲ Ocultar' : '👁 Ver resumen'}
+                                        </button>
+                                    </td>
                                 </tr>
-                            ))}
-                        </tbody>
-                    </table>
-                </div>
+                                {expandido === h.id && (
+                                    <tr>
+                                        <td colSpan={7} style={{ padding: '0 16px 16px', background: '#f8fafc' }}>
+                                            <div style={{ paddingTop: 12 }}>
+                                                <p style={{ fontSize: 12, fontWeight: 700, color: '#475569', marginBottom: 10, textTransform: 'uppercase' }}>
+                                                    Resumen de cambios — {new Date(h.created_at).toLocaleString('es-MX')}
+                                                </p>
+                                                {!h.resumen_cambios || h.resumen_cambios.length === 0 ? (
+                                                    <p style={{ fontSize: 13, color: '#94a3b8', fontStyle: 'italic' }}>Sin detalle disponible.</p>
+                                                ) : (
+                                                    <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+                                                        {h.resumen_cambios.map((c, ci) => {
+                                                            const cfg = TIPO_CONFIG[c.tipo] || TIPO_CONFIG['atribucion_especifica'];
+                                                            return (
+                                                                <div key={ci} style={{
+                                                                    background: cfg.color,
+                                                                    border: `1px solid ${cfg.colorBorde}`,
+                                                                    borderRadius: 8, padding: '8px 14px',
+                                                                    display: 'flex', gap: 10, alignItems: 'flex-start',
+                                                                }}>
+                                                                    <span style={{ fontSize: 16, flexShrink: 0 }}>{cfg.icono}</span>
+                                                                    <div>
+                                                                        <span style={{ fontSize: 11, fontWeight: 700, color: cfg.colorHeader, textTransform: 'uppercase' }}>
+                                                                            {cfg.etiqueta} · ID {c.id}
+                                                                        </span>
+                                                                        {c.observacion && (
+                                                                            <p style={{ fontSize: 12, color: '#78350f', background: '#fef9c3', borderRadius: 4, padding: '3px 8px', margin: '4px 0 0', display: 'inline-block' }}>
+                                                                                📝 {c.observacion}
+                                                                            </p>
+                                                                        )}
+                                                                        {c.tipo === 'corresponsabilidad' ? (
+                                                                            <p style={{ fontSize: 12, color: '#374151', margin: '4px 0 0' }}>
+                                                                                {c.clave_actual || '(vacío)'} → <strong>{c.clave_propuesta || '(vacío)'}</strong>
+                                                                            </p>
+                                                                        ) : (
+                                                                            <p style={{ fontSize: 12, color: '#374151', margin: '4px 0 0' }}>
+                                                                                <span style={{ textDecoration: 'line-through', color: '#9ca3af' }}>
+                                                                                    {(c.texto_original || '').substring(0, 80)}
+                                                                                </span>
+                                                                                {' → '}
+                                                                                <strong>{(c.texto_propuesto || '').substring(0, 80)}</strong>
+                                                                                {(c.texto_propuesto || '').length > 80 ? '...' : ''}
+                                                                            </p>
+                                                                        )}
+                                                                    </div>
+                                                                </div>
+                                                            );
+                                                        })}
+                                                    </div>
+                                                )}
+                                            </div>
+                                        </td>
+                                    </tr>
+                                )}
+                            </React.Fragment>
+                        ))}
+                    </tbody>
+                </table>
             </div>
+        </div>
+    );
+}
+
+// ── Página Principal ──────────────────────────────────────────────────────────
+export default function Revisiones() {
+    const { usuario } = useAuth();
+    const [proyectos, setProyectos] = useState([]);
+    const [proyectoId, setProyectoId] = useState('');
+    const [proyectoActual, setProyectoActual] = useState(null);
+    const [cargando, setCargando] = useState(false);
+    const [cargandoProyectos, setCargandoProyectos] = useState(true);
+
+    // Estado del flujo Excel
+    const [cambiosDetectados, setCambiosDetectados] = useState([]);
+    const [archivoSubido, setArchivoSubido] = useState(null);
+
+    // Cargar lista de proyectos
+    useEffect(() => {
+        api.get('/proyectos')
+            .then(r => setProyectos(r.data))
+            .catch(() => { })
+            .finally(() => setCargandoProyectos(false));
+    }, []);
+
+    // Cuando cambia el selector
+    const handleSelectProyecto = (e) => {
+        const id = e.target.value;
+        setProyectoId(id);
+        setProyectoActual(proyectos.find(p => String(p.id) === String(id)) || null);
+        setCambiosDetectados([]);
+        setArchivoSubido(null);
+    };
+
+    // Descargar Excel de revisión
+    const descargarExcel = async () => {
+        if (!proyectoId) return;
+        setCargando(true);
+        try {
+            const res = await api.get(`/proyectos/${proyectoId}/revision-excel/exportar`, { responseType: 'blob' });
+            const url = window.URL.createObjectURL(new Blob([res.data]));
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = `Revision_${proyectoActual?.nombre?.replace(/\s/g, '_') || proyectoId}.xlsx`;
+            a.click();
+        } catch { alert('Error al descargar el Excel de revisión.'); }
+        setCargando(false);
+    };
+
+    // Subir Excel modificado
+    const handleSubirExcel = async (e) => {
+        const file = e.target.files[0];
+        if (!file || !proyectoId) return;
+        setCargando(true);
+        const fd = new FormData();
+        fd.append('archivo', file);
+        try {
+            const res = await api.post(`/proyectos/${proyectoId}/revision-excel/importar`, fd, {
+                headers: { 'Content-Type': 'multipart/form-data' }
+            });
+            const cambios = res.data.cambios || [];
+            setCambiosDetectados(cambios.map((c, i) => ({ ...c, _idx: i, _aceptado: true })));
+            setArchivoSubido(file.name);
+            if (cambios.length === 0) alert('No se detectaron diferencias en el archivo subido.');
+        } catch (err) {
+            alert(err.response?.data?.error || 'Error procesando el Excel.');
+        }
+        setCargando(false);
+        e.target.value = null;
+    };
+
+    const toggleCambio = (idx) => {
+        setCambiosDetectados(prev => prev.map(c => c._idx === idx ? { ...c, _aceptado: !c._aceptado } : c));
+    };
+
+    const aceptarTodos = () => setCambiosDetectados(prev => prev.map(c => ({ ...c, _aceptado: true })));
+    const rechazarTodos = () => setCambiosDetectados(prev => prev.map(c => ({ ...c, _aceptado: false })));
+
+    // Aplicar cambios y guardar en historial
+    const aplicarCambios = async () => {
+        const seleccionados = cambiosDetectados.filter(c => c._aceptado);
+        if (seleccionados.length === 0) { alert('Selecciona al menos un cambio.'); return; }
+        if (!window.confirm(`¿Aplicar ${seleccionados.length} de ${cambiosDetectados.length} cambios?`)) return;
+        setCargando(true);
+        try {
+            await api.post(`/proyectos/${proyectoId}/revision-excel/aplicar`, {
+                cambios: seleccionados.map(({ tipo, id, texto_propuesto, observacion, clave_propuesta, clave_actual }) => ({
+                    tipo: tipo || 'atribucion_especifica', id, texto_propuesto, observacion, clave_propuesta, clave_actual,
+                })),
+                nombreArchivo: archivoSubido,
+                usuarioNombre: usuario?.nombre || 'Sistema',
+            });
+            alert(`✅ ${seleccionados.length} cambio(s) aplicados con éxito.`);
+            setCambiosDetectados([]);
+            setArchivoSubido(null);
+            // Recargar historial actualizando el estado de proyectoId para que HistorialVersiones se re-renderice
+            setProyectoId(prev => prev + '');
+        } catch { alert('Error al aplicar los cambios.'); }
+        setCargando(false);
+    };
+
+    const aceptados = cambiosDetectados.filter(c => c._aceptado).length;
+    const rechazados = cambiosDetectados.filter(c => !c._aceptado).length;
+    const total = cambiosDetectados.length;
+
+    // ── Render ────────────────────────────────────────────────────
+    return (
+        <div>
+            {/* ── HEADER ── */}
+            <div style={{ marginBottom: 28 }}>
+                <h1 style={{ fontSize: 22, fontWeight: 800, color: 'var(--color-primario)', marginBottom: 4 }}>
+                    🔍 Centro de Revisiones
+                </h1>
+                <p style={{ color: 'var(--color-texto-suave)', fontSize: 13 }}>
+                    Exporta el Excel de un proyecto, captura observaciones y subsanaciones, súbelo y aplica los cambios.
+                    Cada versión subida queda registrada en el historial de consulta.
+                </p>
+            </div>
+
+            {/* ── SELECTOR DE PROYECTO ── */}
+            <div className="card" style={{ marginBottom: 24, borderTop: '4px solid var(--color-primario)' }}>
+                <div className="card-header">
+                    <span className="card-title">📁 Seleccionar Proyecto</span>
+                </div>
+                {cargandoProyectos ? (
+                    <div style={{ padding: 20, color: '#64748b' }}>⏳ Cargando proyectos...</div>
+                ) : (
+                    <div style={{ padding: '0 20px 20px' }}>
+                        <select
+                            className="form-control"
+                            value={proyectoId}
+                            onChange={handleSelectProyecto}
+                            style={{ maxWidth: 520, marginBottom: 0 }}
+                        >
+                            <option value="">-- Elige un proyecto --</option>
+                            {proyectos.map(p => (
+                                <option key={p.id} value={p.id}>
+                                    {p.nombre}  ({p.dependencia_nombre}) — {p.estado === 'en_revision' ? '🔍 En revisión' : p.estado === 'aprobado' ? '✅ Aprobado' : '✏️ Borrador'}
+                                </option>
+                            ))}
+                        </select>
+                        {proyectoActual && (
+                            <div style={{ marginTop: 12, display: 'flex', gap: 8, alignItems: 'center' }}>
+                                <span style={{ fontSize: 13, fontWeight: 700, color: 'var(--color-primario)' }}>{proyectoActual.nombre}</span>
+                                <span style={{ fontSize: 12, color: '#64748b' }}>— {proyectoActual.dependencia_nombre}</span>
+                                <span className={`badge badge-${proyectoActual.estado}`}>
+                                    {proyectoActual.estado === 'en_revision' ? '🔍 En revisión' : proyectoActual.estado === 'aprobado' ? '✅ Aprobado' : '✏️ Borrador'}
+                                </span>
+                            </div>
+                        )}
+                    </div>
+                )}
+            </div>
+
+            {/* ── FLUJO EXCEL (solo si hay proyecto seleccionado) ── */}
+            {proyectoId && (
+                <>
+                    {/* Acciones */}
+                    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))', gap: 20, marginBottom: 24 }}>
+                        <div className="card" style={{ borderTop: '4px solid var(--color-primario)' }}>
+                            <h4 style={{ fontSize: 15, fontWeight: 700, marginBottom: 10 }}>1. Descargar Documento</h4>
+                            <p style={{ fontSize: 13, color: '#64748b', marginBottom: 18, lineHeight: 1.5 }}>
+                                Genera un Excel con el árbol completo: atribuciones, glosario, ley y corresponsabilidades.
+                                Las columnas <strong>Observaciones</strong> y <strong>Nueva Propuesta</strong> son editables en todas las hojas.
+                            </p>
+                            <button className="btn btn-primary" onClick={descargarExcel} disabled={cargando} style={{ width: '100%' }}>
+                                {cargando ? '⏳ Generando...' : '📤 Exportar Excel para Revisión'}
+                            </button>
+                        </div>
+
+                        <div className="card" style={{ borderTop: '4px solid var(--color-exito)' }}>
+                            <h4 style={{ fontSize: 15, fontWeight: 700, marginBottom: 10 }}>2. Subir Subsanaciones</h4>
+                            <p style={{ fontSize: 13, color: '#64748b', marginBottom: 18, lineHeight: 1.5 }}>
+                                Sube el Excel modificado. El sistema detectará cambios en atribuciones, glosario, ley y
+                                <strong> corresponsabilidad</strong> para que los aceptes o rechaces uno a uno.
+                            </p>
+                            <label className={`btn btn-success ${cargando ? 'disabled' : ''}`}
+                                style={{ width: '100%', cursor: cargando ? 'not-allowed' : 'pointer', textAlign: 'center', display: 'block' }}>
+                                {cargando ? '⏳ Leyendo Excel...' : '📥 Subir Excel Modificado'}
+                                <input type="file" accept=".xlsx" style={{ display: 'none' }} onChange={handleSubirExcel} disabled={cargando} />
+                            </label>
+                        </div>
+                    </div>
+
+                    {/* Leyenda de tipos */}
+                    <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', marginBottom: 16, fontSize: 12 }}>
+                        {Object.entries(TIPO_CONFIG).map(([key, cfg]) => (
+                            <span key={key} style={{ background: cfg.color, color: cfg.colorHeader, border: `1px solid ${cfg.colorBorde}`, borderRadius: 20, padding: '3px 12px', fontWeight: 700 }}>
+                                {cfg.icono} {cfg.etiqueta}
+                            </span>
+                        ))}
+                    </div>
+
+                    {/* Verificador de cambios */}
+                    {archivoSubido && (
+                        <div className="card" style={{ border: '2px dashed var(--color-primario)', marginBottom: 24 }}>
+                            <div style={{ borderBottom: '1px solid #e2e8f0', paddingBottom: 16, marginBottom: 20 }}>
+                                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', flexWrap: 'wrap', gap: 12 }}>
+                                    <div>
+                                        <h4 style={{ fontSize: 16, fontWeight: 700, color: 'var(--color-primario)', marginBottom: 6 }}>
+                                            📑 Verificador de Cambios
+                                        </h4>
+                                        <p style={{ fontSize: 13, color: '#475569' }}>
+                                            Archivo: <strong>{archivoSubido}</strong>
+                                        </p>
+                                    </div>
+                                    <div style={{ display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap' }}>
+                                        <span style={{ background: '#dcfce7', color: '#166534', padding: '4px 12px', borderRadius: 20, fontWeight: 700, fontSize: 13 }}>✅ {aceptados} aceptado{aceptados !== 1 ? 's' : ''}</span>
+                                        <span style={{ background: '#fee2e2', color: '#991b1b', padding: '4px 12px', borderRadius: 20, fontWeight: 700, fontSize: 13 }}>❌ {rechazados} rechazado{rechazados !== 1 ? 's' : ''}</span>
+                                        <span style={{ background: '#e2e8f0', color: '#475569', padding: '4px 12px', borderRadius: 20, fontWeight: 700, fontSize: 13 }}>{total} total</span>
+                                    </div>
+                                </div>
+                                {total > 1 && (
+                                    <div style={{ display: 'flex', gap: 8, marginTop: 14 }}>
+                                        <button className="btn btn-outline btn-sm" onClick={aceptarTodos} style={{ fontSize: 12 }}>✅ Aceptar todos</button>
+                                        <button className="btn btn-outline btn-sm" onClick={rechazarTodos} style={{ fontSize: 12, borderColor: '#f87171', color: '#ef4444' }}>❌ Rechazar todos</button>
+                                    </div>
+                                )}
+                            </div>
+
+                            {cambiosDetectados.length === 0 ? (
+                                <div className="empty-state" style={{ minHeight: 120 }}>
+                                    <div style={{ fontSize: 36, marginBottom: 8 }}>✅</div>
+                                    <h5>Sin cambios detectados</h5>
+                                    <button className="btn btn-outline btn-sm" style={{ marginTop: 12 }} onClick={() => setArchivoSubido(null)}>Subir otro archivo</button>
+                                </div>
+                            ) : (
+                                <>
+                                    <div style={{ display: 'flex', flexDirection: 'column', gap: 14, maxHeight: '50vh', overflowY: 'auto', paddingRight: 6, marginBottom: 20 }}>
+                                        {cambiosDetectados.map(c => (
+                                            <TarjetaCambio key={c._idx} c={c} onToggle={toggleCambio} />
+                                        ))}
+                                    </div>
+                                    <div style={{ borderTop: '1px solid #e2e8f0', paddingTop: 16, display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 12 }}>
+                                        <span style={{ fontSize: 13, color: '#64748b' }}>
+                                            Se guardarán <strong style={{ color: '#16a34a' }}>{aceptados}</strong> de {total} cambios.
+                                        </span>
+                                        <div style={{ display: 'flex', gap: 12 }}>
+                                            <button className="btn btn-outline" onClick={() => { setCambiosDetectados([]); setArchivoSubido(null); }}>❌ Descartar</button>
+                                            <button className="btn btn-primary" onClick={aplicarCambios} disabled={cargando || aceptados === 0}>
+                                                {cargando ? '⏳ Guardando...' : `✅ Aplicar ${aceptados} Cambio${aceptados !== 1 ? 's' : ''}`}
+                                            </button>
+                                        </div>
+                                    </div>
+                                </>
+                            )}
+                        </div>
+                    )}
+
+                    {/* ── HISTORIAL ── */}
+                    <div className="card" style={{ borderTop: '4px solid #8b5cf6' }}>
+                        <div className="card-header">
+                            <span className="card-title">📋 Historial de Revisiones Excel</span>
+                            <span style={{ fontSize: 12, color: '#64748b' }}>Versiones subidas — solo consulta</span>
+                        </div>
+                        <HistorialVersiones key={proyectoId} proyectoId={proyectoId} />
+                    </div>
+                </>
+            )}
+
+            {!proyectoId && !cargandoProyectos && (
+                <div className="empty-state card" style={{ minHeight: 200 }}>
+                    <div className="empty-icon">🔍</div>
+                    <h3>Selecciona un proyecto</h3>
+                    <p>Elige un proyecto del selector de arriba para comenzar el proceso de revisión.</p>
+                </div>
+            )}
         </div>
     );
 }

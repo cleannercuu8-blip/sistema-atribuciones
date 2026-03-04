@@ -739,7 +739,6 @@ export default function ProyectoDetalle() {
                     { id: 'ley', label: '📜 Atrib. Generales (Ley)' },
                     { id: 'atribuciones', label: '📝 Atribuciones' },
                     { id: 'glosario', label: '📖 Glosario' },
-                    { id: 'revisiones', label: '🔍 Revisiones' + (revisionActiva ? ' (ACTIVA)' : '') }
                 ].map(t => (
                     <button key={t.id} className={`tab-btn ${tab === t.id ? 'active' : ''}`} onClick={() => setTab(t.id)}>
                         {t.label}
@@ -902,16 +901,7 @@ export default function ProyectoDetalle() {
                 </div>
             )}
 
-            {/* ===== TAB: REVISIONES ===== */}
-            {tab === 'revisiones' && (
-                <TabRevisiones
-                    proyectoId={id}
-                    usuario={usuario}
-                    revisionActiva={revisionActiva}
-                    setRevisionActiva={setRevisionActiva}
-                    setTab={setTab}
-                />
-            )}
+            {/* Revisiones movidas al menú principal /revisiones */}
 
             {/* Modal de Observación Rápida desde el Árbol */}
             {mostrarModalObsRapida && (

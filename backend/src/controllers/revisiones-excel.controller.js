@@ -45,12 +45,10 @@ exports.importarExcel = async (req, res) => {
 };
 
 /**
- * Resuelve la cadena de atribucion_general_id subiendo por padre_atribucion_id
- * hasta encontrar el primero que tenga atribucion_general_id definido.
- * Devuelve el id de la atribución general (Ley), o null si no se encuentra.
+ * Recorre la cadena padre_atribucion_id hacia arriba para encontrar
+ * el atribucion_general_id correcto (Ley). Devuelve null si no lo encuentra.
  */
 async function resolverAtribucionGeneralDesdeRaiz(atribucionId, limite = 50) {
-    let ids = [];
     let currentId = atribucionId;
     let safety = 0;
 
@@ -61,7 +59,6 @@ async function resolverAtribucionGeneralDesdeRaiz(atribucionId, limite = 50) {
         );
         if (res.rows.length === 0) break;
         const row = res.rows[0];
-        ids.push(row);
         if (row.atribucion_general_id) {
             return row.atribucion_general_id;
         }
@@ -74,7 +71,7 @@ async function resolverAtribucionGeneralDesdeRaiz(atribucionId, limite = 50) {
 exports.aplicarCambios = async (req, res) => {
     try {
         const { proyectoId } = req.params;
-        const { cambios } = req.body;
+        const { cambios, nombreArchivo, usuarioNombre } = req.body;
 
         if (!cambios || !Array.isArray(cambios)) {
             return res.status(400).json({ error: 'Formato de cambios inválido' });
@@ -82,46 +79,52 @@ exports.aplicarCambios = async (req, res) => {
 
         await pool.query('BEGIN');
 
+        let aplicados = 0;
+
         for (const cambio of cambios) {
             const tipo = cambio.tipo || 'atribucion_especifica';
 
             if (tipo === 'atribucion_especifica') {
-                // ── Cambio de texto de atribución específica ─────────────
+                // ── Cambio de texto de atribución específica ──────────────────
                 await pool.query(
                     `UPDATE atribuciones_especificas
                      SET texto = $1, updated_at = NOW()
                      WHERE id = $2 AND proyecto_id = $3`,
                     [cambio.texto_propuesto, cambio.id, proyectoId]
                 );
+                aplicados++;
 
             } else if (tipo === 'glosario') {
-                // ── Cambio de significado en glosario ─────────────────────
+                // ── Cambio de significado en glosario ──────────────────────────
+                // IMPORTANTE: la tabla glosario NO tiene updated_at → no lo incluir
                 await pool.query(
                     `UPDATE glosario
-                     SET significado = $1, updated_at = NOW()
+                     SET significado = $1
                      WHERE id = $2 AND proyecto_id = $3`,
                     [cambio.texto_propuesto, cambio.id, proyectoId]
                 );
+                aplicados++;
 
             } else if (tipo === 'atribucion_general') {
-                // ── Cambio de texto en atribución general (Ley) ───────────
+                // ── Cambio de texto en atribución general (Ley) ───────────────
+                // atribuciones_generales tampoco tiene updated_at en el schema
                 await pool.query(
                     `UPDATE atribuciones_generales
-                     SET texto = $1, updated_at = NOW()
+                     SET texto = $1
                      WHERE id = $2 AND proyecto_id = $3`,
                     [cambio.texto_propuesto, cambio.id, proyectoId]
                 );
+                aplicados++;
 
             } else if (tipo === 'corresponsabilidad') {
-                // ── Cambio de corresponsabilidad (padre_atribucion_id) ─────
-                // La clave propuesta puede venir vacía (quitar corresponsabilidad)
+                // ── Cambio de corresponsabilidad (padre_atribucion_id) ─────────
                 const nuevaClave = cambio.clave_propuesta?.trim() || '';
 
                 let nuevoPadreId = null;
                 let nuevaAtribucionGeneralId = null;
 
                 if (nuevaClave !== '') {
-                    // Buscar la atribución que tiene esa clave en el mismo proyecto
+                    // Buscar la atribución con esa clave en el mismo proyecto
                     const padreRes = await pool.query(
                         `SELECT id, atribucion_general_id, padre_atribucion_id
                          FROM atribuciones_especificas
@@ -131,7 +134,6 @@ exports.aplicarCambios = async (req, res) => {
                     );
 
                     if (padreRes.rows.length === 0) {
-                        // Clave no encontrada — ignorar este cambio con advertencia
                         console.warn(`[corresponsabilidad] Clave "${nuevaClave}" no encontrada en proyecto ${proyectoId}, se omite.`);
                         continue;
                     }
@@ -139,17 +141,15 @@ exports.aplicarCambios = async (req, res) => {
                     const padreRow = padreRes.rows[0];
                     nuevoPadreId = padreRow.id;
 
-                    // Subir la cadena desde el padre nuevo para encontrar la Atribución General (Ley)
-                    // Primero verificar si el padre directo tiene atribucion_general_id
+                    // Resolver la cadena hacia la Ley desde el nuevo padre
                     if (padreRow.atribucion_general_id) {
                         nuevaAtribucionGeneralId = padreRow.atribucion_general_id;
                     } else {
-                        // Subir la cadena del padre hasta encontrarlo
                         nuevaAtribucionGeneralId = await resolverAtribucionGeneralDesdeRaiz(padreRow.padre_atribucion_id);
                     }
                 }
 
-                // Actualizar la atribución: nuevo padre y nueva atribución general (Ley)
+                // Actualizar: nuevo padre y nueva atribución general (Ley)
                 await pool.query(
                     `UPDATE atribuciones_especificas
                      SET padre_atribucion_id = $1,
@@ -160,11 +160,12 @@ exports.aplicarCambios = async (req, res) => {
                     [
                         nuevoPadreId,
                         nuevaAtribucionGeneralId,
-                        nuevaClave || null, // También actualizar el texto libre de corresponsabilidad
+                        nuevaClave || null,
                         cambio.id,
                         proyectoId
                     ]
                 );
+                aplicados++;
             }
         }
 
@@ -174,12 +175,53 @@ exports.aplicarCambios = async (req, res) => {
             ['en_revision', proyectoId]
         );
 
+        // ── Guardar en historial ───────────────────────────────────────────
+        try {
+            await pool.query(
+                `INSERT INTO historial_revisiones_excel
+                    (proyecto_id, nombre_archivo, total_cambios, cambios_aplicados, usuario_nombre, resumen_cambios)
+                 VALUES ($1, $2, $3, $4, $5, $6)`,
+                [
+                    proyectoId,
+                    nombreArchivo || 'archivo.xlsx',
+                    cambios.length,
+                    aplicados,
+                    usuarioNombre || 'Sistema',
+                    JSON.stringify(cambios)
+                ]
+            );
+        } catch (histErr) {
+            // El historial es opcional; no abortar si falla (tabla quizá no existe aún)
+            console.warn('[historial] No se pudo guardar historial:', histErr.message);
+        }
+
         await pool.query('COMMIT');
 
-        res.json({ mensaje: 'Cambios aplicados correctamente', aplicados: cambios.length });
+        res.json({ mensaje: 'Cambios aplicados correctamente', aplicados });
     } catch (error) {
         await pool.query('ROLLBACK');
         console.error('Error aplicando cambios:', error);
         res.status(500).json({ error: 'Error al persistir los cambios en la base de datos' });
+    }
+};
+
+/**
+ * Lista el historial de Excels de revisión subidos para un proyecto,
+ * ordenado del más reciente al más antiguo.
+ */
+exports.listarHistorial = async (req, res) => {
+    try {
+        const { proyectoId } = req.params;
+        const result = await pool.query(
+            `SELECT id, nombre_archivo, total_cambios, cambios_aplicados, usuario_nombre, resumen_cambios, created_at
+             FROM historial_revisiones_excel
+             WHERE proyecto_id = $1
+             ORDER BY created_at DESC`,
+            [proyectoId]
+        );
+        res.json(result.rows);
+    } catch (error) {
+        console.error('Error listando historial:', error);
+        res.status(500).json({ error: 'Error al obtener el historial' });
     }
 };
