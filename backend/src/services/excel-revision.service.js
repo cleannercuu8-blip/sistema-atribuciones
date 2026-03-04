@@ -1,192 +1,201 @@
 const exceljs = require('exceljs');
 const pool = require('../config/db');
+const { exportarExcel } = require('./excel.service');
+
+// Helpers (mismos que excel.service)
+const getColumnLetter = (n) => {
+    let result = '';
+    while (n > 0) {
+        const remainder = (n - 1) % 26;
+        result = String.fromCharCode(65 + remainder) + result;
+        n = Math.floor((n - 1) / 26);
+    }
+    return result;
+};
+
+const obtenerCadena = (unidad, mapaUnidades) => {
+    const cadena = [];
+    let actual = unidad;
+    while (actual) {
+        cadena.unshift(actual);
+        actual = actual.padre_id ? mapaUnidades[actual.padre_id] : null;
+    }
+    if (cadena.length === 0 || cadena[0].nivel_numero !== 0) {
+        cadena.unshift({ nivel_numero: 0, nombre: 'ORIGEN DE LA ATRIBUCIÓN', siglas: 'LEY' });
+    }
+    return cadena;
+};
 
 class ExcelRevisionService {
 
+    /**
+     * Genera el Excel COMPLETO (mismo que el export general) pero con 3 columnas
+     * adicionales al final de cada pestaña de unidad:
+     *  - ID_ATRIBUCION (oculta, bloqueada) — para identificar en el análisis
+     *  - OBSERVACIONES DEL REVISOR (editable, amarillo)
+     *  - NUEVA PROPUESTA DE LA DEPENDENCIA (editable, verde)
+     */
     async generarExcelRevision(proyectoId) {
-        const workbook = new exceljs.Workbook();
-        const sheet = workbook.addWorksheet('Revisión');
+        // Generar el workbook base (que tiene todas las pestañas)
+        const workbook = await exportarExcel(proyectoId);
 
-        // ── Columnas ──────────────────────────────────────────────────
-        sheet.columns = [
-            { header: 'ID (NO TOCAR)', key: 'id', width: 12 },
-            { header: 'Unidad Administrativa', key: 'unidad', width: 32 },
-            { header: 'Nivel', key: 'nivel', width: 8 },
-            { header: 'Unidad Superior', key: 'unidad_superior', width: 28 },
-            { header: 'Clave', key: 'clave', width: 12 },
-            { header: 'Texto Original (Base de Datos)', key: 'texto_original', width: 55 },
-            { header: 'Ley / Norma Vinculada', key: 'ley_norma', width: 30 },
-            { header: 'Vínculo Superior (Padre)', key: 'padre_clave', width: 22 },
-            { header: 'Corresponsabilidad', key: 'corresponsabilidad', width: 28 },
-            { header: 'Observaciones del Revisor', key: 'observaciones', width: 38 },
-            { header: 'NUEVA PROPUESTA DE LA DEPENDENCIA', key: 'nueva_propuesta', width: 55 },
-        ];
+        // ── Obtener datos para añadir columnas de revisión ────────────
+        const unidadesResult = await pool.query(
+            `SELECT * FROM unidades_administrativas WHERE proyecto_id = $1 ORDER BY nivel_numero ASC, orden ASC`,
+            [proyectoId]
+        );
+        const unidades = unidadesResult.rows;
 
-        // ── Estilo cabecera principal ─────────────────────────────────
-        const headerRow = sheet.getRow(1);
-        headerRow.font = { bold: true, color: { argb: 'FFFFFFFF' }, size: 10 };
-        headerRow.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FF1F4E78' } };
-        headerRow.alignment = { vertical: 'middle', horizontal: 'center', wrapText: true };
-        headerRow.height = 36;
+        const atEspResult = await pool.query(
+            `SELECT ae.id, ae.unidad_id, ae.clave, ae.texto, ae.activo
+             FROM atribuciones_especificas ae
+             WHERE ae.proyecto_id = $1 AND ae.activo = true
+             ORDER BY ae.unidad_id, ae.clave`,
+            [proyectoId]
+        );
+        const atriEspecificas = atEspResult.rows;
 
-        // ── Paleta de colores por nivel (fondos de filas de unidad) ───
-        const nivelFondos = [
-            'FFD6E4F0',  // nivel 1 – azul claro
-            'FFCCE5CC',  // nivel 2 – verde claro
-            'FFFFF0CC',  // nivel 3 – amarillo claro
-            'FFEDD9D9',  // nivel 4 – rosa claro
-            'FFE8E0F0',  // nivel 5 – lila claro
-            'FFD9EFF7',  // nivel 6+ – cyan claro
-        ];
-
-        // ── Consulta: unidades con su superior ────────────────────────
-        const unidadesRes = await pool.query(`
-            SELECT u.id, u.nombre, u.siglas, u.nivel_numero, p.nombre AS padre_nombre, p.siglas AS padre_siglas
-            FROM unidades_administrativas u
-            LEFT JOIN unidades_administrativas p ON u.padre_id = p.id
-            WHERE u.proyecto_id = $1
-            ORDER BY u.nivel_numero, u.nombre
-        `, [proyectoId]);
-
-        // ── Consulta: atribuciones con relaciones ─────────────────────
-        const atribRes = await pool.query(`
-            SELECT
-                a.id,
-                a.unidad_id,
-                a.clave,
-                a.texto,
-                a.corresponsabilidad,
-                padre_a.clave   AS padre_clave,
-                ag.clave        AS gen_clave,
-                ag.norma        AS gen_norma,
-                ag.articulo     AS gen_articulo
-            FROM atribuciones_especificas a
-            LEFT JOIN atribuciones_especificas padre_a ON a.padre_atribucion_id = padre_a.id
-            LEFT JOIN atribuciones_generales   ag      ON a.atribucion_general_id = ag.id
-            WHERE a.proyecto_id = $1
-            ORDER BY a.unidad_id, a.clave
-        `, [proyectoId]);
-
-        // Agrupar atribuciones por unidad
+        // Atribuciones agrupadas por unidad
         const atribPorUnidad = {};
-        atribRes.rows.forEach(a => {
+        atriEspecificas.forEach(a => {
             if (!atribPorUnidad[a.unidad_id]) atribPorUnidad[a.unidad_id] = [];
             atribPorUnidad[a.unidad_id].push(a);
         });
 
-        // ── Protección de hoja ────────────────────────────────────────
-        await sheet.protect('password123', {
-            selectLockedCells: true,
-            selectUnlockedCells: true,
-            formatCells: true,
-            formatColumns: true,
-            formatRows: true,
-            insertColumns: false,
-            insertRows: false,
-            deleteColumns: false,
-            deleteRows: false,
-            sort: true,
-            autoFilter: true,
-        });
+        // Mapa de unidades para calcular la cadena
+        const unidadesMap = {};
+        unidades.forEach(u => { unidadesMap[String(u.id)] = u; });
 
-        // ── Volcado de datos ──────────────────────────────────────────
-        unidadesRes.rows.forEach(u => {
-            const fondoNivel = nivelFondos[Math.min(u.nivel_numero - 1, nivelFondos.length - 1)];
-            const indent = '  '.repeat(u.nivel_numero - 1);
+        // ── Recorrer cada pestaña de unidad y añadir columnas ─────────
+        for (const unidad of unidades) {
+            const wsName = unidad.siglas.substring(0, 31);
+            const ws = workbook.getWorksheet(wsName);
+            if (!ws) continue;
 
-            // Fila cabecera de unidad (sin ID de atribución, no editable)
-            const unitRow = sheet.addRow({
-                id: '',
-                unidad: `${indent}${u.nivel_numero}. ${u.nombre} [${u.siglas}]`,
-                nivel: u.nivel_numero,
-                unidad_superior: u.padre_nombre ? `${u.padre_nombre} [${u.padre_siglas}]` : '(Raíz)',
-                clave: '',
-                texto_original: '',
-                ley_norma: '',
-                padre_clave: '',
-                corresponsabilidad: '',
-                observaciones: '',
-                nueva_propuesta: '',
+            const cadena = obtenerCadena(unidad, unidadesMap);
+            // El número de columnas de datos ya existentes = cadena.length * 2 + 1 (corresponsabilidad)
+            const numColsExistentes = cadena.length * 2 + 1;
+
+            // Columnas nuevas
+            const colIdNum = numColsExistentes + 1;  // ID (oculta)
+            const colObsNum = numColsExistentes + 2;  // Observaciones
+            const colPropNum = numColsExistentes + 3;  // Nueva Propuesta
+
+            const colId = getColumnLetter(colIdNum);
+            const colObs = getColumnLetter(colObsNum);
+            const colProp = getColumnLetter(colPropNum);
+
+            // Extender el merge del título (fila 1) y descripción (fila 2)
+            const ultimaColNueva = colProp;
+            // Desanclar merges existentes (ExcelJS no permite re-merge, así que actualizamos valor solo)
+            try {
+                const ultimaColVieja = getColumnLetter(numColsExistentes);
+                ws.getRow(1).height = 30;
+                // El valor del título ya está en A1; sólo ajustamos el color en las celdas nuevas
+                ['A1', `${colId}1`, `${colObs}1`, `${colProp}1`].forEach(addr => {
+                    if (ws.getCell(addr).value === null) {
+                        ws.getCell(addr).fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FF1a3a5c' } };
+                    }
+                });
+            } catch (_) { }
+
+            // Encabezados fila 3
+            const estiloEncabezado = (cell, texto) => {
+                cell.value = texto;
+                cell.font = { bold: true, color: { argb: 'FFFFFFFF' }, size: 10 };
+                cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FF1a3a5c' } };
+                cell.alignment = { vertical: 'middle', horizontal: 'center', wrapText: true };
+                cell.border = {
+                    top: { style: 'thin', color: { argb: 'cccccc' } },
+                    bottom: { style: 'thin', color: { argb: 'cccccc' } },
+                    left: { style: 'thin', color: { argb: 'cccccc' } },
+                    right: { style: 'thin', color: { argb: 'cccccc' } },
+                };
+            };
+
+            // Col ID oculta
+            ws.getColumn(colIdNum).width = 5;
+            ws.getColumn(colIdNum).hidden = true;  // Ocultamos la columna ID
+            estiloEncabezado(ws.getCell(`${colId}3`), 'ID');
+
+            // Col Observaciones
+            ws.getColumn(colObsNum).width = 38;
+            estiloEncabezado(ws.getCell(`${colObs}3`), 'OBSERVACIONES DEL REVISOR');
+
+            // Col Nueva Propuesta
+            ws.getColumn(colPropNum).width = 50;
+            estiloEncabezado(ws.getCell(`${colProp}3`), 'NUEVA PROPUESTA DE LA DEPENDENCIA');
+
+            // ── Proteger hoja con nuevas columnas editables ───────────
+            await ws.protect('password123', {
+                selectLockedCells: true,
+                selectUnlockedCells: true,
+                formatCells: true,
+                formatColumns: true,
+                formatRows: true,
+                insertColumns: false,
+                insertRows: false,
+                deleteColumns: false,
+                deleteRows: false,
+                sort: true,
+                autoFilter: true,
             });
 
-            // Estilo fila de unidad
-            unitRow.font = { bold: true, size: 10, color: { argb: 'FF1F4E78' } };
-            unitRow.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: fondoNivel } };
-            unitRow.alignment = { vertical: 'middle', wrapText: true };
-            unitRow.height = 22;
-            // Toda la fila bloqueada
-            for (let col = 1; col <= 11; col++) {
-                unitRow.getCell(col).protection = { locked: true };
-            }
+            // ── Llenar ID, Observaciones, Nueva Propuesta por fila ────
+            const atribsDeEstaUnidad = atribPorUnidad[unidad.id] || [];
+            let fila = 4;  // La fila 4 en adelante son datos (igual que en excel.service)
+            for (const atr of atribsDeEstaUnidad) {
+                // ID (bloqueado, oculto)
+                const celId = ws.getCell(`${colId}${fila}`);
+                celId.value = atr.id;
+                celId.protection = { locked: true };
 
-            // Atribuciones de esta unidad
-            const atribs = atribPorUnidad[u.id] || [];
-            atribs.forEach(a => {
-                const leyTexto = [a.gen_clave, a.gen_norma, a.gen_articulo].filter(Boolean).join(' — ');
-                const addedRow = sheet.addRow({
-                    id: a.id,
-                    unidad: `${indent}  ${u.siglas}`,
-                    nivel: u.nivel_numero,
-                    unidad_superior: u.padre_siglas || '(Raíz)',
-                    clave: a.clave,
-                    texto_original: a.texto,
-                    ley_norma: leyTexto || '',
-                    padre_clave: a.padre_clave || '',
-                    corresponsabilidad: a.corresponsabilidad || '',
-                    observaciones: '',
-                    nueva_propuesta: a.texto,  // por defecto igual al original
-                });
-
-                addedRow.alignment = { vertical: 'top', wrapText: true };
-                addedRow.height = 30;
-
-                // Columnas bloqueadas (A–I)
-                for (let col = 1; col <= 9; col++) {
-                    addedRow.getCell(col).protection = { locked: true };
-                    addedRow.getCell(col).fill = {
-                        type: 'pattern', pattern: 'solid',
-                        fgColor: { argb: 'FFF8FAFC' }
-                    };
-                }
-
-                // Col J — Observaciones (editable, amarillo)
-                const celObs = addedRow.getCell('observaciones');
+                // Observaciones (editable, amarillo)
+                const celObs = ws.getCell(`${colObs}${fila}`);
+                celObs.value = '';
                 celObs.protection = { locked: false };
                 celObs.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFFFF2CC' } };
+                celObs.alignment = { vertical: 'top', wrapText: true };
+                celObs.border = {
+                    top: { style: 'hair', color: { argb: 'cccccc' } },
+                    bottom: { style: 'hair', color: { argb: 'cccccc' } },
+                    left: { style: 'hair', color: { argb: 'cccccc' } },
+                    right: { style: 'hair', color: { argb: 'cccccc' } },
+                };
 
-                // Col K — Nueva Propuesta (editable, verde)
-                const celProp = addedRow.getCell('nueva_propuesta');
+                // Nueva Propuesta (editable, verde claro)
+                const celProp = ws.getCell(`${colProp}${fila}`);
+                celProp.value = atr.texto;  // valor por defecto = texto actual
                 celProp.protection = { locked: false };
                 celProp.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFE2EFDA' } };
-            });
+                celProp.alignment = { vertical: 'top', wrapText: true };
+                celProp.border = {
+                    top: { style: 'hair', color: { argb: 'cccccc' } },
+                    bottom: { style: 'hair', color: { argb: 'cccccc' } },
+                    left: { style: 'hair', color: { argb: 'cccccc' } },
+                    right: { style: 'hair', color: { argb: 'cccccc' } },
+                };
 
-            // Si no hay atribuciones, fila vacía de aviso
-            if (atribs.length === 0) {
-                const emptyRow = sheet.addRow({
-                    id: '', unidad: `${indent}  (Sin atribuciones registradas)`,
-                    nivel: '', unidad_superior: '', clave: '', texto_original: '',
-                    ley_norma: '', padre_clave: '', corresponsabilidad: '',
-                    observaciones: '', nueva_propuesta: '',
-                });
-                emptyRow.font = { italic: true, color: { argb: 'FF94A3B8' }, size: 9 };
-                emptyRow.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFF8FAFC' } };
-                for (let col = 1; col <= 11; col++) {
-                    emptyRow.getCell(col).protection = { locked: true };
-                }
+                fila++;
             }
-        });
+        }
 
         return workbook;
     }
 
-    // ── Analizar Excel subido ──────────────────────────────────────────
+    /**
+     * Analiza el Excel de revisión subido.
+     * Recorre TODAS las pestañas (que no sean ORGANIGRAMA, GLOSARIOS ni ATRIBUCIONES GENERALES).
+     * En cada pestaña busca filas con dato en la columna ID y detecta si "Nueva Propuesta" difiere.
+     */
     async analizarExcel(proyectoId, buffer) {
         const workbook = new exceljs.Workbook();
         await workbook.xlsx.load(buffer);
-        const sheet = workbook.getWorksheet(1);
-        const cambios = [];
 
-        // Mapa de textos originales en BD
+        const cambios = [];
+        const HOJAS_SISTEMA = ['ORGANIGRAMA', 'GLOSARIOS', 'ATRIBUCIONES GENERALES'];
+
+        // Mapa de textos actuales en BD
         const originalDataMap = new Map();
         const result = await pool.query(
             'SELECT id, texto FROM atribuciones_especificas WHERE proyecto_id = $1',
@@ -194,25 +203,48 @@ class ExcelRevisionService {
         );
         result.rows.forEach(r => originalDataMap.set(r.id.toString(), r.texto));
 
-        sheet.eachRow((row, rowNumber) => {
-            if (rowNumber === 1) return; // skip header
+        // Procesar cada hoja de unidad
+        workbook.eachSheet((sheet) => {
+            if (HOJAS_SISTEMA.includes(sheet.name)) return;
 
-            // Col A = ID, F = texto original, J = observaciones, K = nueva propuesta
-            const id = row.getCell(1).value?.toString()?.trim();
-            const newText = row.getCell(11).value?.toString()?.trim() || '';
-            const obs = row.getCell(10).value?.toString()?.trim() || '';
+            // Detectar el número de columna del ID dinámicamente:
+            // La fila 3 tiene los encabezados. Buscamos la celda cuyo valor sea 'ID'
+            let colIdNum = null;
+            let colObsNum = null;
+            let colPropNum = null;
 
-            if (!id || isNaN(parseInt(id))) return; // fila de unidad sin ID
+            const headerRow = sheet.getRow(3);
+            headerRow.eachCell((cell, colNumber) => {
+                const val = cell.value?.toString()?.trim();
+                if (val === 'ID') colIdNum = colNumber;
+                else if (val === 'OBSERVACIONES DEL REVISOR') colObsNum = colNumber;
+                else if (val === 'NUEVA PROPUESTA DE LA DEPENDENCIA') colPropNum = colNumber;
+            });
 
-            const dbText = originalDataMap.get(id);
-            if (dbText !== undefined && dbText.trim() !== newText) {
-                cambios.push({
-                    id: parseInt(id),
-                    texto_original: dbText,
-                    texto_propuesto: newText,
-                    observacion: obs,
-                });
-            }
+            if (!colIdNum || !colPropNum) return; // hoja sin columnas de revisión
+
+            sheet.eachRow((row, rowNumber) => {
+                if (rowNumber <= 3) return; // saltar título, descripción y encabezados
+
+                const idVal = row.getCell(colIdNum).value;
+                const newText = row.getCell(colPropNum).value?.toString()?.trim() || '';
+                const obs = colObsNum ? (row.getCell(colObsNum).value?.toString()?.trim() || '') : '';
+
+                if (!idVal) return;
+                const idStr = idVal.toString().trim();
+                if (isNaN(parseInt(idStr))) return;
+
+                const dbText = originalDataMap.get(idStr);
+                if (dbText !== undefined && dbText.trim() !== newText) {
+                    cambios.push({
+                        id: parseInt(idStr),
+                        texto_original: dbText,
+                        texto_propuesto: newText,
+                        observacion: obs,
+                        hoja: sheet.name,
+                    });
+                }
+            });
         });
 
         return cambios;
