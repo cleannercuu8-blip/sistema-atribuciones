@@ -110,9 +110,14 @@ class ExcelRevisionService {
         const unidadesMap = {};
         unidades.forEach(u => { unidadesMap[String(u.id)] = u; });
 
-        // Mapa de atribuciones por ID (para resolver cadena hacia arriba)
         const atriMap = {};
         atriEspecificas.forEach(a => { atriMap[String(a.id)] = a; });
+
+        // Obtener atribuciones generales (Ley) de forma global
+        const agResult = await pool.query(
+            'SELECT * FROM atribuciones_generales WHERE proyecto_id = $1 AND activo = true ORDER BY clave',
+            [proyectoId]
+        );
 
         // ── Procesar hoja GLOSARIOS ─────────────────────────────────────
         const wsGlos = workbook.getWorksheet('GLOSARIOS');
@@ -167,11 +172,7 @@ class ExcelRevisionService {
             estiloEncabezadoRev(wsAG.getCell('G3'), 'OBSERVACIONES DEL REVISOR');
             estiloEncabezadoRev(wsAG.getCell('H3'), 'NUEVA PROPUESTA (Texto)');
 
-            // Obtener atribuciones generales con IDs
-            const agResult = await pool.query(
-                'SELECT * FROM atribuciones_generales WHERE proyecto_id = $1 AND activo = true ORDER BY clave',
-                [proyectoId]
-            );
+            estiloEncabezadoRev(wsAG.getCell('H3'), 'NUEVA PROPUESTA (Texto)');
 
             let filaAG = 4;
             for (const ag of agResult.rows) {
