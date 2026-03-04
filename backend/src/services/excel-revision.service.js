@@ -478,24 +478,20 @@ class ExcelRevisionService {
                     textoPropuesto = row.getCell(colPropNum).value?.toString()?.trim() || '';
                 }
 
-                // SI el campo "NUEVA PROPUESTA" es igual al de la DB, 
-                // pero el usuario editó la columna original de texto (fallback)
-                // Buscamos la columna de texto original (habitualmente es la penúltima antes de Corresponsabilidad)
-                // Para ser 100% seguros, si no hay cambio en 'NUEVA PROPUESTA', 
-                // chequeamos si alguna celda de texto en la fila cambió respecto a dbRow.texto
-                if (dbRow.texto.trim() === textoPropuesto) {
-                    // Verificamos si en la columna "original" (que está antes de la corresponsabilidad)
-                    // hay un valor distinto. La columna de texto de esta unidad suele ser colIdNum - 3
-                    const colTextoOrigIdx = colIdNum - 3;
+                // Fallback: Si no hay propuesta en la columna verde, ver si el usuario editó la original
+                // La columna de texto de esta unidad es: [ID] - 2
+                if (dbRow.texto.trim() === textoPropuesto || textoPropuesto === '') {
+                    const colTextoOrigIdx = colIdNum - 2;
                     if (colTextoOrigIdx > 0) {
                         const valOrig = row.getCell(colTextoOrigIdx).value?.toString()?.trim();
+                        // Solo aceptamos el fallback si tiene contenido real y es diferente
                         if (valOrig && valOrig !== '-' && valOrig !== dbRow.texto.trim()) {
                             textoPropuesto = valOrig;
                         }
                     }
                 }
 
-                if (dbRow.texto.trim() !== textoPropuesto && textoPropuesto !== '') {
+                if (textoPropuesto !== '' && dbRow.texto.trim() !== textoPropuesto) {
                     cambios.push({
                         tipo: 'atribucion_especifica',
                         id: parseInt(idStr),
@@ -511,8 +507,8 @@ class ExcelRevisionService {
                     let nuevaClave = row.getCell(colCorrClaveNum).value?.toString()?.trim() || '';
                     const claveActual = dbRow?.padre_clave?.trim() || dbRow?.ag_clave?.trim() || '';
 
-                    // Fallback: si no detecta cambio en colCorrClaveNum, mirar la columna original de corresponsabilidad
-                    if (nuevaClave === claveActual) {
+                    // Fallback: Si no hay cambio en la columna azul, ver la columna original (ID - 1)
+                    if (nuevaClave === claveActual || nuevaClave === '') {
                         const colCorrOrigIdx = colIdNum - 1;
                         if (colCorrOrigIdx > 0) {
                             const valCorrOrig = row.getCell(colCorrOrigIdx).value?.toString()?.trim();
@@ -522,7 +518,7 @@ class ExcelRevisionService {
                         }
                     }
 
-                    if (nuevaClave !== claveActual) {
+                    if (nuevaClave !== '' && nuevaClave !== claveActual) {
                         cambios.push({
                             tipo: 'corresponsabilidad',
                             id: parseInt(idStr),

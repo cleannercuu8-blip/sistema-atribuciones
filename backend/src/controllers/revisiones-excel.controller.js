@@ -69,6 +69,7 @@ async function resolverAtribucionGeneralDesdeRaiz(atribucionId, limite = 50) {
 }
 
 exports.aplicarCambios = async (req, res) => {
+    const client = await pool.connect();
     try {
         const { proyectoId } = req.params;
         const { cambios, nombreArchivo, usuarioNombre } = req.body;
@@ -77,55 +78,51 @@ exports.aplicarCambios = async (req, res) => {
             return res.status(400).json({ error: 'Formato de cambios inválido' });
         }
 
-        await pool.query('BEGIN');
+        await client.query('BEGIN');
 
         let aplicados = 0;
 
         for (const cambio of cambios) {
             const tipo = cambio.tipo || 'atribucion_especifica';
+            let mensajeActividad = '';
 
             if (tipo === 'atribucion_especifica') {
-                // ── Cambio de texto de atribución específica ──────────────────
-                await pool.query(
+                await client.query(
                     `UPDATE atribuciones_especificas
                      SET texto = $1, updated_at = NOW()
                      WHERE id = $2 AND proyecto_id = $3`,
                     [cambio.texto_propuesto, cambio.id, proyectoId]
                 );
+                mensajeActividad = `Actualizó texto de atribución ID ${cambio.id} vía Excel`;
                 aplicados++;
 
             } else if (tipo === 'glosario') {
-                // ── Cambio de significado en glosario ──────────────────────────
-                // IMPORTANTE: la tabla glosario NO tiene updated_at → no lo incluir
-                await pool.query(
+                await client.query(
                     `UPDATE glosario
                      SET significado = $1
                      WHERE id = $2 AND proyecto_id = $3`,
                     [cambio.texto_propuesto, cambio.id, proyectoId]
                 );
+                mensajeActividad = `Actualizó glosario ID ${cambio.id} vía Excel`;
                 aplicados++;
 
             } else if (tipo === 'atribucion_general') {
-                // ── Cambio de texto en atribución general (Ley) ───────────────
-                // atribuciones_generales tampoco tiene updated_at en el schema
-                await pool.query(
+                await client.query(
                     `UPDATE atribuciones_generales
                      SET texto = $1
                      WHERE id = $2 AND proyecto_id = $3`,
                     [cambio.texto_propuesto, cambio.id, proyectoId]
                 );
+                mensajeActividad = `Actualizó atribución de Ley ID ${cambio.id} vía Excel`;
                 aplicados++;
 
             } else if (tipo === 'corresponsabilidad') {
-                // ── Cambio de corresponsabilidad (padre_atribucion_id) ─────────
                 const nuevaClave = cambio.clave_propuesta?.trim() || '';
-
                 let nuevoPadreId = null;
                 let nuevaAtribucionGeneralId = null;
 
                 if (nuevaClave !== '') {
-                    // 1. Buscar en atribuciones_especificas
-                    const padreRes = await pool.query(
+                    const padreRes = await client.query(
                         `SELECT id, atribucion_general_id, padre_atribucion_id
                          FROM atribuciones_especificas
                          WHERE proyecto_id = $1 AND clave = $2 AND activo = true
@@ -136,85 +133,89 @@ exports.aplicarCambios = async (req, res) => {
                     if (padreRes.rows.length > 0) {
                         const padreRow = padreRes.rows[0];
                         nuevoPadreId = padreRow.id;
-
-                        // Resolver la cadena hacia la Ley desde el nuevo padre
                         if (padreRow.atribucion_general_id) {
                             nuevaAtribucionGeneralId = padreRow.atribucion_general_id;
                         } else {
-                            nuevaAtribucionGeneralId = await resolverAtribucionGeneralDesdeRaiz(padreRow.padre_atribucion_id);
+                            // Función auxiliar para resolver la raíz (si existe en el mismo archivo/scope)
+                            let currentId = padreRow.padre_atribucion_id;
+                            let safety = 0;
+                            while (currentId && safety < 50) {
+                                const res = await client.query(
+                                    'SELECT id, padre_atribucion_id, atribucion_general_id FROM atribuciones_especificas WHERE id = $1',
+                                    [currentId]
+                                );
+                                if (res.rows.length === 0) break;
+                                if (res.rows[0].atribucion_general_id) {
+                                    nuevaAtribucionGeneralId = res.rows[0].atribucion_general_id;
+                                    break;
+                                }
+                                currentId = res.rows[0].padre_atribucion_id;
+                                safety++;
+                            }
                         }
                     } else {
-                        // 2. Si no está en específicas, buscar en generales (Atribuciones de la Ley)
-                        const agRes = await pool.query(
+                        const agRes = await client.query(
                             `SELECT id FROM atribuciones_generales
                              WHERE proyecto_id = $1 AND clave = $2 AND activo = true
                              LIMIT 1`,
                             [proyectoId, nuevaClave]
                         );
-
                         if (agRes.rows.length > 0) {
                             nuevaAtribucionGeneralId = agRes.rows[0].id;
-                            nuevoPadreId = null; // Cuelga directamente de un bloque de la Ley
                         } else {
-                            console.warn(`[corresponsabilidad] Clave "${nuevaClave}" no encontrada en proyecto ${proyectoId}, se omite.`);
                             continue;
                         }
                     }
                 }
 
-                // Actualizar: nuevo padre y nueva atribución general (Ley)
-                await pool.query(
+                await client.query(
                     `UPDATE atribuciones_especificas
                      SET padre_atribucion_id = $1,
                          atribucion_general_id = $2,
                          corresponsabilidad = $3,
                          updated_at = NOW()
                      WHERE id = $4 AND proyecto_id = $5`,
-                    [
-                        nuevoPadreId,
-                        nuevaAtribucionGeneralId,
-                        nuevaClave || null,
-                        cambio.id,
-                        proyectoId
-                    ]
+                    [nuevoPadreId, nuevaAtribucionGeneralId, nuevaClave || null, cambio.id, proyectoId]
                 );
+                mensajeActividad = `Cambió corresponsabilidad de atribución ID ${cambio.id} a "${nuevaClave}"`;
                 aplicados++;
+            }
+
+            // Registrar en tabla de actividades (Movimientos del proyecto)
+            if (mensajeActividad) {
+                await client.query(
+                    `INSERT INTO actividades (tipo, entidad, entidad_id, proyecto_id, mensaje, autor)
+                     VALUES ($1, $2, $3, $4, $5, $6)`,
+                    ['actualizacion', 'atribucion_especifica', cambio.id, proyectoId, mensajeActividad, usuarioNombre || 'Sistema']
+                );
             }
         }
 
-        // Marcar proyecto como en revisión
-        await pool.query(
+        await client.query(
             'UPDATE proyectos SET estado = $1, updated_at = NOW() WHERE id = $2',
             ['en_revision', proyectoId]
         );
 
-        // ── Guardar en historial ───────────────────────────────────────────
+        // Guardar en historial de revisiones excel
         try {
-            await pool.query(
+            await client.query(
                 `INSERT INTO historial_revisiones_excel
                     (proyecto_id, nombre_archivo, total_cambios, cambios_aplicados, usuario_nombre, resumen_cambios)
                  VALUES ($1, $2, $3, $4, $5, $6)`,
-                [
-                    proyectoId,
-                    nombreArchivo || 'archivo.xlsx',
-                    cambios.length,
-                    aplicados,
-                    usuarioNombre || 'Sistema',
-                    JSON.stringify(cambios)
-                ]
+                [proyectoId, nombreArchivo || 'archivo.xlsx', cambios.length, aplicados, usuarioNombre || 'Sistema', JSON.stringify(cambios)]
             );
         } catch (histErr) {
-            // El historial es opcional; no abortar si falla (tabla quizá no existe aún)
             console.warn('[historial] No se pudo guardar historial:', histErr.message);
         }
 
-        await pool.query('COMMIT');
-
+        await client.query('COMMIT');
         res.json({ mensaje: 'Cambios aplicados correctamente', aplicados });
     } catch (error) {
-        await pool.query('ROLLBACK');
+        await client.query('ROLLBACK');
         console.error('Error aplicando cambios:', error);
         res.status(500).json({ error: 'Error al persistir los cambios en la base de datos' });
+    } finally {
+        client.release();
     }
 };
 
