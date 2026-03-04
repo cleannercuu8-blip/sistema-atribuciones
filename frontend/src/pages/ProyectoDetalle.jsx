@@ -1244,7 +1244,14 @@ const TabRevisiones = ({ proyectoId, usuario, revisionActiva, setRevisionActiva,
         setCargando(true);
         try {
             await api.post(`/proyectos/${proyectoId}/revision-excel/aplicar`, {
-                cambios: seleccionados.map(({ id, texto_propuesto, observacion }) => ({ id, texto_propuesto, observacion }))
+                cambios: seleccionados.map(({ tipo, id, texto_propuesto, observacion, clave_propuesta, clave_actual }) => ({
+                    tipo: tipo || 'atribucion_especifica',
+                    id,
+                    texto_propuesto,
+                    observacion,
+                    clave_propuesta,
+                    clave_actual,
+                }))
             });
             alert(`✅ ${seleccionados.length} cambio(s) aplicados con éxito.`);
             setCambiosDetectados([]);
@@ -1258,6 +1265,149 @@ const TabRevisiones = ({ proyectoId, usuario, revisionActiva, setRevisionActiva,
     const aceptados = cambiosDetectados.filter(c => c._aceptado).length;
     const rechazados = cambiosDetectados.filter(c => !c._aceptado).length;
     const totalCambios = cambiosDetectados.length;
+
+    // Config visual por tipo de cambio
+    const tipoConfig = {
+        atribucion_especifica: {
+            icono: '🔵',
+            etiqueta: 'Atribución Específica',
+            color: '#eff6ff',
+            colorBorde: '#93c5fd',
+            colorHeader: '#1d4ed8',
+        },
+        glosario: {
+            icono: '📖',
+            etiqueta: 'Glosario',
+            color: '#f0fdf4',
+            colorBorde: '#6ee7b7',
+            colorHeader: '#15803d',
+        },
+        atribucion_general: {
+            icono: '📜',
+            etiqueta: 'Atribución General (Ley)',
+            color: '#faf5ff',
+            colorBorde: '#c084fc',
+            colorHeader: '#7e22ce',
+        },
+        corresponsabilidad: {
+            icono: '🔗',
+            etiqueta: 'Corresponsabilidad',
+            color: '#fff7ed',
+            colorBorde: '#fdba74',
+            colorHeader: '#c2410c',
+        },
+    };
+
+    const renderTarjeta = (c) => {
+        const cfg = tipoConfig[c.tipo] || tipoConfig['atribucion_especifica'];
+        const esCorrsp = c.tipo === 'corresponsabilidad';
+        const esGlosario = c.tipo === 'glosario';
+        const esAG = c.tipo === 'atribucion_general';
+
+        return (
+            <div key={c._idx} style={{
+                border: c._aceptado ? `1.5px solid #86efac` : `1.5px dashed #fca5a5`,
+                borderRadius: 10,
+                padding: 16,
+                background: c._aceptado ? cfg.color : '#fff8f8',
+                opacity: c._aceptado ? 1 : 0.65,
+                transition: 'all 0.2s ease',
+            }}>
+                {/* Fila superior: tipo + ID + toggle */}
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12, flexWrap: 'wrap', gap: 8 }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
+                        <span style={{
+                            background: cfg.color, color: cfg.colorHeader,
+                            border: `1px solid ${cfg.colorBorde}`,
+                            borderRadius: 20, padding: '2px 10px', fontSize: 11, fontWeight: 800,
+                        }}>
+                            {cfg.icono} {cfg.etiqueta}
+                        </span>
+                        {esCorrsp && (
+                            <span style={{
+                                background: '#fef9c3', color: '#92400e',
+                                border: '1px solid #fde047',
+                                borderRadius: 20, padding: '2px 10px', fontSize: 11, fontWeight: 700,
+                            }}>
+                                ⚠️ Cambia jerarquía
+                            </span>
+                        )}
+                        <span style={{ fontSize: 12, color: '#64748b' }}>
+                            Cambio #{c._idx + 1} · ID: {c.id} · {c.hoja}
+                        </span>
+                    </div>
+                    <button
+                        onClick={() => toggleCambio(c._idx)}
+                        style={{
+                            padding: '5px 18px', borderRadius: 8, border: 'none',
+                            cursor: 'pointer', fontWeight: 700, fontSize: 13,
+                            background: c._aceptado ? '#16a34a' : '#dc2626',
+                            color: 'white', transition: 'background 0.2s', minWidth: 130,
+                        }}
+                        title={c._aceptado ? 'Clic para rechazar' : 'Clic para aceptar'}
+                    >
+                        {c._aceptado ? '✅ Aceptado' : '❌ Rechazado'}
+                    </button>
+                </div>
+
+                {/* Observación */}
+                {c.observacion ? (
+                    <div style={{ background: '#fef9c3', border: '1px solid #fde047', borderRadius: 8, padding: '10px 14px', marginBottom: 12 }}>
+                        <div style={{ fontSize: 11, fontWeight: 800, color: '#92400e', textTransform: 'uppercase', marginBottom: 4, letterSpacing: '0.05em' }}>
+                            📝 Observación del Revisor
+                        </div>
+                        <p style={{ fontSize: 13, color: '#78350f', lineHeight: 1.5, margin: 0 }}>{c.observacion}</p>
+                    </div>
+                ) : (
+                    <div style={{ background: '#f8fafc', border: '1px dashed #cbd5e1', borderRadius: 8, padding: '8px 14px', marginBottom: 12 }}>
+                        <span style={{ fontSize: 12, color: '#94a3b8', fontStyle: 'italic' }}>Sin observación capturada en el Excel</span>
+                    </div>
+                )}
+
+                {/* Contenido de cambio */}
+                {esCorrsp ? (
+                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
+                        <div style={{ background: '#fef2f2', borderRadius: 8, padding: '10px 14px' }}>
+                            <div style={{ fontSize: 11, fontWeight: 800, color: '#991b1b', textTransform: 'uppercase', marginBottom: 6 }}>
+                                🔴 Relación actual (se cambiará)
+                            </div>
+                            <p style={{ fontSize: 13, color: '#7f1d1d', lineHeight: 1.6, margin: 0 }}>
+                                Vinculada a clave: <strong>{c.clave_actual || '(sin asignación)'}</strong>
+                            </p>
+                        </div>
+                        <div style={{ background: '#fff7ed', borderRadius: 8, padding: '10px 14px' }}>
+                            <div style={{ fontSize: 11, fontWeight: 800, color: '#c2410c', textTransform: 'uppercase', marginBottom: 6 }}>
+                                🟠 Nueva relación propuesta
+                            </div>
+                            <p style={{ fontSize: 13, color: '#7c2d12', lineHeight: 1.6, margin: 0 }}>
+                                Vinculada a clave: <strong>{c.clave_propuesta || '(sin asignación)'}</strong>
+                            </p>
+                            <p style={{ fontSize: 11, color: '#9a3412', marginTop: 6, marginBottom: 0, fontStyle: 'italic' }}>
+                                El sistema actualizará el vínculo hasta la Ley automáticamente.
+                            </p>
+                        </div>
+                    </div>
+                ) : (
+                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
+                        <div style={{ background: '#fef2f2', borderRadius: 8, padding: '10px 14px' }}>
+                            <div style={{ fontSize: 11, fontWeight: 800, color: '#991b1b', textTransform: 'uppercase', marginBottom: 6 }}>
+                                🔴 {esGlosario ? 'Significado actual' : esAG ? 'Texto actual (Ley)' : 'Texto actual (se eliminará)'}
+                            </div>
+                            <del style={{ fontSize: 13, color: '#7f1d1d', lineHeight: 1.6 }}>
+                                {c.texto_original || '(Sin texto original)'}
+                            </del>
+                        </div>
+                        <div style={{ background: '#f0fdf4', borderRadius: 8, padding: '10px 14px' }}>
+                            <div style={{ fontSize: 11, fontWeight: 800, color: '#166534', textTransform: 'uppercase', marginBottom: 6 }}>
+                                🟢 {esGlosario ? 'Nuevo significado' : esAG ? 'Nuevo texto (Ley)' : 'Propuesta del Excel (se guardará)'}
+                            </div>
+                            <p style={{ fontSize: 13, color: '#14532d', lineHeight: 1.6, margin: 0 }}>{c.texto_propuesto}</p>
+                        </div>
+                    </div>
+                )}
+            </div>
+        );
+    };
 
     return (
         <div>
@@ -1274,8 +1424,8 @@ const TabRevisiones = ({ proyectoId, usuario, revisionActiva, setRevisionActiva,
                 <div className="card" style={{ borderTop: '4px solid var(--color-primario)' }}>
                     <h4 style={{ fontSize: 15, fontWeight: 700, marginBottom: 12 }}>1. Descargar Documento</h4>
                     <p style={{ fontSize: 13, color: '#64748b', marginBottom: 20, lineHeight: 1.5 }}>
-                        Genera un Excel con el árbol completo: jerarquía de unidades, atribuciones, corresponsabilidades y relaciones.
-                        Las columnas <strong>Observaciones</strong> y <strong>Nueva Propuesta</strong> son editables.
+                        Genera un Excel con el árbol completo: atribuciones, glosario, ley y corresponsabilidades.
+                        Las columnas <strong>Observaciones</strong> y <strong>Nueva Propuesta</strong> son editables en todas las hojas.
                     </p>
                     <button className="btn btn-primary" onClick={descargarExcel} disabled={cargando} style={{ width: '100%' }}>
                         {cargando ? '⏳ Generando documento...' : '📤 Exportar Excel para Revisión'}
@@ -1285,14 +1435,27 @@ const TabRevisiones = ({ proyectoId, usuario, revisionActiva, setRevisionActiva,
                 <div className="card" style={{ borderTop: '4px solid var(--color-exito)' }}>
                     <h4 style={{ fontSize: 15, fontWeight: 700, marginBottom: 12 }}>2. Importar Subsanaciones</h4>
                     <p style={{ fontSize: 13, color: '#64748b', marginBottom: 20, lineHeight: 1.5 }}>
-                        Sube el Excel modificado. El sistema detectará los cambios para que puedas
-                        <strong> aceptar o rechazar cada uno individualmente</strong>.
+                        Sube el Excel modificado. El sistema detectará cambios en atribuciones, glosario, ley y
+                        <strong> corresponsabilidad</strong> para que los aceptes o rechaces uno a uno.
                     </p>
                     <label className={`btn btn-success ${cargando ? 'disabled' : ''}`} style={{ width: '100%', cursor: cargando ? 'not-allowed' : 'pointer', textAlign: 'center', display: 'block' }}>
                         {cargando ? '⏳ Leyendo Excel...' : '📥 Subir Excel Modificado'}
                         <input type="file" accept=".xlsx" style={{ display: 'none' }} onChange={handleSubirExcel} disabled={cargando} />
                     </label>
                 </div>
+            </div>
+
+            {/* Leyenda de tipos */}
+            <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', marginBottom: 16, fontSize: 12 }}>
+                {Object.entries(tipoConfig).map(([key, cfg]) => (
+                    <span key={key} style={{
+                        background: cfg.color, color: cfg.colorHeader,
+                        border: `1px solid ${cfg.colorBorde}`,
+                        borderRadius: 20, padding: '3px 12px', fontWeight: 700,
+                    }}>
+                        {cfg.icono} {cfg.etiqueta}
+                    </span>
+                ))}
             </div>
 
             {archivoSubido && (
@@ -1331,70 +1494,13 @@ const TabRevisiones = ({ proyectoId, usuario, revisionActiva, setRevisionActiva,
                         <div className="empty-state" style={{ minHeight: 150, padding: 20 }}>
                             <div style={{ fontSize: 40, marginBottom: 10 }}>✅</div>
                             <h5 style={{ fontSize: 15 }}>No hay alteraciones detectadas</h5>
-                            <p style={{ fontSize: 13 }}>El archivo no modificó la columna «Nueva Propuesta».</p>
+                            <p style={{ fontSize: 13 }}>El archivo no contiene cambios respecto a la base de datos.</p>
                             <button className="btn btn-outline btn-sm" style={{ marginTop: 15 }} onClick={() => setArchivoSubido(null)}>Subir otro archivo</button>
                         </div>
                     ) : (
                         <div>
                             <div style={{ display: 'flex', flexDirection: 'column', gap: 16, maxHeight: '55vh', overflowY: 'auto', paddingRight: 8, marginBottom: 20 }}>
-                                {cambiosDetectados.map((c) => (
-                                    <div key={c._idx} style={{
-                                        border: c._aceptado ? '1.5px solid #86efac' : '1.5px dashed #fca5a5',
-                                        borderRadius: 10,
-                                        padding: 16,
-                                        background: c._aceptado ? '#f0fdf4' : '#fff8f8',
-                                        opacity: c._aceptado ? 1 : 0.65,
-                                        transition: 'all 0.2s ease',
-                                    }}>
-                                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 }}>
-                                            <span style={{ fontSize: 12, fontWeight: 700, color: '#64748b' }}>
-                                                Cambio #{c._idx + 1} &nbsp;·&nbsp; ID: {c.id}
-                                            </span>
-                                            <button
-                                                onClick={() => toggleCambio(c._idx)}
-                                                style={{
-                                                    padding: '5px 18px', borderRadius: 8, border: 'none',
-                                                    cursor: 'pointer', fontWeight: 700, fontSize: 13,
-                                                    background: c._aceptado ? '#16a34a' : '#dc2626',
-                                                    color: 'white', transition: 'background 0.2s', minWidth: 130,
-                                                }}
-                                                title={c._aceptado ? 'Clic para rechazar' : 'Clic para aceptar'}
-                                            >
-                                                {c._aceptado ? '✅ Aceptado' : '❌ Rechazado'}
-                                            </button>
-                                        </div>
-
-                                        {c.observacion ? (
-                                            <div style={{ background: '#fef9c3', border: '1px solid #fde047', borderRadius: 8, padding: '10px 14px', marginBottom: 12 }}>
-                                                <div style={{ fontSize: 11, fontWeight: 800, color: '#92400e', textTransform: 'uppercase', marginBottom: 4, letterSpacing: '0.05em' }}>
-                                                    📝 Observación del Revisor
-                                                </div>
-                                                <p style={{ fontSize: 13, color: '#78350f', lineHeight: 1.5, margin: 0 }}>{c.observacion}</p>
-                                            </div>
-                                        ) : (
-                                            <div style={{ background: '#f8fafc', border: '1px dashed #cbd5e1', borderRadius: 8, padding: '8px 14px', marginBottom: 12 }}>
-                                                <span style={{ fontSize: 12, color: '#94a3b8', fontStyle: 'italic' }}>Sin observación capturada en el Excel</span>
-                                            </div>
-                                        )}
-
-                                        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
-                                            <div style={{ background: '#fef2f2', borderRadius: 8, padding: '10px 14px' }}>
-                                                <div style={{ fontSize: 11, fontWeight: 800, color: '#991b1b', textTransform: 'uppercase', marginBottom: 6 }}>
-                                                    🔴 Texto actual (se eliminará)
-                                                </div>
-                                                <del style={{ fontSize: 13, color: '#7f1d1d', lineHeight: 1.6 }}>
-                                                    {c.texto_original || '(Sin texto original)'}
-                                                </del>
-                                            </div>
-                                            <div style={{ background: '#f0fdf4', borderRadius: 8, padding: '10px 14px' }}>
-                                                <div style={{ fontSize: 11, fontWeight: 800, color: '#166534', textTransform: 'uppercase', marginBottom: 6 }}>
-                                                    🟢 Propuesta del Excel (se guardará)
-                                                </div>
-                                                <p style={{ fontSize: 13, color: '#14532d', lineHeight: 1.6, margin: 0 }}>{c.texto_propuesto}</p>
-                                            </div>
-                                        </div>
-                                    </div>
-                                ))}
+                                {cambiosDetectados.map((c) => renderTarjeta(c))}
                             </div>
 
                             <div style={{ borderTop: '1px solid #e2e8f0', paddingTop: 16, display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 12, flexWrap: 'wrap' }}>
