@@ -1189,9 +1189,6 @@ const TabRevisiones = ({ proyectoId, usuario, revisionActiva, setRevisionActiva,
     const [cambiosDetectados, setCambiosDetectados] = useState([]);
     const [archivoSubido, setArchivoSubido] = useState(null);
 
-    const esRevisor = usuario.rol === 'admin' || usuario.rol === 'revisor';
-    const esDependencia = usuario.rol === 'enlace' || usuario.rol === 'dependencia';
-
     const descargarExcel = async () => {
         setCargando(true);
         try {
@@ -1210,34 +1207,46 @@ const TabRevisiones = ({ proyectoId, usuario, revisionActiva, setRevisionActiva,
     const handleSubirExcel = async (e) => {
         const file = e.target.files[0];
         if (!file) return;
-
         setCargando(true);
         const fd = new FormData();
         fd.append('archivo', file);
-
         try {
             const res = await api.post(`/proyectos/${proyectoId}/revision-excel/importar`, fd, {
                 headers: { 'Content-Type': 'multipart/form-data' }
             });
-            setCambiosDetectados(res.data.cambios);
+            const cambios = res.data.cambios || [];
+            setCambiosDetectados(cambios.map((c, i) => ({ ...c, _idx: i, _aceptado: true })));
             setArchivoSubido(file.name);
-            if (res.data.cambios && res.data.cambios.length === 0) {
-                alert('No se detectaron diferencias en el archivo subido.');
-            }
+            if (cambios.length === 0) alert('No se detectaron diferencias en el archivo subido.');
         } catch (err) {
             alert(err.response?.data?.error || 'Error procesando el archivo Excel.');
         }
         setCargando(false);
-        e.target.value = null; // reset input
+        e.target.value = null;
     };
 
-    const aplicarCambios = async () => {
-        if (!window.confirm(`¿Estás seguro de registrar permanentemente estos ${cambiosDetectados.length} cambios en el sistema?`)) return;
+    const toggleCambio = (idx) => {
+        setCambiosDetectados(prev =>
+            prev.map(c => c._idx === idx ? { ...c, _aceptado: !c._aceptado } : c)
+        );
+    };
 
+    const aceptarTodos = () => setCambiosDetectados(prev => prev.map(c => ({ ...c, _aceptado: true })));
+    const rechazarTodos = () => setCambiosDetectados(prev => prev.map(c => ({ ...c, _aceptado: false })));
+
+    const aplicarCambios = async () => {
+        const seleccionados = cambiosDetectados.filter(c => c._aceptado);
+        if (seleccionados.length === 0) {
+            alert('No hay cambios aceptados. Acepta al menos uno.');
+            return;
+        }
+        if (!window.confirm(`¿Confirmar? Se guardarán permanentemente ${seleccionados.length} de ${cambiosDetectados.length} cambios.`)) return;
         setCargando(true);
         try {
-            await api.post(`/proyectos/${proyectoId}/revision-excel/aplicar`, { cambios: cambiosDetectados });
-            alert('✅ Cambios aplicados con éxito en la base de datos.');
+            await api.post(`/proyectos/${proyectoId}/revision-excel/aplicar`, {
+                cambios: seleccionados.map(({ id, texto_propuesto, observacion }) => ({ id, texto_propuesto, observacion }))
+            });
+            alert(`✅ ${seleccionados.length} cambio(s) aplicados con éxito.`);
             setCambiosDetectados([]);
             setArchivoSubido(null);
         } catch (err) {
@@ -1246,37 +1255,38 @@ const TabRevisiones = ({ proyectoId, usuario, revisionActiva, setRevisionActiva,
         setCargando(false);
     };
 
+    const aceptados = cambiosDetectados.filter(c => c._aceptado).length;
+    const rechazados = cambiosDetectados.filter(c => !c._aceptado).length;
+    const totalCambios = cambiosDetectados.length;
+
     return (
         <div>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 20 }}>
                 <div>
                     <h3 style={{ fontSize: 18, fontWeight: 700, color: 'var(--color-primario)' }}>🔍 Gestión de Revisiones (Flujo Excel)</h3>
                     <p style={{ fontSize: 13, color: 'var(--color-texto-suave)', marginTop: 4 }}>
-                        El sistema ahora utiliza un flujo ágil basado en archivos de Excel para realizar comparaciones exactas.
+                        Flujo ágil basado en Excel: descarga, edita y sube el archivo para revisar cambios.
                     </p>
                 </div>
             </div>
 
             <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(300px, 1fr))', gap: 20, marginBottom: 30 }}>
+                <div className="card" style={{ borderTop: '4px solid var(--color-primario)' }}>
+                    <h4 style={{ fontSize: 15, fontWeight: 700, marginBottom: 12 }}>1. Descargar Documento</h4>
+                    <p style={{ fontSize: 13, color: '#64748b', marginBottom: 20, lineHeight: 1.5 }}>
+                        Genera un Excel con el árbol completo: jerarquía de unidades, atribuciones, corresponsabilidades y relaciones.
+                        Las columnas <strong>Observaciones</strong> y <strong>Nueva Propuesta</strong> son editables.
+                    </p>
+                    <button className="btn btn-primary" onClick={descargarExcel} disabled={cargando} style={{ width: '100%' }}>
+                        {cargando ? '⏳ Generando documento...' : '📤 Exportar Excel para Revisión'}
+                    </button>
+                </div>
 
-                {/* Panel Revisor (Admin) */}
-                {(esRevisor || true) && (
-                    <div className="card" style={{ borderTop: '4px solid var(--color-primario)' }}>
-                        <h4 style={{ fontSize: 15, fontWeight: 700, marginBottom: 12 }}>1. Descargar Documento</h4>
-                        <p style={{ fontSize: 13, color: '#64748b', marginBottom: 20, lineHeight: 1.5 }}>
-                            Genera un Excel protegido con todas las unidades y atribuciones actuales. Se lo puedes enviar a la Dependencia por correo para que trabajen en la columna "Nueva Propuesta".
-                        </p>
-                        <button className="btn btn-primary" onClick={descargarExcel} disabled={cargando} style={{ width: '100%' }}>
-                            {cargando ? '⏳ Generando documento...' : '📤 Exportar Excel para Revisión'}
-                        </button>
-                    </div>
-                )}
-
-                {/* Panel Dependencia */}
                 <div className="card" style={{ borderTop: '4px solid var(--color-exito)' }}>
                     <h4 style={{ fontSize: 15, fontWeight: 700, marginBottom: 12 }}>2. Importar Subsanaciones</h4>
                     <p style={{ fontSize: 13, color: '#64748b', marginBottom: 20, lineHeight: 1.5 }}>
-                        Sube aquí el archivo Excel modificado. El sistema lo leerá y detectará automáticamente qué textos fueron alterados para que puedas verificar visualmente los cambios antes de guardarlos.
+                        Sube el Excel modificado. El sistema detectará los cambios para que puedas
+                        <strong> aceptar o rechazar cada uno individualmente</strong>.
                     </p>
                     <label className={`btn btn-success ${cargando ? 'disabled' : ''}`} style={{ width: '100%', cursor: cargando ? 'not-allowed' : 'pointer', textAlign: 'center', display: 'block' }}>
                         {cargando ? '⏳ Leyendo Excel...' : '📥 Subir Excel Modificado'}
@@ -1285,58 +1295,120 @@ const TabRevisiones = ({ proyectoId, usuario, revisionActiva, setRevisionActiva,
                 </div>
             </div>
 
-            {/* Panel de Diferencias (Diff) */}
             {archivoSubido && (
                 <div className="card" style={{ border: '2px dashed var(--color-primario)' }}>
-                    <div className="card-header" style={{ borderBottom: '1px solid #e2e8f0', paddingBottom: 16, marginBottom: 16 }}>
-                        <h4 style={{ fontSize: 16, fontWeight: 700, color: 'var(--color-primario)' }}>
-                            📑 Verificador de Cambios Detectados
-                        </h4>
-                        <span className="badge badge-en_revision">{cambiosDetectados.length} modificaciones encontradas</span>
+                    <div style={{ borderBottom: '1px solid #e2e8f0', paddingBottom: 16, marginBottom: 20 }}>
+                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', flexWrap: 'wrap', gap: 12 }}>
+                            <div>
+                                <h4 style={{ fontSize: 16, fontWeight: 700, color: 'var(--color-primario)', marginBottom: 6 }}>
+                                    📑 Verificador de Cambios Detectados
+                                </h4>
+                                <p style={{ fontSize: 13, color: '#475569' }}>
+                                    Archivo: <strong>{archivoSubido}</strong> — Acepta o rechaza cada cambio individualmente.
+                                </p>
+                            </div>
+                            <div style={{ display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap' }}>
+                                <span style={{ background: '#dcfce7', color: '#166534', padding: '4px 12px', borderRadius: 20, fontWeight: 700, fontSize: 13 }}>
+                                    ✅ {aceptados} aceptado{aceptados !== 1 ? 's' : ''}
+                                </span>
+                                <span style={{ background: '#fee2e2', color: '#991b1b', padding: '4px 12px', borderRadius: 20, fontWeight: 700, fontSize: 13 }}>
+                                    ❌ {rechazados} rechazado{rechazados !== 1 ? 's' : ''}
+                                </span>
+                                <span style={{ background: '#e2e8f0', color: '#475569', padding: '4px 12px', borderRadius: 20, fontWeight: 700, fontSize: 13 }}>
+                                    {totalCambios} total
+                                </span>
+                            </div>
+                        </div>
+                        {totalCambios > 1 && (
+                            <div style={{ display: 'flex', gap: 8, marginTop: 14 }}>
+                                <button className="btn btn-outline btn-sm" onClick={aceptarTodos} style={{ fontSize: 12 }}>✅ Aceptar todos</button>
+                                <button className="btn btn-outline btn-sm" onClick={rechazarTodos} style={{ fontSize: 12, borderColor: '#f87171', color: '#ef4444' }}>❌ Rechazar todos</button>
+                            </div>
+                        )}
                     </div>
 
                     {cambiosDetectados.length === 0 ? (
                         <div className="empty-state" style={{ minHeight: 150, padding: 20 }}>
                             <div style={{ fontSize: 40, marginBottom: 10 }}>✅</div>
                             <h5 style={{ fontSize: 15 }}>No hay alteraciones detectadas</h5>
-                            <p style={{ fontSize: 13 }}>El archivo parece no tener cambios o no modificó la columna "Nueva Propuesta".</p>
+                            <p style={{ fontSize: 13 }}>El archivo no modificó la columna «Nueva Propuesta».</p>
                             <button className="btn btn-outline btn-sm" style={{ marginTop: 15 }} onClick={() => setArchivoSubido(null)}>Subir otro archivo</button>
                         </div>
                     ) : (
                         <div>
-                            <p style={{ fontSize: 13, color: '#475569', marginBottom: 16 }}>
-                                Revisa con cuidado las alteraciones detectadas en el documento Excel <strong>({archivoSubido})</strong>.
-                                Lo que aparece en rojo será reemplazado por lo que está en verde.
-                            </p>
-
-                            <div style={{ display: 'flex', flexDirection: 'column', gap: 16, maxHeight: '50vh', overflowY: 'auto', paddingRight: 10, marginBottom: 20 }}>
-                                {cambiosDetectados.map((c, i) => (
-                                    <div key={i} style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16, background: '#f8fafc', padding: 16, borderRadius: 8, border: '1px solid #cbd5e1' }}>
-                                        <div>
-                                            <div style={{ fontSize: 11, fontWeight: 800, color: '#991b1b', textTransform: 'uppercase', marginBottom: 6 }}>🔴 Sistema actual (Se eliminará)</div>
-                                            <del style={{ fontSize: 13, color: '#7f1d1d', lineHeight: 1.5 }}>{c.texto_original || '(Sin texto original)'}</del>
-
-                                            {c.observacion && (
-                                                <div style={{ marginTop: 10, padding: 8, background: '#fef3c7', borderRadius: 6, border: '1px solid #fde68a', fontSize: 12, color: '#92400e' }}>
-                                                    <strong>📝 Observación del Excel:</strong> <br />{c.observacion}
-                                                </div>
-                                            )}
+                            <div style={{ display: 'flex', flexDirection: 'column', gap: 16, maxHeight: '55vh', overflowY: 'auto', paddingRight: 8, marginBottom: 20 }}>
+                                {cambiosDetectados.map((c) => (
+                                    <div key={c._idx} style={{
+                                        border: c._aceptado ? '1.5px solid #86efac' : '1.5px dashed #fca5a5',
+                                        borderRadius: 10,
+                                        padding: 16,
+                                        background: c._aceptado ? '#f0fdf4' : '#fff8f8',
+                                        opacity: c._aceptado ? 1 : 0.65,
+                                        transition: 'all 0.2s ease',
+                                    }}>
+                                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 }}>
+                                            <span style={{ fontSize: 12, fontWeight: 700, color: '#64748b' }}>
+                                                Cambio #{c._idx + 1} &nbsp;·&nbsp; ID: {c.id}
+                                            </span>
+                                            <button
+                                                onClick={() => toggleCambio(c._idx)}
+                                                style={{
+                                                    padding: '5px 18px', borderRadius: 8, border: 'none',
+                                                    cursor: 'pointer', fontWeight: 700, fontSize: 13,
+                                                    background: c._aceptado ? '#16a34a' : '#dc2626',
+                                                    color: 'white', transition: 'background 0.2s', minWidth: 130,
+                                                }}
+                                                title={c._aceptado ? 'Clic para rechazar' : 'Clic para aceptar'}
+                                            >
+                                                {c._aceptado ? '✅ Aceptado' : '❌ Rechazado'}
+                                            </button>
                                         </div>
-                                        <div>
-                                            <div style={{ fontSize: 11, fontWeight: 800, color: '#166534', textTransform: 'uppercase', marginBottom: 6 }}>🟢 Propuesta del Excel (Se guardará)</div>
-                                            <div style={{ fontSize: 13, color: '#14532d', lineHeight: 1.5, background: '#dcfce7', padding: '6px 10px', borderRadius: 4 }}>{c.texto_propuesto}</div>
+
+                                        {c.observacion ? (
+                                            <div style={{ background: '#fef9c3', border: '1px solid #fde047', borderRadius: 8, padding: '10px 14px', marginBottom: 12 }}>
+                                                <div style={{ fontSize: 11, fontWeight: 800, color: '#92400e', textTransform: 'uppercase', marginBottom: 4, letterSpacing: '0.05em' }}>
+                                                    📝 Observación del Revisor
+                                                </div>
+                                                <p style={{ fontSize: 13, color: '#78350f', lineHeight: 1.5, margin: 0 }}>{c.observacion}</p>
+                                            </div>
+                                        ) : (
+                                            <div style={{ background: '#f8fafc', border: '1px dashed #cbd5e1', borderRadius: 8, padding: '8px 14px', marginBottom: 12 }}>
+                                                <span style={{ fontSize: 12, color: '#94a3b8', fontStyle: 'italic' }}>Sin observación capturada en el Excel</span>
+                                            </div>
+                                        )}
+
+                                        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
+                                            <div style={{ background: '#fef2f2', borderRadius: 8, padding: '10px 14px' }}>
+                                                <div style={{ fontSize: 11, fontWeight: 800, color: '#991b1b', textTransform: 'uppercase', marginBottom: 6 }}>
+                                                    🔴 Texto actual (se eliminará)
+                                                </div>
+                                                <del style={{ fontSize: 13, color: '#7f1d1d', lineHeight: 1.6 }}>
+                                                    {c.texto_original || '(Sin texto original)'}
+                                                </del>
+                                            </div>
+                                            <div style={{ background: '#f0fdf4', borderRadius: 8, padding: '10px 14px' }}>
+                                                <div style={{ fontSize: 11, fontWeight: 800, color: '#166534', textTransform: 'uppercase', marginBottom: 6 }}>
+                                                    🟢 Propuesta del Excel (se guardará)
+                                                </div>
+                                                <p style={{ fontSize: 13, color: '#14532d', lineHeight: 1.6, margin: 0 }}>{c.texto_propuesto}</p>
+                                            </div>
                                         </div>
                                     </div>
                                 ))}
                             </div>
 
-                            <div style={{ borderTop: '1px solid #e2e8f0', paddingTop: 16, display: 'flex', justifyContent: 'flex-end', gap: 12 }}>
-                                <button className="btn btn-outline" onClick={() => { setCambiosDetectados([]); setArchivoSubido(null); }}>
-                                    ❌ Descartar y Limpiar
-                                </button>
-                                <button className="btn btn-primary" onClick={aplicarCambios} disabled={cargando}>
-                                    {cargando ? '⏳ Guardando...' : '✅ Aprobar y Actualizar Sistema'}
-                                </button>
+                            <div style={{ borderTop: '1px solid #e2e8f0', paddingTop: 16, display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 12, flexWrap: 'wrap' }}>
+                                <span style={{ fontSize: 13, color: '#64748b' }}>
+                                    Se guardarán <strong style={{ color: '#16a34a' }}>{aceptados}</strong> de {totalCambios} cambios.
+                                </span>
+                                <div style={{ display: 'flex', gap: 12 }}>
+                                    <button className="btn btn-outline" onClick={() => { setCambiosDetectados([]); setArchivoSubido(null); }}>
+                                        ❌ Descartar y Limpiar
+                                    </button>
+                                    <button className="btn btn-primary" onClick={aplicarCambios} disabled={cargando || aceptados === 0}>
+                                        {cargando ? '⏳ Guardando...' : `✅ Aplicar ${aceptados} Cambio${aceptados !== 1 ? 's' : ''}`}
+                                    </button>
+                                </div>
                             </div>
                         </div>
                     )}
