@@ -294,9 +294,9 @@ class ExcelRevisionService {
                 };
 
                 // Añadir nota con las claves disponibles del superior
-                if (clavesSuperiores) {
+                if (clavesSuperioresArray.length > 0) {
                     celCorrClave.note = {
-                        texts: [{ text: `Claves disponibles del superior:\n${clavesSuperiores}` }],
+                        texts: [{ text: `Claves disponibles del superior:\n${clavesSuperioresArray.join(', ')}` }],
                         editAs: 'oneCells',
                     };
                 }
