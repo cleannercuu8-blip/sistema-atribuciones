@@ -124,7 +124,7 @@ exports.aplicarCambios = async (req, res) => {
                 let nuevaAtribucionGeneralId = null;
 
                 if (nuevaClave !== '') {
-                    // Buscar la atribución con esa clave en el mismo proyecto
+                    // 1. Buscar en atribuciones_especificas
                     const padreRes = await pool.query(
                         `SELECT id, atribucion_general_id, padre_atribucion_id
                          FROM atribuciones_especificas
@@ -133,19 +133,32 @@ exports.aplicarCambios = async (req, res) => {
                         [proyectoId, nuevaClave]
                     );
 
-                    if (padreRes.rows.length === 0) {
-                        console.warn(`[corresponsabilidad] Clave "${nuevaClave}" no encontrada en proyecto ${proyectoId}, se omite.`);
-                        continue;
-                    }
+                    if (padreRes.rows.length > 0) {
+                        const padreRow = padreRes.rows[0];
+                        nuevoPadreId = padreRow.id;
 
-                    const padreRow = padreRes.rows[0];
-                    nuevoPadreId = padreRow.id;
-
-                    // Resolver la cadena hacia la Ley desde el nuevo padre
-                    if (padreRow.atribucion_general_id) {
-                        nuevaAtribucionGeneralId = padreRow.atribucion_general_id;
+                        // Resolver la cadena hacia la Ley desde el nuevo padre
+                        if (padreRow.atribucion_general_id) {
+                            nuevaAtribucionGeneralId = padreRow.atribucion_general_id;
+                        } else {
+                            nuevaAtribucionGeneralId = await resolverAtribucionGeneralDesdeRaiz(padreRow.padre_atribucion_id);
+                        }
                     } else {
-                        nuevaAtribucionGeneralId = await resolverAtribucionGeneralDesdeRaiz(padreRow.padre_atribucion_id);
+                        // 2. Si no está en específicas, buscar en generales (Atribuciones de la Ley)
+                        const agRes = await pool.query(
+                            `SELECT id FROM atribuciones_generales
+                             WHERE proyecto_id = $1 AND clave = $2 AND activo = true
+                             LIMIT 1`,
+                            [proyectoId, nuevaClave]
+                        );
+
+                        if (agRes.rows.length > 0) {
+                            nuevaAtribucionGeneralId = agRes.rows[0].id;
+                            nuevoPadreId = null; // Cuelga directamente de un bloque de la Ley
+                        } else {
+                            console.warn(`[corresponsabilidad] Clave "${nuevaClave}" no encontrada en proyecto ${proyectoId}, se omite.`);
+                            continue;
+                        }
                     }
                 }
 

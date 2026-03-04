@@ -231,11 +231,14 @@ class ExcelRevisionService {
             ws.getColumn(colCorrClaveNum).width = 28;
             estiloEncabezadoRev(ws.getCell(`${colCorrClave}3`), 'NUEVA CORRESP. (CLAVE SUPERIOR)');
 
-            // Obtener claves del nivel superior para el comentario/nota de referencia
-            let clavesSuperiores = '';
+            // Obtener claves del nivel superior para el comentario/nota de referencia y lista desplegable
+            let clavesSuperioresArray = [];
             if (unidad.padre_id) {
                 const padreAtribs = atribPorUnidad[unidad.padre_id] || [];
-                clavesSuperiores = padreAtribs.map(a => a.clave).join(', ');
+                clavesSuperioresArray = padreAtribs.map(a => a.clave);
+            } else {
+                // Si es Nivel 1, su superior directo es la Ley (Atribuciones Generales)
+                clavesSuperioresArray = agResult.rows.map(ag => ag.clave);
             }
 
             // Llenar filas de datos
@@ -254,16 +257,35 @@ class ExcelRevisionService {
                 estiloEditable(ws.getCell(`${colProp}${fila}`), atr.texto, 'FFE2EFDA');
 
                 // Nueva Corresponsabilidad por Clave (editable, azul claro)
-                // Valor por defecto: clave actual del padre (si existe) o vacío
+                // Valor por defecto: clave actual del padre (si existe) o de la Ley (si es Nivel 1)
                 let claveActualPadre = '';
                 if (atr.padre_atribucion_id && atriMap[String(atr.padre_atribucion_id)]) {
                     claveActualPadre = atriMap[String(atr.padre_atribucion_id)].clave || '';
+                } else if (atr.atribucion_general_id) {
+                    const agObj = agResult.rows.find(ag => ag.id === atr.atribucion_general_id);
+                    if (agObj) claveActualPadre = agObj.clave || '';
                 }
+
                 const celCorrClave = ws.getCell(`${colCorrClave}${fila}`);
                 celCorrClave.value = claveActualPadre;
                 celCorrClave.protection = { locked: false };
                 celCorrClave.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFDBEAFE' } }; // Azul claro
                 celCorrClave.alignment = { vertical: 'top', wrapText: false };
+
+                if (clavesSuperioresArray.length > 0) {
+                    const listString = `"${clavesSuperioresArray.join(',')}"`;
+                    if (listString.length < 255) {
+                        celCorrClave.dataValidation = {
+                            type: 'list',
+                            allowBlank: true,
+                            showErrorMessage: true,
+                            errorStyle: 'warning',
+                            errorTitle: 'Clave recomendada',
+                            error: 'La clave ingresada no es común para el nivel superior.',
+                            formulae: [listString]
+                        };
+                    }
+                }
                 celCorrClave.border = {
                     top: { style: 'hair', color: { argb: 'cccccc' } },
                     bottom: { style: 'hair', color: { argb: 'cccccc' } },
@@ -306,10 +328,11 @@ class ExcelRevisionService {
         // Mapa de textos actuales de atribuciones_especificas
         const atriEspMap = new Map();
         const resAE = await pool.query(
-            `SELECT ae.id, ae.texto, ae.corresponsabilidad, ae.padre_atribucion_id,
-                    pa.clave as padre_clave
+            `SELECT ae.id, ae.texto, ae.corresponsabilidad, ae.padre_atribucion_id, ae.atribucion_general_id,
+                    pa.clave as padre_clave, ag.clave as ag_clave
              FROM atribuciones_especificas ae
              LEFT JOIN atribuciones_especificas pa ON ae.padre_atribucion_id = pa.id
+             LEFT JOIN atribuciones_generales ag ON ae.atribucion_general_id = ag.id
              WHERE ae.proyecto_id = $1 AND ae.activo = true`,
             [proyectoId]
         );
@@ -459,7 +482,7 @@ class ExcelRevisionService {
                 // -- Cambio de CORRESPONSABILIDAD (clave del padre) --
                 if (colCorrClaveNum) {
                     const nuevaClave = row.getCell(colCorrClaveNum).value?.toString()?.trim() || '';
-                    const claveActual = dbRow?.padre_clave?.trim() || '';
+                    const claveActual = dbRow?.padre_clave?.trim() || dbRow?.ag_clave?.trim() || '';
 
                     if (dbRow && nuevaClave !== claveActual) {
                         cambios.push({
