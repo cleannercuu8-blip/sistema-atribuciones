@@ -326,7 +326,7 @@ class ExcelRevisionService {
         const cambios = [];
         const HOJAS_SISTEMA = ['ORGANIGRAMA', 'GLOSARIOS', 'ATRIBUCIONES GENERALES'];
 
-        // Mapa de textos actuales de atribuciones_especificas
+        // Mapas de datos actuales
         const atriEspMap = new Map();
         const resAE = await pool.query(
             `SELECT ae.id, ae.texto, ae.corresponsabilidad, ae.padre_atribucion_id, ae.atribucion_general_id,
@@ -339,7 +339,6 @@ class ExcelRevisionService {
         );
         resAE.rows.forEach(r => atriEspMap.set(r.id.toString(), r));
 
-        // Mapa de glosario actual
         const glosMap = new Map();
         const resGlos = await pool.query(
             'SELECT id, acronimo, significado FROM glosario WHERE proyecto_id = $1',
@@ -347,7 +346,6 @@ class ExcelRevisionService {
         );
         resGlos.rows.forEach(r => glosMap.set(r.id.toString(), r));
 
-        // Mapa de atribuciones generales actuales
         const agMap = new Map();
         const resAG = await pool.query(
             'SELECT id, clave, norma, articulo, fraccion_parrafo, texto FROM atribuciones_generales WHERE proyecto_id = $1 AND activo = true',
@@ -358,36 +356,37 @@ class ExcelRevisionService {
         // ── Procesar hoja GLOSARIOS ─────────────────────────────────────
         const wsGlos = workbook.getWorksheet('GLOSARIOS');
         if (wsGlos) {
-            // Encabezados en fila 2 (A=ACRÓNIMO, B=SIGNIFICADO, C=ID, D=OBS, E=NUEVA PROPUESTA)
             let colIdG = null, colObsG = null, colPropG = null;
-            const headerRowG = wsGlos.getRow(2);
-            headerRowG.eachCell((cell, colNum) => {
-                const v = cell.value?.toString()?.trim();
-                if (v === 'ID') colIdG = colNum;
-                else if (v === 'OBSERVACIONES DEL REVISOR') colObsG = colNum;
-                else if (v === 'NUEVA PROPUESTA') colPropG = colNum;
-            });
+            // Buscar encabezados en las primeras 5 filas
+            for (let i = 1; i <= 5; i++) {
+                wsGlos.getRow(i).eachCell((cell, col) => {
+                    const v = cell.value?.toString()?.toUpperCase()?.trim();
+                    if (v === 'ID') colIdG = col;
+                    if (v?.includes('OBSERVACIONES')) colObsG = col;
+                    if (v?.includes('NUEVA PROPUESTA')) colPropG = col;
+                });
+                if (colIdG && colPropG) break;
+            }
 
             if (colIdG && colPropG) {
                 wsGlos.eachRow((row, rowNumber) => {
-                    if (rowNumber < 3) return;
+                    if (rowNumber < 2) return;
                     const idVal = row.getCell(colIdG).value;
                     if (!idVal) return;
-                    const idStr = idVal.toString().trim();
-                    if (isNaN(parseInt(idStr))) return;
+                    const idStr = Math.floor(Number(idVal.toString())).toString();
+
+                    const original = glosMap.get(idStr);
+                    if (!original) return;
 
                     const newSignificado = row.getCell(colPropG).value?.toString()?.trim() || '';
-                    const obs = colObsG ? (row.getCell(colObsG).value?.toString()?.trim() || '') : '';
-                    const original = glosMap.get(idStr);
-
-                    if (original && original.significado.trim() !== newSignificado) {
+                    if (original.significado.trim() !== newSignificado) {
                         cambios.push({
                             tipo: 'glosario',
                             id: parseInt(idStr),
                             acronimo: original.acronimo,
                             texto_original: original.significado,
                             texto_propuesto: newSignificado,
-                            observacion: obs,
+                            observacion: colObsG ? (row.getCell(colObsG).value?.toString()?.trim() || '') : '',
                             hoja: 'GLOSARIOS',
                         });
                     }
@@ -398,36 +397,36 @@ class ExcelRevisionService {
         // ── Procesar hoja ATRIBUCIONES GENERALES ───────────────────────
         const wsAG = workbook.getWorksheet('ATRIBUCIONES GENERALES');
         if (wsAG) {
-            // Encabezados en fila 3 (A-E existentes, F=ID, G=OBS, H=NUEVA PROPUESTA)
             let colIdAG = null, colObsAG = null, colPropAG = null;
-            const headerRowAG = wsAG.getRow(3);
-            headerRowAG.eachCell((cell, colNum) => {
-                const v = cell.value?.toString()?.trim();
-                if (v === 'ID') colIdAG = colNum;
-                else if (v === 'OBSERVACIONES DEL REVISOR') colObsAG = colNum;
-                else if (v === 'NUEVA PROPUESTA (Texto)') colPropAG = colNum;
-            });
+            for (let i = 1; i <= 5; i++) {
+                wsAG.getRow(i).eachCell((cell, col) => {
+                    const v = cell.value?.toString()?.toUpperCase()?.trim();
+                    if (v === 'ID') colIdAG = col;
+                    if (v?.includes('OBSERVACIONES')) colObsAG = col;
+                    if (v?.includes('NUEVA PROPUESTA')) colPropAG = col;
+                });
+                if (colIdAG && colPropAG) break;
+            }
 
             if (colIdAG && colPropAG) {
                 wsAG.eachRow((row, rowNumber) => {
-                    if (rowNumber < 4) return;
+                    if (rowNumber < 3) return;
                     const idVal = row.getCell(colIdAG).value;
                     if (!idVal) return;
-                    const idStr = idVal.toString().trim();
-                    if (isNaN(parseInt(idStr))) return;
+                    const idStr = Math.floor(Number(idVal.toString())).toString();
+
+                    const original = agMap.get(idStr);
+                    if (!original) return;
 
                     const newTexto = row.getCell(colPropAG).value?.toString()?.trim() || '';
-                    const obs = colObsAG ? (row.getCell(colObsAG).value?.toString()?.trim() || '') : '';
-                    const original = agMap.get(idStr);
-
-                    if (original && original.texto.trim() !== newTexto) {
+                    if (original.texto.trim() !== newTexto) {
                         cambios.push({
                             tipo: 'atribucion_general',
                             id: parseInt(idStr),
                             clave: original.clave,
                             texto_original: original.texto,
                             texto_propuesto: newTexto,
-                            observacion: obs,
+                            observacion: colObsAG ? (row.getCell(colObsAG).value?.toString()?.trim() || '') : '',
                             hoja: 'ATRIBUCIONES GENERALES',
                         });
                     }
@@ -439,53 +438,91 @@ class ExcelRevisionService {
         workbook.eachSheet((sheet) => {
             if (HOJAS_SISTEMA.includes(sheet.name)) return;
 
-            // Detectar columnas por encabezado en fila 3
             let colIdNum = null;
-            let colObsNum = null;
             let colPropNum = null;
             let colCorrClaveNum = null;
+            let colObsNum = null;
 
-            const headerRow = sheet.getRow(3);
-            headerRow.eachCell((cell, colNumber) => {
-                const val = cell.value?.toString()?.trim();
-                if (val === 'ID') colIdNum = colNumber;
-                else if (val === 'OBSERVACIONES DEL REVISOR') colObsNum = colNumber;
-                else if (val === 'NUEVA PROPUESTA (TEXTO)') colPropNum = colNumber;
-                else if (val === 'NUEVA CORRESP. (CLAVE SUPERIOR)') colCorrClaveNum = colNumber;
-            });
+            // Robustez: buscar en las primeras 5 filas por si hay variaciones
+            for (let r = 1; r <= 5; r++) {
+                sheet.getRow(r).eachCell((cell, col) => {
+                    const val = cell.value?.toString()?.toUpperCase()?.trim();
+                    if (val === 'ID') colIdNum = col;
+                    if (val?.includes('NUEVA PROPUESTA')) colPropNum = col;
+                    if (val?.includes('CLAVE SUPERIOR') || val?.includes('NUEVA CORRESP')) colCorrClaveNum = col;
+                    if (val?.includes('OBSERVACIONES')) colObsNum = col;
+                });
+                if (colIdNum && (colPropNum || colCorrClaveNum)) break;
+            }
 
-            if (!colIdNum || !colPropNum) return;
+            if (!colIdNum) return;
 
             sheet.eachRow((row, rowNumber) => {
                 if (rowNumber <= 3) return;
 
                 const idVal = row.getCell(colIdNum).value;
-                if (!idVal) return;
-                const idStr = idVal.toString().trim();
+                if (idVal === undefined || idVal === null) return;
+
+                // Limpieza de ID: soporta "101", 101, 101.0
+                const idStr = Math.floor(Number(idVal.toString().trim())).toString();
                 if (isNaN(parseInt(idStr))) return;
+
+                const dbRow = atriEspMap.get(idStr);
+                if (!dbRow) return;
 
                 const obs = colObsNum ? (row.getCell(colObsNum).value?.toString()?.trim() || '') : '';
 
                 // -- Cambio de TEXTO --
-                const newText = row.getCell(colPropNum).value?.toString()?.trim() || '';
-                const dbRow = atriEspMap.get(idStr);
-                if (dbRow && dbRow.texto.trim() !== newText) {
+                let textoPropuesto = '';
+                if (colPropNum) {
+                    textoPropuesto = row.getCell(colPropNum).value?.toString()?.trim() || '';
+                }
+
+                // SI el campo "NUEVA PROPUESTA" es igual al de la DB, 
+                // pero el usuario editó la columna original de texto (fallback)
+                // Buscamos la columna de texto original (habitualmente es la penúltima antes de Corresponsabilidad)
+                // Para ser 100% seguros, si no hay cambio en 'NUEVA PROPUESTA', 
+                // chequeamos si alguna celda de texto en la fila cambió respecto a dbRow.texto
+                if (dbRow.texto.trim() === textoPropuesto) {
+                    // Verificamos si en la columna "original" (que está antes de la corresponsabilidad)
+                    // hay un valor distinto. La columna de texto de esta unidad suele ser colIdNum - 3
+                    const colTextoOrigIdx = colIdNum - 3;
+                    if (colTextoOrigIdx > 0) {
+                        const valOrig = row.getCell(colTextoOrigIdx).value?.toString()?.trim();
+                        if (valOrig && valOrig !== '-' && valOrig !== dbRow.texto.trim()) {
+                            textoPropuesto = valOrig;
+                        }
+                    }
+                }
+
+                if (dbRow.texto.trim() !== textoPropuesto && textoPropuesto !== '') {
                     cambios.push({
                         tipo: 'atribucion_especifica',
                         id: parseInt(idStr),
                         texto_original: dbRow.texto,
-                        texto_propuesto: newText,
+                        texto_propuesto: textoPropuesto,
                         observacion: obs,
                         hoja: sheet.name,
                     });
                 }
 
-                // -- Cambio de CORRESPONSABILIDAD (clave del padre) --
+                // -- Cambio de CORRESPONSABILIDAD --
                 if (colCorrClaveNum) {
-                    const nuevaClave = row.getCell(colCorrClaveNum).value?.toString()?.trim() || '';
+                    let nuevaClave = row.getCell(colCorrClaveNum).value?.toString()?.trim() || '';
                     const claveActual = dbRow?.padre_clave?.trim() || dbRow?.ag_clave?.trim() || '';
 
-                    if (dbRow && nuevaClave !== claveActual) {
+                    // Fallback: si no detecta cambio en colCorrClaveNum, mirar la columna original de corresponsabilidad
+                    if (nuevaClave === claveActual) {
+                        const colCorrOrigIdx = colIdNum - 1;
+                        if (colCorrOrigIdx > 0) {
+                            const valCorrOrig = row.getCell(colCorrOrigIdx).value?.toString()?.trim();
+                            if (valCorrOrig && valCorrOrig !== '-' && valCorrOrig !== claveActual) {
+                                nuevaClave = valCorrOrig;
+                            }
+                        }
+                    }
+
+                    if (nuevaClave !== claveActual) {
                         cambios.push({
                             tipo: 'corresponsabilidad',
                             id: parseInt(idStr),
@@ -493,9 +530,8 @@ class ExcelRevisionService {
                             clave_propuesta: nuevaClave,
                             observacion: obs,
                             hoja: sheet.name,
-                            // metadatos para mostrar en el fronted
-                            texto_original: `Corresponsabilidad: ${claveActual || '(sin asignación)'}`,
-                            texto_propuesto: `Corresponsabilidad: ${nuevaClave || '(sin asignación)'}`,
+                            texto_original: `Corresponsabilidad: ${claveActual || '(sin)'}`,
+                            texto_propuesto: `Corresponsabilidad: ${nuevaClave || '(sin)'}`,
                         });
                     }
                 }
