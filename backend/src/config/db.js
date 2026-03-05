@@ -5,9 +5,9 @@ const pool = new Pool({
   ssl: process.env.NODE_ENV === 'production' ? { rejectUnauthorized: false } : false,
 });
 
-pool.on('connect', () => {
-  console.log('✅ Conectado a PostgreSQL');
-});
+// pool.on('connect', () => {
+//   console.log('✅ Conectado a PostgreSQL');
+// });
 
 pool.on('error', (err) => {
   console.error('❌ Error en la conexión a PostgreSQL:', err);

@@ -41,34 +41,55 @@ app.use('/uploads', express.static(path.join(__dirname, '../uploads')));
 const pool = require('./config/db');
 const schemaPath = path.join(__dirname, './config/schema.sql');
 
+/**
+ * Inicialización completa de la base de datos (Ejecuta el schema.sql)
+ * Se usa solo cuando DB_INIT=true para recrear/asegurar la estructura.
+ */
 const initDB = async () => {
     try {
         const schema = fs.readFileSync(schemaPath, 'utf8');
         await pool.query(schema);
-        console.log('✅ Esquema de BD inicializado correctamente');
+        console.log('✅ Esquema de BD (schema.sql) aplicado correctamente.');
 
-        // 1. Tablas de Catálogos (Bases para FKs)
+        // Mantener las migraciones de limpieza de dependencias que estaban en el controller
         await pool.query(`
-            CREATE TABLE IF NOT EXISTS cat_responsables (
-                id SERIAL PRIMARY KEY,
-                nombre VARCHAR(255) NOT NULL UNIQUE,
-                activo BOOLEAN DEFAULT true,
-                created_at TIMESTAMPTZ DEFAULT NOW()
-            );
+            DO $$ 
+            BEGIN 
+                DELETE FROM dependencias d
+                WHERE d.id > (
+                    SELECT MIN(id) FROM dependencias d2 
+                    WHERE d2.nombre = d.nombre
+                );
+                IF NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conname = 'dependencias_nombre_key') THEN
+                    ALTER TABLE dependencias ADD CONSTRAINT dependencias_nombre_key UNIQUE (nombre);
+                END IF;
+            END $$;
+        `);
+        console.log('🔹 Restricción UNIQUE en dependencias verificada.');
+    } catch (err) {
+        console.error('❌ Error al inicializar BD:', err.message);
+    }
+};
 
-            CREATE TABLE IF NOT EXISTS cat_enlaces (
-                id SERIAL PRIMARY KEY,
-                nombre VARCHAR(255) NOT NULL,
-                email VARCHAR(255) NOT NULL UNIQUE,
-                activo BOOLEAN DEFAULT true,
-                created_at TIMESTAMPTZ DEFAULT NOW()
-            );
+/**
+ * Migraciones esenciales que SIEMPRE deben ejecutarse para asegurar la integridad de la BD
+ */
+const runEssentialMigrations = async () => {
+    try {
+        console.log('🚀 Ejecutando comprobación de esquema y migraciones esenciales...');
 
-            CREATE TABLE IF NOT EXISTS cat_avances (
+        await pool.query(`
+            -- 1. Extensiones y Tipos
+            CREATE EXTENSION IF NOT EXISTS "pgcrypto";
+
+            -- 2. Tablas Base y Catálogos
+            CREATE TABLE IF NOT EXISTS cat_estados_proyecto (
                 id SERIAL PRIMARY KEY,
-                nombre VARCHAR(255) NOT NULL UNIQUE,
+                nombre VARCHAR(100) NOT NULL UNIQUE,
+                color VARCHAR(20) DEFAULT '#475569',
                 activo BOOLEAN DEFAULT true,
-                created_at TIMESTAMPTZ DEFAULT NOW()
+                created_at TIMESTAMPTZ DEFAULT NOW(),
+                updated_at TIMESTAMPTZ DEFAULT NOW()
             );
 
             CREATE TABLE IF NOT EXISTS actividades (
@@ -81,187 +102,10 @@ const initDB = async () => {
                 autor VARCHAR(200),
                 created_at TIMESTAMPTZ DEFAULT NOW()
             );
-        `);
-        console.log('🔹 Tablas de catálogos listas');
 
-        // 3. Tablas de Estados de Proyecto
-        await pool.query(`
-            CREATE TABLE IF NOT EXISTS cat_estados_proyecto (
-                id SERIAL PRIMARY KEY,
-                nombre VARCHAR(100) NOT NULL UNIQUE,
-                color VARCHAR(20) DEFAULT '#475569',
-                activo BOOLEAN DEFAULT true,
-                created_at TIMESTAMPTZ DEFAULT NOW(),
-                updated_at TIMESTAMPTZ DEFAULT NOW()
-            );
-        `);
-
-        // Insertar estados base si no hay ninguno
-        const estadosCheck = await pool.query('SELECT count(*) FROM cat_estados_proyecto');
-        if (parseInt(estadosCheck.rows[0].count) === 0) {
-            await pool.query(`
-                INSERT INTO cat_estados_proyecto (nombre, color) VALUES 
-                ('Borrador', '#64748b'),
-                ('Activo', '#22c55e'),
-                ('En Pausa', '#f59e0b'),
-                ('Cerrado por inactividad', '#ef4444'),
-                ('Dictaminado', '#3b82f6')
-            `);
-        }
-
-        // 4. Migraciones manuales (idempotentes)
-        await pool.query(`
-            ALTER TABLE proyectos ADD COLUMN IF NOT EXISTS responsable_apoyo TEXT;
-            ALTER TABLE proyectos ALTER COLUMN responsable_apoyo TYPE TEXT;
-        `);
-
-        // 5. Migración de Roles de Usuario
-        await pool.query(`
-            DO $$ 
-            BEGIN 
-                -- Convertir la columna de ENUM a VARCHAR si es necesario para permitir nuevos valores
-                IF EXISTS (
-                    SELECT 1 FROM information_schema.columns 
-                    WHERE table_name='usuarios' AND column_name='rol' AND data_type='USER-DEFINED'
-                ) THEN
-                    ALTER TABLE usuarios ALTER COLUMN rol TYPE VARCHAR(50) USING rol::VARCHAR;
-                END IF;
-
-                IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='usuarios' AND column_name='rol') THEN
-                    ALTER TABLE usuarios ADD COLUMN rol VARCHAR(50) DEFAULT 'revisor';
-                END IF;
-            END $$;
-        `);
-
-        // 5. Migración de Proyectos para usar catálogo de estados
-        await pool.query(`
-            ALTER TABLE proyectos ADD COLUMN IF NOT EXISTS estado_id INTEGER REFERENCES cat_estados_proyecto(id);
-        `);
-
-        // Migrar estados actuales (texto) a IDs si aplica
-        await pool.query(`
-            UPDATE proyectos p
-            SET estado_id = (SELECT id FROM cat_estados_proyecto WHERE nombre ILIKE p.estado::text LIMIT 1)
-            WHERE estado_id IS NULL AND estado IS NOT NULL;
-        `);
-
-        // Migración: agregar updated_at a cat_estados_proyecto si no existe
-        await pool.query(`
-            ALTER TABLE cat_estados_proyecto ADD COLUMN IF NOT EXISTS updated_at TIMESTAMPTZ DEFAULT NOW();
-        `);
-
-        console.log('🔹 Catálogo de estados y migración de proyectos lista');
-
-        // Migración para documentos de Word en Revisiones
-        await pool.query(`
-            ALTER TABLE revisiones ADD COLUMN IF NOT EXISTS producto_word VARCHAR(255);
-        `);
-        console.log('🔹 Migración de soporte para Word completada');
-
-        // Migración para snapshots de observaciones
-        await pool.query(`
-            ALTER TABLE observaciones 
-            ADD COLUMN IF NOT EXISTS valor_original TEXT,
-            ADD COLUMN IF NOT EXISTS valor_subsanado TEXT;
-        `);
-        console.log('🔹 Migración de snapshots de observaciones completada');
-
-        // Asegurar UNIQUE en dependencias para permitir ON CONFLICT
-        await pool.query(`
-            DO $$ 
-            BEGIN 
-                -- 1. Eliminar duplicados si los hay (deja el ID más bajo)
-                DELETE FROM dependencias d
-                WHERE d.id > (
-                    SELECT MIN(id) FROM dependencias d2 
-                    WHERE d2.nombre = d.nombre
-                );
-
-                -- 2. Añadir la restricción si no existe
-                IF NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conname = 'dependencias_nombre_key') THEN
-                    ALTER TABLE dependencias ADD CONSTRAINT dependencias_nombre_key UNIQUE (nombre);
-                END IF;
-            END $$;
-        `);
-        // Añadir columna de corresponsabilidad y responsables
-        await pool.query(`
-            ALTER TABLE atribuciones_especificas ADD COLUMN IF NOT EXISTS corresponsabilidad TEXT;
-            ALTER TABLE atribuciones_especificas ADD COLUMN IF NOT EXISTS responsable_id INTEGER REFERENCES usuarios(id);
-            ALTER TABLE atribuciones_especificas ADD COLUMN IF NOT EXISTS apoyo_ids INTEGER[];
-        `);
-        console.log('🔹 Columnas de corresponsabilidad y responsables verificadas');
-
-        // Restricciones de unicidad para prevención de duplicados
-        await pool.query(`
-            DO $$ 
-            BEGIN 
-                -- Unicidad para Glosario (acronimo por proyecto)
-                IF NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conname = 'glosario_proyecto_acronimo_key') THEN
-                    ALTER TABLE glosario ADD CONSTRAINT glosario_proyecto_acronimo_key UNIQUE (proyecto_id, acronimo);
-                END IF;
-                
-                -- Unicidad para Atribuciones Generales (clave por proyecto)
-                IF NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conname = 'atribuciones_generales_proyecto_clave_key') THEN
-                    ALTER TABLE atribuciones_generales ADD CONSTRAINT atribuciones_generales_proyecto_clave_key UNIQUE (proyecto_id, clave);
-                END IF;
-            END $$;
-        `);
-        console.log('🔹 Restricciones de unicidad verificadas (Glosario y Ley Base)');
-
-        console.log('🔹 Restricción UNIQUE en dependencias verificada (y limpieza de duplicados realizada)');
-    } catch (err) {
-        console.error('❌ Error al inicializar BD:', err.message);
-    }
-};
-
-// La inicialización automática estaba causando reinicios lentos
-// Solo se ejecutará si se define la variable de entorno DB_INIT=true
-if (process.env.DB_INIT === 'true') {
-    console.log('🛠️ Iniciando limpieza y recreación de BD...');
-    initDB();
-} else {
-    console.log('✅ Saltando inicialización automática de BD (Ambiente estable)');
-}
-
-// Migraciones ligeras que SIEMPRE corren al iniciar (seguras con IF NOT EXISTS / IF NOT EXISTS)
-const runSafeMigrations = async () => {
-    try {
-        // Asegurar que la tabla de estados existe
-        await pool.query(`
-            CREATE TABLE IF NOT EXISTS cat_estados_proyecto (
-                id SERIAL PRIMARY KEY,
-                nombre VARCHAR(100) NOT NULL UNIQUE,
-                color VARCHAR(20) DEFAULT '#475569',
-                activo BOOLEAN DEFAULT true,
-                created_at TIMESTAMPTZ DEFAULT NOW(),
-                updated_at TIMESTAMPTZ DEFAULT NOW()
-            );
-            
-            -- Asegurar columna estado_id en proyectos
-            ALTER TABLE proyectos ADD COLUMN IF NOT EXISTS estado_id INTEGER REFERENCES cat_estados_proyecto(id);
-            ALTER TABLE proyectos ADD COLUMN IF NOT EXISTS responsable_apoyo TEXT;
-
-            -- Asegurar columnas en atribuciones_especificas
-            ALTER TABLE atribuciones_especificas ADD COLUMN IF NOT EXISTS corresponsabilidad TEXT;
-            ALTER TABLE atribuciones_especificas ADD COLUMN IF NOT EXISTS responsable_id INTEGER;
-            ALTER TABLE atribuciones_especificas ADD COLUMN IF NOT EXISTS apoyo_ids INTEGER[];
-
-            -- Asegurar tabla de actividades
-            CREATE TABLE IF NOT EXISTS actividades (
-                id SERIAL PRIMARY KEY,
-                tipo VARCHAR(50) NOT NULL,
-                entidad VARCHAR(50),
-                entidad_id INTEGER,
-                proyecto_id INTEGER REFERENCES proyectos(id) ON DELETE CASCADE,
-                mensaje TEXT NOT NULL,
-                autor VARCHAR(200),
-                created_at TIMESTAMPTZ DEFAULT NOW()
-            );
-
-            -- Asegurar tabla de historial excel
             CREATE TABLE IF NOT EXISTS historial_revisiones_excel (
                 id SERIAL PRIMARY KEY,
-                proyecto_id INTEGER NOT NULL REFERENCES proyectos(id) ON DELETE CASCADE,
+                proyecto_id INTEGER NOT NULL,
                 nombre_archivo VARCHAR(255),
                 total_cambios INTEGER DEFAULT 0,
                 cambios_aplicados INTEGER DEFAULT 0,
@@ -271,11 +115,38 @@ const runSafeMigrations = async () => {
                 created_at TIMESTAMPTZ DEFAULT NOW()
             );
 
-            -- Migración archivo_url si la tabla ya existía
-            ALTER TABLE historial_revisiones_excel ADD COLUMN IF NOT EXISTS archivo_url TEXT;
+            -- 3. Migraciones de Columnas Existentes
+            ALTER TABLE proyectos ADD COLUMN IF NOT EXISTS estado_id INTEGER REFERENCES cat_estados_proyecto(id);
+            ALTER TABLE proyectos ADD COLUMN IF NOT EXISTS responsable_apoyo TEXT;
+            
+            ALTER TABLE usuarios ADD COLUMN IF NOT EXISTS rol VARCHAR(50) DEFAULT 'revisor';
+            
+            ALTER TABLE revisiones ADD COLUMN IF NOT EXISTS producto_word VARCHAR(255);
+            
+            ALTER TABLE observaciones 
+            ADD COLUMN IF NOT EXISTS valor_original TEXT,
+            ADD COLUMN IF NOT EXISTS valor_subsanado TEXT;
+
+            ALTER TABLE atribuciones_especificas 
+            ADD COLUMN IF NOT EXISTS corresponsabilidad TEXT,
+            ADD COLUMN IF NOT EXISTS responsable_id INTEGER,
+            ADD COLUMN IF NOT EXISTS apoyo_ids INTEGER[];
+
+            -- 4. Restricciones de Unicidad
+            DO $$ BEGIN
+                IF NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conname = 'glosario_proyecto_acronimo_key') THEN
+                    ALTER TABLE glosario ADD CONSTRAINT glosario_proyecto_acronimo_key UNIQUE (proyecto_id, acronimo);
+                END IF;
+                IF NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conname = 'atribuciones_generales_proyecto_clave_key') THEN
+                    ALTER TABLE atribuciones_generales ADD CONSTRAINT atribuciones_generales_proyecto_clave_key UNIQUE (proyecto_id, clave);
+                END IF;
+                IF NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conname = 'dependencias_nombre_key') THEN
+                    ALTER TABLE dependencias ADD CONSTRAINT dependencias_nombre_key UNIQUE (nombre);
+                END IF;
+            END $$;
         `);
 
-        // Insertar estados por defecto
+        // Insertar estados por defecto si la tabla está vacía
         const cnt = await pool.query('SELECT count(*) FROM cat_estados_proyecto');
         if (parseInt(cnt.rows[0].count) === 0) {
             await pool.query(`
@@ -289,13 +160,11 @@ const runSafeMigrations = async () => {
             `);
         }
 
-        console.log('✅ Migraciones automáticas esenciales aplicadas');
+        console.log('✅ Esquema y migraciones verificadas.');
     } catch (err) {
-        console.error('⚠️ Error en migraciones automáticas:', err.message);
+        console.error('⚠️ Error en verificación de BD:', err.message);
     }
 };
-
-runSafeMigrations();
 
 // ============================================
 // RUTAS API
@@ -346,9 +215,31 @@ app.use((err, req, res, next) => {
 // INICIAR SERVIDOR
 // ============================================
 const PORT = process.env.PORT || 3001;
-app.listen(PORT, () => {
-    console.log(`🚀 Servidor corriendo en puerto ${PORT}`);
-    console.log(`   Ambiente: ${process.env.NODE_ENV || 'development'}`);
-});
+
+const startServer = async () => {
+    try {
+        // En Render, es mejor abrir el puerto RÁPIDO para evitar el Port scan timeout
+        app.listen(PORT, () => {
+            console.log(`🚀 Servidor corriendo en puerto ${PORT}`);
+            console.log(`   Ambiente: ${process.env.NODE_ENV || 'production'}`);
+        });
+
+        // Una vez abierto el puerto, hacemos el bootstrap de la BD en segundo plano
+        // pero de forma más controlada.
+        if (process.env.DB_INIT === 'true') {
+            console.log('🛠️ DB_INIT activa: Ejecutando inicialización completa...');
+            await initDB();
+        } else {
+            // Siempre ejecutamos las migraciones esenciales pero de forma atómica
+            await runEssentialMigrations();
+        }
+
+    } catch (err) {
+        console.error('❌ Error fatal al iniciar servidor:', err);
+        process.exit(1);
+    }
+};
+
+startServer();
 
 module.exports = app;
