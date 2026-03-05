@@ -464,7 +464,7 @@ class ExcelRevisionService {
                 if (idVal === undefined || idVal === null) return;
 
                 // Limpieza de ID: soporta "101", 101, 101.0
-                const idStr = Math.floor(Number(idVal.toString().trim())).toString();
+                const idStr = Math.floor(Number(idVal.toString().trim())).split('.')[0];
                 if (isNaN(parseInt(idStr))) return;
 
                 const dbRow = atriEspMap.get(idStr);

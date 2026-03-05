@@ -87,34 +87,40 @@ exports.aplicarCambios = async (req, res) => {
             let mensajeActividad = '';
 
             if (tipo === 'atribucion_especifica') {
-                await client.query(
+                const updateRes = await client.query(
                     `UPDATE atribuciones_especificas
                      SET texto = $1, updated_at = NOW()
                      WHERE id = $2 AND proyecto_id = $3`,
                     [cambio.texto_propuesto, cambio.id, proyectoId]
                 );
-                mensajeActividad = `Actualizó texto de atribución ID ${cambio.id} vía Excel`;
-                aplicados++;
+                if (updateRes.rowCount > 0) {
+                    mensajeActividad = `Actualizó texto de atribución ID ${cambio.id} vía Excel`;
+                    aplicados++;
+                }
 
             } else if (tipo === 'glosario') {
-                await client.query(
+                const updateRes = await client.query(
                     `UPDATE glosario
                      SET significado = $1
                      WHERE id = $2 AND proyecto_id = $3`,
                     [cambio.texto_propuesto, cambio.id, proyectoId]
                 );
-                mensajeActividad = `Actualizó glosario ID ${cambio.id} vía Excel`;
-                aplicados++;
+                if (updateRes.rowCount > 0) {
+                    mensajeActividad = `Actualizó glosario ID ${cambio.id} (${cambio.acronimo || ''}) vía Excel`;
+                    aplicados++;
+                }
 
             } else if (tipo === 'atribucion_general') {
-                await client.query(
+                const updateRes = await client.query(
                     `UPDATE atribuciones_generales
                      SET texto = $1
                      WHERE id = $2 AND proyecto_id = $3`,
                     [cambio.texto_propuesto, cambio.id, proyectoId]
                 );
-                mensajeActividad = `Actualizó atribución de Ley ID ${cambio.id} vía Excel`;
-                aplicados++;
+                if (updateRes.rowCount > 0) {
+                    mensajeActividad = `Actualizó atribución de Ley ID ${cambio.id} (${cambio.clave || ''}) vía Excel`;
+                    aplicados++;
+                }
 
             } else if (tipo === 'corresponsabilidad') {
                 const nuevaClave = cambio.clave_propuesta?.trim() || '';
@@ -122,6 +128,7 @@ exports.aplicarCambios = async (req, res) => {
                 let nuevaAtribucionGeneralId = null;
 
                 if (nuevaClave !== '') {
+                    // Buscar en atribuciones específicas
                     const padreRes = await client.query(
                         `SELECT id, atribucion_general_id, padre_atribucion_id
                          FROM atribuciones_especificas
@@ -136,24 +143,11 @@ exports.aplicarCambios = async (req, res) => {
                         if (padreRow.atribucion_general_id) {
                             nuevaAtribucionGeneralId = padreRow.atribucion_general_id;
                         } else {
-                            // Función auxiliar para resolver la raíz (si existe en el mismo archivo/scope)
-                            let currentId = padreRow.padre_atribucion_id;
-                            let safety = 0;
-                            while (currentId && safety < 50) {
-                                const res = await client.query(
-                                    'SELECT id, padre_atribucion_id, atribucion_general_id FROM atribuciones_especificas WHERE id = $1',
-                                    [currentId]
-                                );
-                                if (res.rows.length === 0) break;
-                                if (res.rows[0].atribucion_general_id) {
-                                    nuevaAtribucionGeneralId = res.rows[0].atribucion_general_id;
-                                    break;
-                                }
-                                currentId = res.rows[0].padre_atribucion_id;
-                                safety++;
-                            }
+                            // Resolver raíz si no tiene atribucion_general_id directa
+                            nuevaAtribucionGeneralId = await resolverAtribucionGeneralDesdeRaiz(nuevoPadreId);
                         }
                     } else {
+                        // Buscar en atribuciones generales (Ley)
                         const agRes = await client.query(
                             `SELECT id FROM atribuciones_generales
                              WHERE proyecto_id = $1 AND clave = $2 AND activo = true
@@ -163,12 +157,13 @@ exports.aplicarCambios = async (req, res) => {
                         if (agRes.rows.length > 0) {
                             nuevaAtribucionGeneralId = agRes.rows[0].id;
                         } else {
-                            continue;
+                            console.warn(`[Excel] No se encontró clave ${nuevaClave} para corresponsabilidad`);
+                            continue; // O podríamos manejarlo como error
                         }
                     }
                 }
 
-                await client.query(
+                const updateRes = await client.query(
                     `UPDATE atribuciones_especificas
                      SET padre_atribucion_id = $1,
                          atribucion_general_id = $2,
@@ -177,8 +172,11 @@ exports.aplicarCambios = async (req, res) => {
                      WHERE id = $4 AND proyecto_id = $5`,
                     [nuevoPadreId, nuevaAtribucionGeneralId, nuevaClave || null, cambio.id, proyectoId]
                 );
-                mensajeActividad = `Cambió corresponsabilidad de atribución ID ${cambio.id} a "${nuevaClave}"`;
-                aplicados++;
+
+                if (updateRes.rowCount > 0) {
+                    mensajeActividad = `Cambió corresponsabilidad de atribución ID ${cambio.id} a "${nuevaClave || 'NINGUNA'}"`;
+                    aplicados++;
+                }
             }
 
             // Registrar en tabla de actividades (Movimientos del proyecto)

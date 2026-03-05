@@ -298,19 +298,31 @@ export default function Revisiones() {
         if (!window.confirm(`¿Aplicar ${seleccionados.length} de ${cambiosDetectados.length} cambios?`)) return;
         setCargando(true);
         try {
-            await api.post(`/proyectos/${proyectoId}/revision-excel/aplicar`, {
-                cambios: seleccionados.map(({ tipo, id, texto_propuesto, observacion, clave_propuesta, clave_actual }) => ({
-                    tipo: tipo || 'atribucion_especifica', id, texto_propuesto, observacion, clave_propuesta, clave_actual,
+            const res = await api.post(`/proyectos/${proyectoId}/revision-excel/aplicar`, {
+                cambios: seleccionados.map(({ tipo, id, texto_propuesto, observacion, clave_propuesta, clave_actual, acronimo, clave }) => ({
+                    tipo: tipo || 'atribucion_especifica', id, texto_propuesto, observacion, clave_propuesta, clave_actual, acronimo, clave
                 })),
                 nombreArchivo: archivoSubido,
                 usuarioNombre: usuario?.nombre || 'Sistema',
             });
-            alert(`✅ ${seleccionados.length} cambio(s) aplicados con éxito.`);
+
+            const realAplicados = res.data.aplicados || 0;
+            if (realAplicados === seleccionados.length) {
+                alert(`✅ Los ${realAplicados} cambios se aplicaron con éxito.`);
+            } else {
+                alert(`⚠️ Se aplicaron ${realAplicados} de ${seleccionados.length} cambios. Revisa el historial para más detalles.`);
+            }
+
             setCambiosDetectados([]);
             setArchivoSubido(null);
-            // Recargar historial actualizando el estado de proyectoId para que HistorialVersiones se re-renderice
+            // Recargar historial
             setProyectoId(prev => prev + '');
-        } catch { alert('Error al aplicar los cambios.'); }
+            // Opcional: Recargar lista de proyectos para ver el cambio de estado 'en_revision'
+            api.get('/proyectos').then(r => setProyectos(r.data));
+        } catch (err) {
+            console.error(err);
+            alert(err.response?.data?.error || 'Error al aplicar los cambios en el servidor.');
+        }
         setCargando(false);
     };
 
