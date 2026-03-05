@@ -128,5 +128,8 @@ router.put('/:proyectoId/revision-excel/historial/:id', excelRevCtrl.actualizarH
 router.post('/:proyectoId/revision-excel/importar', uploadExcel.single('archivo'), excelRevCtrl.importarExcel);
 router.post('/:proyectoId/revision-excel/aplicar', excelRevCtrl.aplicarCambios);
 
+// === EXPORTAR WORD ===
+router.get('/:id/exportar-word', ctrl.exportarWord);
+
 module.exports = router;
 

@@ -1,5 +1,5 @@
-const pool = require('../config/db');
 const path = require('path');
+const wordService = require('../services/word.service');
 
 // GET /api/proyectos
 const listar = async (req, res) => {
@@ -302,4 +302,19 @@ const subirOrganigrama = async (req, res) => {
     }
 };
 
-module.exports = { listar, obtener, crear, actualizar, eliminar, subirOrganigrama };
+const exportarWord = async (req, res) => {
+    try {
+        const buffer = await wordService.exportarWord(req.params.id);
+        const proyResult = await pool.query('SELECT nombre FROM proyectos WHERE id = $1', [req.params.id]);
+        const nombre = proyResult.rows[0]?.nombre || 'proyecto';
+
+        res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.wordprocessingml.document');
+        res.setHeader('Content-Disposition', `attachment; filename="Proyecto-${nombre.replace(/\s/g, '-')}.docx"`);
+        res.send(buffer);
+    } catch (err) {
+        console.error(err);
+        res.status(500).json({ error: 'Error al generar el Word' });
+    }
+};
+
+module.exports = { listar, obtener, crear, actualizar, eliminar, subirOrganigrama, exportarWord };

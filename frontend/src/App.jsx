@@ -11,6 +11,7 @@ import Admin from './pages/Admin';
 import Perfil from './pages/Perfil';
 import Catalogos from './pages/Catalogos';
 import CargaGlobal from './pages/CargaGlobal';
+import WordProject from './pages/WordProject';
 
 const RutaProtegida = ({ children, roles }) => {
     const { usuario, cargando } = useAuth();
@@ -47,6 +48,11 @@ const AppRoutes = () => {
                 <Route path="revisiones" element={
                     <RutaProtegida roles={['admin', 'revisor', 'visualizador']}>
                         <Revisiones />
+                    </RutaProtegida>
+                } />
+                <Route path="proyecto-word" element={
+                    <RutaProtegida roles={['admin', 'revisor', 'visualizador']}>
+                        <WordProject />
                     </RutaProtegida>
                 } />
                 <Route path="admin" element={
