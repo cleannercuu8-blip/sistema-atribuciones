@@ -224,8 +224,9 @@ if (process.env.DB_INIT === 'true') {
 
 // Migraciones ligeras que SIEMPRE corren al iniciar (seguras con IF NOT EXISTS / IF NOT EXISTS)
 const runSafeMigrations = async () => {
-    // Asegurar que la tabla de estados existe
-    await pool.query(`
+    try {
+        // Asegurar que la tabla de estados existe
+        await pool.query(`
             CREATE TABLE IF NOT EXISTS cat_estados_proyecto (
                 id SERIAL PRIMARY KEY,
                 nombre VARCHAR(100) NOT NULL UNIQUE,
@@ -269,10 +270,10 @@ const runSafeMigrations = async () => {
             );
         `);
 
-    // Insertar estados por defecto
-    const cnt = await pool.query('SELECT count(*) FROM cat_estados_proyecto');
-    if (parseInt(cnt.rows[0].count) === 0) {
-        await pool.query(`
+        // Insertar estados por defecto
+        const cnt = await pool.query('SELECT count(*) FROM cat_estados_proyecto');
+        if (parseInt(cnt.rows[0].count) === 0) {
+            await pool.query(`
                 INSERT INTO cat_estados_proyecto (nombre, color) VALUES
                 ('Activo', '#22c55e'),
                 ('En Pausa', '#f59e0b'),
@@ -281,12 +282,12 @@ const runSafeMigrations = async () => {
                 ('Borrador', '#64748b')
                 ON CONFLICT (nombre) DO NOTHING;
             `);
-    }
+        }
 
-    console.log('✅ Migraciones automáticas esenciales aplicadas');
-} catch (err) {
-    console.error('⚠️ Error en migraciones automáticas:', err.message);
-}
+        console.log('✅ Migraciones automáticas esenciales aplicadas');
+    } catch (err) {
+        console.error('⚠️ Error en migraciones automáticas:', err.message);
+    }
 };
 
 runSafeMigrations();
