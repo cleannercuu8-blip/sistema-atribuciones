@@ -135,6 +135,9 @@ CREATE TABLE IF NOT EXISTS atribuciones_especificas (
   padre_atribucion_id INTEGER REFERENCES atribuciones_especificas(id),
   -- Relación con la atribución general de ley (si aplica)
   atribucion_general_id INTEGER REFERENCES atribuciones_generales(id),
+  corresponsabilidad TEXT,
+  responsable_id INTEGER REFERENCES usuarios(id),
+  apoyo_ids INTEGER[],
   activo BOOLEAN DEFAULT true,
   created_at TIMESTAMPTZ DEFAULT NOW(),
   updated_at TIMESTAMPTZ DEFAULT NOW()
@@ -148,7 +151,8 @@ CREATE TABLE IF NOT EXISTS glosario (
   proyecto_id INTEGER NOT NULL REFERENCES proyectos(id) ON DELETE CASCADE,
   acronimo VARCHAR(50) NOT NULL,
   significado TEXT NOT NULL,
-  created_at TIMESTAMPTZ DEFAULT NOW()
+  created_at TIMESTAMPTZ DEFAULT NOW(),
+  UNIQUE(proyecto_id, acronimo)
 );
 
 -- =============================================
@@ -195,16 +199,35 @@ CREATE TABLE IF NOT EXISTS configuracion_email (
 );
 
 -- =============================================
--- ÍNDICES
+-- ACTIVIDADES Y LOGS
 -- =============================================
-CREATE INDEX IF NOT EXISTS idx_proyectos_dependencia ON proyectos(dependencia_id);
-CREATE INDEX IF NOT EXISTS idx_unidades_proyecto ON unidades_administrativas(proyecto_id);
-CREATE INDEX IF NOT EXISTS idx_unidades_padre ON unidades_administrativas(padre_id);
-CREATE INDEX IF NOT EXISTS idx_atr_esp_proyecto ON atribuciones_especificas(proyecto_id);
-CREATE INDEX IF NOT EXISTS idx_atr_esp_unidad ON atribuciones_especificas(unidad_id);
-CREATE INDEX IF NOT EXISTS idx_atr_esp_padre ON atribuciones_especificas(padre_atribucion_id);
-CREATE INDEX IF NOT EXISTS idx_revisiones_proyecto ON revisiones(proyecto_id);
-CREATE INDEX IF NOT EXISTS idx_observaciones_revision ON observaciones(revision_id);
+CREATE TABLE IF NOT EXISTS actividades (
+  id SERIAL PRIMARY KEY,
+  tipo VARCHAR(50) NOT NULL,
+  entidad VARCHAR(50),
+  entidad_id INTEGER,
+  proyecto_id INTEGER REFERENCES proyectos(id) ON DELETE CASCADE,
+  mensaje TEXT NOT NULL,
+  autor VARCHAR(200),
+  created_at TIMESTAMPTZ DEFAULT NOW()
+);
+
+CREATE TABLE IF NOT EXISTS historial_revisiones_excel (
+  id SERIAL PRIMARY KEY,
+  proyecto_id INTEGER NOT NULL REFERENCES proyectos(id) ON DELETE CASCADE,
+  nombre_archivo VARCHAR(255),
+  total_cambios INTEGER DEFAULT 0,
+  cambios_aplicados INTEGER DEFAULT 0,
+  usuario_nombre VARCHAR(200),
+  resumen_cambios JSONB,
+  created_at TIMESTAMPTZ DEFAULT NOW()
+);
+
+-- =============================================
+-- ÍNDICES ADICIONALES
+-- =============================================
+CREATE INDEX IF NOT EXISTS idx_historial_rev_excel_proyecto ON historial_revisiones_excel(proyecto_id);
+CREATE INDEX IF NOT EXISTS idx_actividades_proyecto ON actividades(proyecto_id);
 
 INSERT INTO usuarios (nombre, email, password_hash, rol)
 VALUES (

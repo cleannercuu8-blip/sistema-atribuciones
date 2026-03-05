@@ -224,9 +224,8 @@ if (process.env.DB_INIT === 'true') {
 
 // Migraciones ligeras que SIEMPRE corren al iniciar (seguras con IF NOT EXISTS / IF NOT EXISTS)
 const runSafeMigrations = async () => {
-    try {
-        // Asegurar que la tabla de estados existe
-        await pool.query(`
+    // Asegurar que la tabla de estados existe
+    await pool.query(`
             CREATE TABLE IF NOT EXISTS cat_estados_proyecto (
                 id SERIAL PRIMARY KEY,
                 nombre VARCHAR(100) NOT NULL UNIQUE,
@@ -235,17 +234,45 @@ const runSafeMigrations = async () => {
                 created_at TIMESTAMPTZ DEFAULT NOW(),
                 updated_at TIMESTAMPTZ DEFAULT NOW()
             );
+            
+            -- Asegurar columna estado_id en proyectos
+            ALTER TABLE proyectos ADD COLUMN IF NOT EXISTS estado_id INTEGER REFERENCES cat_estados_proyecto(id);
+            ALTER TABLE proyectos ADD COLUMN IF NOT EXISTS responsable_apoyo TEXT;
+
+            -- Asegurar columnas en atribuciones_especificas
+            ALTER TABLE atribuciones_especificas ADD COLUMN IF NOT EXISTS corresponsabilidad TEXT;
+            ALTER TABLE atribuciones_especificas ADD COLUMN IF NOT EXISTS responsable_id INTEGER;
+            ALTER TABLE atribuciones_especificas ADD COLUMN IF NOT EXISTS apoyo_ids INTEGER[];
+
+            -- Asegurar tabla de actividades
+            CREATE TABLE IF NOT EXISTS actividades (
+                id SERIAL PRIMARY KEY,
+                tipo VARCHAR(50) NOT NULL,
+                entidad VARCHAR(50),
+                entidad_id INTEGER,
+                proyecto_id INTEGER REFERENCES proyectos(id) ON DELETE CASCADE,
+                mensaje TEXT NOT NULL,
+                autor VARCHAR(200),
+                created_at TIMESTAMPTZ DEFAULT NOW()
+            );
+
+            -- Asegurar tabla de historial excel
+            CREATE TABLE IF NOT EXISTS historial_revisiones_excel (
+                id SERIAL PRIMARY KEY,
+                proyecto_id INTEGER NOT NULL REFERENCES proyectos(id) ON DELETE CASCADE,
+                nombre_archivo VARCHAR(255),
+                total_cambios INTEGER DEFAULT 0,
+                cambios_aplicados INTEGER DEFAULT 0,
+                usuario_nombre VARCHAR(200),
+                resumen_cambios JSONB,
+                created_at TIMESTAMPTZ DEFAULT NOW()
+            );
         `);
 
-        // Agregar columna updated_at si no existe (para BD creadas antes)
+    // Insertar estados por defecto
+    const cnt = await pool.query('SELECT count(*) FROM cat_estados_proyecto');
+    if (parseInt(cnt.rows[0].count) === 0) {
         await pool.query(`
-            ALTER TABLE cat_estados_proyecto ADD COLUMN IF NOT EXISTS updated_at TIMESTAMPTZ DEFAULT NOW();
-        `);
-
-        // Insertar estados por defecto si la tabla está vacía
-        const cnt = await pool.query('SELECT count(*) FROM cat_estados_proyecto');
-        if (parseInt(cnt.rows[0].count) === 0) {
-            await pool.query(`
                 INSERT INTO cat_estados_proyecto (nombre, color) VALUES
                 ('Activo', '#22c55e'),
                 ('En Pausa', '#f59e0b'),
@@ -254,17 +281,12 @@ const runSafeMigrations = async () => {
                 ('Borrador', '#64748b')
                 ON CONFLICT (nombre) DO NOTHING;
             `);
-        }
-
-        // Asegurar columna estado_id en proyectos
-        await pool.query(`
-            ALTER TABLE proyectos ADD COLUMN IF NOT EXISTS estado_id INTEGER REFERENCES cat_estados_proyecto(id);
-        `);
-
-        console.log('✅ Migraciones ligeras aplicadas correctamente');
-    } catch (err) {
-        console.error('⚠️ Error en migraciones ligeras:', err.message);
     }
+
+    console.log('✅ Migraciones automáticas esenciales aplicadas');
+} catch (err) {
+    console.error('⚠️ Error en migraciones automáticas:', err.message);
+}
 };
 
 runSafeMigrations();
