@@ -25,7 +25,8 @@ app.use((req, res, next) => {
 // Crear directorio de uploads si no existe
 const uploadsDir = path.join(__dirname, '../uploads/organigramas');
 const productosDir = path.join(__dirname, '../uploads/productos');
-[uploadsDir, productosDir].forEach(dir => {
+const revisionesDir = path.join(__dirname, '../uploads/revisiones');
+[uploadsDir, productosDir, revisionesDir].forEach(dir => {
     if (!fs.existsSync(dir)) {
         fs.mkdirSync(dir, { recursive: true });
     }
@@ -266,8 +267,12 @@ const runSafeMigrations = async () => {
                 cambios_aplicados INTEGER DEFAULT 0,
                 usuario_nombre VARCHAR(200),
                 resumen_cambios JSONB,
+                archivo_url TEXT,
                 created_at TIMESTAMPTZ DEFAULT NOW()
             );
+
+            -- Migración archivo_url si la tabla ya existía
+            ALTER TABLE historial_revisiones_excel ADD COLUMN IF NOT EXISTS archivo_url TEXT;
         `);
 
         // Insertar estados por defecto

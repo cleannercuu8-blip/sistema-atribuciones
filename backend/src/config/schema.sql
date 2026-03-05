@@ -220,6 +220,7 @@ CREATE TABLE IF NOT EXISTS historial_revisiones_excel (
   cambios_aplicados INTEGER DEFAULT 0,
   usuario_nombre VARCHAR(200),
   resumen_cambios JSONB,
+  archivo_url TEXT,
   created_at TIMESTAMPTZ DEFAULT NOW()
 );
 

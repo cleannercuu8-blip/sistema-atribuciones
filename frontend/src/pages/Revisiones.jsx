@@ -144,7 +144,19 @@ function HistorialVersiones({ proyectoId }) {
                                         <span style={{ background: '#dcfce7', color: '#166534', borderRadius: 12, padding: '2px 10px', fontWeight: 700, fontSize: 12 }}>{h.cambios_aplicados}</span>
                                     </td>
                                     <td style={{ fontSize: 12, color: '#475569' }}>{h.usuario_nombre || '-'}</td>
-                                    <td>
+                                    <td style={{ whiteSpace: 'nowrap' }}>
+                                        {h.archivo_url && (
+                                            <a
+                                                href={`${api.defaults.baseURL.replace('/api', '')}/uploads/revisiones/${h.archivo_url}`}
+                                                target="_blank"
+                                                rel="noopener noreferrer"
+                                                className="btn btn-outline btn-sm"
+                                                style={{ fontSize: 11, marginRight: 6, color: '#1d4ed8', borderColor: '#bfdbfe' }}
+                                                title="Descargar el Excel original subpuesto"
+                                            >
+                                                📥 Excel
+                                            </a>
+                                        )}
                                         <button
                                             className="btn btn-outline btn-sm"
                                             onClick={() => setExpandido(expandido === h.id ? null : h.id)}
@@ -229,6 +241,7 @@ export default function Revisiones() {
     // Estado del flujo Excel
     const [cambiosDetectados, setCambiosDetectados] = useState([]);
     const [archivoSubido, setArchivoSubido] = useState(null);
+    const [archivoUrlTemporal, setArchivoUrlTemporal] = useState(null);
 
     // Cargar lista de proyectos
     useEffect(() => {
@@ -245,6 +258,7 @@ export default function Revisiones() {
         setProyectoActual(proyectos.find(p => String(p.id) === String(id)) || null);
         setCambiosDetectados([]);
         setArchivoSubido(null);
+        setArchivoUrlTemporal(null);
     };
 
     // Descargar Excel de revisión
@@ -276,6 +290,7 @@ export default function Revisiones() {
             const cambios = res.data.cambios || [];
             setCambiosDetectados(cambios.map((c, i) => ({ ...c, _idx: i, _aceptado: true })));
             setArchivoSubido(file.name);
+            setArchivoUrlTemporal(res.data.archivoUrl); // Nuevo campo del backend
             if (cambios.length === 0) alert('No se detectaron diferencias en el archivo subido.');
         } catch (err) {
             alert(err.response?.data?.error || 'Error procesando el Excel.');
@@ -304,6 +319,7 @@ export default function Revisiones() {
                 })),
                 nombreArchivo: archivoSubido,
                 usuarioNombre: usuario?.nombre || 'Sistema',
+                archivoUrl: archivoUrlTemporal,
             });
 
             const realAplicados = res.data.aplicados || 0;
@@ -315,6 +331,7 @@ export default function Revisiones() {
 
             setCambiosDetectados([]);
             setArchivoSubido(null);
+            setArchivoUrlTemporal(null);
             // Recargar historial
             setProyectoId(prev => prev + '');
             // Opcional: Recargar lista de proyectos para ver el cambio de estado 'en_revision'

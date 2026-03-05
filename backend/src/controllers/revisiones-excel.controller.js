@@ -30,14 +30,20 @@ exports.importarExcel = async (req, res) => {
         }
 
         const fs = require('fs');
+        const path = require('path');
         const buffer = fs.readFileSync(file.path);
 
         const cambios = await excelRevService.analizarExcel(proyectoId, buffer);
 
-        // Limpiamos el archivo temporal
-        fs.unlinkSync(file.path);
+        // En lugar de borrarlo inmediatamente, lo movemos a una carpeta permanente de Revisiones
+        // para que quede como historial descargable.
+        const ext = path.extname(file.originalname);
+        const nuevoNombre = `REV-P${proyectoId}-${Date.now()}${ext}`;
+        const destino = path.join(__dirname, '../../uploads/revisiones', nuevoNombre);
 
-        res.json({ cambios });
+        fs.renameSync(file.path, destino);
+
+        res.json({ cambios, archivoUrl: nuevoNombre });
     } catch (error) {
         console.error('Error importando Excel:', error);
         res.status(500).json({ error: 'Error al procesar el documento Excel' });
@@ -72,7 +78,7 @@ exports.aplicarCambios = async (req, res) => {
     const client = await pool.connect();
     try {
         const { proyectoId } = req.params;
-        const { cambios, nombreArchivo, usuarioNombre } = req.body;
+        const { cambios, nombreArchivo, usuarioNombre, archivoUrl } = req.body;
 
         if (!cambios || !Array.isArray(cambios)) {
             return res.status(400).json({ error: 'Formato de cambios inválido' });
@@ -198,9 +204,9 @@ exports.aplicarCambios = async (req, res) => {
         try {
             await client.query(
                 `INSERT INTO historial_revisiones_excel
-                    (proyecto_id, nombre_archivo, total_cambios, cambios_aplicados, usuario_nombre, resumen_cambios)
-                 VALUES ($1, $2, $3, $4, $5, $6)`,
-                [proyectoId, nombreArchivo || 'archivo.xlsx', cambios.length, aplicados, usuarioNombre || 'Sistema', JSON.stringify(cambios)]
+                    (proyecto_id, nombre_archivo, total_cambios, cambios_aplicados, usuario_nombre, resumen_cambios, archivo_url)
+                 VALUES ($1, $2, $3, $4, $5, $6, $7)`,
+                [proyectoId, nombreArchivo || 'archivo.xlsx', cambios.length, aplicados, usuarioNombre || 'Sistema', JSON.stringify(cambios), archivoUrl || null]
             );
         } catch (histErr) {
             console.warn('[historial] No se pudo guardar historial:', histErr.message);
@@ -225,7 +231,7 @@ exports.listarHistorial = async (req, res) => {
     try {
         const { proyectoId } = req.params;
         const result = await pool.query(
-            `SELECT id, nombre_archivo, total_cambios, cambios_aplicados, usuario_nombre, resumen_cambios, created_at
+            `SELECT id, nombre_archivo, total_cambios, cambios_aplicados, usuario_nombre, resumen_cambios, created_at, archivo_url
              FROM historial_revisiones_excel
              WHERE proyecto_id = $1
              ORDER BY created_at DESC`,
