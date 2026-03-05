@@ -1,142 +1,162 @@
-const { Document, Packer, Paragraph, TextRun, Table, TableRow, TableCell, WidthType, AlignmentType, HeadingLevel, BorderStyle } = require('docx');
+const { Document, Packer, Paragraph, TextRun, Table, TableRow, TableCell, WidthType, AlignmentType, HeadingLevel, BorderStyle, Spacing } = require('docx');
 const pool = require('../config/db');
 
-/**
- * Genera un documento de Word con el contenido del proyecto
- */
+// Auxiliar para números ordinales en español
+const ordinales = ["CERO", "PRIMERO", "SEGUNDO", "TERCERO", "CUARTO", "QUINTO", "SEXTO", "SÉPTIMO", "OCTAVO", "NOVENO", "DÉCIMO", "UNDÉCIMO", "DUODÉCIMO"];
+
+// Auxiliar para números romanos
+const toRoman = (num) => {
+    const lookup = { M: 1000, CM: 900, D: 500, CD: 400, C: 100, XC: 90, L: 50, XL: 40, X: 10, IX: 9, V: 5, IV: 4, I: 1 };
+    let roman = '';
+    for (let i in lookup) {
+        while (num >= lookup[i]) {
+            roman += i;
+            num -= lookup[i];
+        }
+    }
+    return roman;
+};
+
 const exportarWord = async (proyectoId) => {
-    // 1. Obtener datos básicos
-    const proyResult = await pool.query(
-        `SELECT p.*, d.nombre as dep_nombre, d.siglas as dep_siglas 
-         FROM proyectos p JOIN dependencias d ON p.dependencia_id = d.id WHERE p.id = $1`,
-        [proyectoId]
-    );
-    const proyecto = proyResult.rows[0];
+    // 1. Obtener datos
+    const proyRes = await pool.query(`
+        SELECT p.*, d.nombre as dep_nombre 
+        FROM proyectos p JOIN dependencias d ON p.dependencia_id = d.id 
+        WHERE p.id = $1`, [proyectoId]);
+    const proyecto = proyRes.rows[0];
 
-    // 2. Obtener Glosario
-    const glosResult = await pool.query(
-        'SELECT * FROM glosario WHERE proyecto_id = $1 ORDER BY acronimo',
-        [proyectoId]
-    );
+    const glosRes = await pool.query('SELECT * FROM glosario WHERE proyecto_id = $1 ORDER BY acronimo', [proyectoId]);
+    const atGenRes = await pool.query('SELECT * FROM atribuciones_generales WHERE proyecto_id = $1 AND activo = true ORDER BY clave', [proyectoId]);
+    const unidadesRes = await pool.query('SELECT * FROM unidades_administrativas WHERE proyecto_id = $1 ORDER BY nivel_numero ASC, orden ASC', [proyectoId]);
+    const atEspRes = await pool.query('SELECT * FROM atribuciones_especificas WHERE proyecto_id = $1 AND activo = true ORDER BY clave ASC', [proyectoId]);
 
-    // 3. Obtener Atribuciones Generales
-    const atGenResult = await pool.query(
-        'SELECT * FROM atribuciones_generales WHERE proyecto_id = $1 AND activo = true ORDER BY clave',
-        [proyectoId]
-    );
+    const glosario = glosRes.rows;
+    const atribucionesGenerales = atGenRes.rows;
+    const unidades = unidadesRes.rows;
+    const atribucionesEspecificas = atEspRes.rows;
 
-    // 4. Obtener Unidades y Atribuciones Específicas
-    const unidadesResult = await pool.query(
-        'SELECT * FROM unidades_administrativas WHERE proyecto_id = $1 ORDER BY nivel_numero, orden',
-        [proyectoId]
-    );
-    const unidades = unidadesResult.rows;
+    let articuloActual = 1;
 
-    const atEspResult = await pool.query(
-        `SELECT ae.*, ag.clave as gen_clave 
-         FROM atribuciones_especificas ae
-         LEFT JOIN atribuciones_generales ag ON ae.atribucion_general_id = ag.id
-         WHERE ae.proyecto_id = $1 AND ae.activo = true`,
-        [proyectoId]
-    );
-    const atribucionesEspecíficas = atEspResult.rows;
+    const children = [
+        // Portada
+        new Paragraph({
+            text: proyecto.dep_nombre.toUpperCase(),
+            heading: HeadingLevel.HEADING_1,
+            alignment: AlignmentType.CENTER,
+            spacing: { after: 400 }
+        }),
+        new Paragraph({
+            text: proyecto.nombre.toUpperCase(),
+            alignment: AlignmentType.CENTER,
+            spacing: { after: 800 }
+        }),
 
-    // --- CONSTRUCCIÓN DEL DOCUMENTO ---
+        // Glosario
+        new Paragraph({ text: 'GLOSARIO', heading: HeadingLevel.HEADING_2, spacing: { before: 400, after: 200 } }),
+        ...glosario.map(g => new Paragraph({
+            children: [
+                new TextRun({ text: `${g.acronimo}: `, bold: true }),
+                new TextRun(g.significado)
+            ],
+            spacing: { after: 100 }
+        })),
+
+        // Cuerpo del documento
+        new Paragraph({ text: 'CONTENIDO ESTRUCTURAL', heading: HeadingLevel.HEADING_2, spacing: { before: 800, after: 400 } }),
+    ];
+
+    // Agrupar unidades por jerarquía
+    // Nivel 1 -> Título, Nivel 2 -> Capítulo, Nivel 3 -> Sección
+    let tituloCount = 0;
+    let capituloCount = 0;
+    let seccionCount = 0;
+
+    unidades.forEach(u => {
+        const atribs = atribucionesEspecificas.filter(a => a.unidad_id === u.id);
+        if (atribs.length === 0) return;
+
+        if (u.nivel_numero === 1) {
+            tituloCount++;
+            capituloCount = 0;
+            seccionCount = 0;
+            children.push(new Paragraph({
+                text: `TÍTULO ${ordinales[tituloCount] || tituloCount}`,
+                heading: HeadingLevel.HEADING_3,
+                alignment: AlignmentType.CENTER,
+                spacing: { before: 600, after: 200 }
+            }));
+            children.push(new Paragraph({
+                text: u.nombre.toUpperCase(),
+                heading: HeadingLevel.HEADING_3,
+                alignment: AlignmentType.CENTER,
+                spacing: { after: 400 }
+            }));
+        } else if (u.nivel_numero === 2) {
+            capituloCount++;
+            seccionCount = 0;
+            children.push(new Paragraph({
+                text: `CAPÍTULO ${ordinales[capituloCount] || capituloCount}`,
+                heading: HeadingLevel.HEADING_4,
+                alignment: AlignmentType.CENTER,
+                spacing: { before: 400, after: 200 }
+            }));
+            children.push(new Paragraph({
+                text: u.nombre.toUpperCase(),
+                heading: HeadingLevel.HEADING_4,
+                alignment: AlignmentType.CENTER,
+                spacing: { after: 300 }
+            }));
+        } else if (u.nivel_numero === 3) {
+            seccionCount++;
+            children.push(new Paragraph({
+                text: `SECCIÓN ${ordinales[seccionCount] || seccionCount}`,
+                alignment: AlignmentType.CENTER,
+                spacing: { before: 300, after: 100 }
+            }));
+            children.push(new Paragraph({
+                text: u.nombre.toUpperCase(),
+                alignment: AlignmentType.CENTER,
+                spacing: { after: 300 }
+            }));
+        } else {
+            // Niveles inferiores como subtítulos simples
+            children.push(new Paragraph({
+                text: u.nombre,
+                bold: true,
+                spacing: { before: 300, after: 200 }
+            }));
+        }
+
+        // Texto introductorio
+        children.push(new Paragraph({
+            text: `Al frente del ${u.nombre} se encuentra una persona titular y le corresponde el ejercicio de las siguientes atribuciones:`,
+            spacing: { after: 200 },
+            alignment: AlignmentType.JUSTIFY
+        }));
+
+        // Atribuciones (Articulado secuencial)
+        children.push(new Paragraph({
+            text: `ARTÍCULO ${articuloActual}.`,
+            bold: true,
+            spacing: { before: 200, after: 100 }
+        }));
+
+        atribs.forEach((a, index) => {
+            children.push(new Paragraph({
+                text: `${toRoman(index + 1)}. ${a.texto}`,
+                spacing: { after: 100, left: 720 }, // Sangría para la lista
+                alignment: AlignmentType.JUSTIFY
+            }));
+        });
+
+        articuloActual++;
+    });
+
     const doc = new Document({
         sections: [{
             properties: {},
-            children: [
-                // Portada / Título
-                new Paragraph({
-                    text: proyecto.dep_nombre.toUpperCase(),
-                    heading: HeadingLevel.HEADING_1,
-                    alignment: AlignmentType.CENTER,
-                }),
-                new Paragraph({
-                    text: 'PROPUESTA DE ATRIBUCIONES JERÁRQUICAS',
-                    alignment: AlignmentType.CENTER,
-                    spacing: { before: 200, after: 400 },
-                }),
-                new Paragraph({
-                    children: [
-                        new TextRun({ text: `Proyecto: `, bold: true }),
-                        new TextRun(proyecto.nombre),
-                    ],
-                    spacing: { after: 800 },
-                }),
-
-                // SECCIÓN: GLOSARIO
-                new Paragraph({ text: 'I. GLOSARIO DE ACRÓNIMOS', heading: HeadingLevel.HEADING_2, spacing: { before: 400, after: 200 } }),
-                new Table({
-                    width: { size: 100, type: WidthType.PERCENTAGE },
-                    rows: [
-                        new TableRow({
-                            children: [
-                                new TableCell({ children: [new Paragraph({ text: 'ACRÓNIMO', bold: true })], width: { size: 20, type: WidthType.PERCENTAGE } }),
-                                new TableCell({ children: [new Paragraph({ text: 'SIGNIFICADO', bold: true })], width: { size: 80, type: WidthType.PERCENTAGE } }),
-                            ],
-                        }),
-                        ...glosResult.rows.map(g => new TableRow({
-                            children: [
-                                new TableCell({ children: [new Paragraph(g.acronimo)] }),
-                                new TableCell({ children: [new Paragraph(g.significado)] }),
-                            ],
-                        })),
-                    ],
-                }),
-
-                // SECCIÓN: BASE LEGAL (ATRIBUCIONES GENERALES)
-                new Paragraph({ text: 'II. ATRIBUCIONES GENERALES (BASE LEGAL)', heading: HeadingLevel.HEADING_2, spacing: { before: 600, after: 200 } }),
-                ...atGenResult.rows.map(ag => new Paragraph({
-                    children: [
-                        new TextRun({ text: `${ag.clave}. `, bold: true }),
-                        new TextRun({ text: `${ag.norma}, Art. ${ag.articulo}: `, italic: true }),
-                        new TextRun(ag.texto),
-                    ],
-                    spacing: { after: 200 },
-                    alignment: AlignmentType.JUSTIFY,
-                })),
-
-                // SECCIÓN: ATRIBUCIONES POR UNIDAD
-                new Paragraph({ text: 'III. ATRIBUCIONES POR UNIDAD ADMINISTRATIVA', heading: HeadingLevel.HEADING_2, spacing: { before: 600, after: 400 } }),
-
-                // Iterar por unidades
-                ...unidades.flatMap(unidad => {
-                    const atribs = atribucionesEspecíficas.filter(ae => ae.unidad_id === unidad.id);
-                    if (atribs.length === 0) return [];
-
-                    return [
-                        new Paragraph({
-                            children: [
-                                new TextRun({ text: `${unidad.siglas} - ${unidad.nombre}`, bold: true, size: 28 }),
-                            ],
-                            heading: HeadingLevel.HEADING_3,
-                            spacing: { before: 400, after: 200 },
-                            border: { bottom: { color: 'auto', space: 1, style: BorderStyle.SINGLE, size: 6 } }
-                        }),
-                        new Table({
-                            width: { size: 100, type: WidthType.PERCENTAGE },
-                            rows: [
-                                new TableRow({
-                                    children: [
-                                        new TableCell({ children: [new Paragraph({ text: 'ID', bold: true })], width: { size: 10, type: WidthType.PERCENTAGE } }),
-                                        new TableCell({ children: [new Paragraph({ text: 'ATRIBUCIÓN', bold: true })], width: { size: 70, type: WidthType.PERCENTAGE } }),
-                                        new TableCell({ children: [new Paragraph({ text: 'REF. LEGAL', bold: true })], width: { size: 20, type: WidthType.PERCENTAGE } }),
-                                    ],
-                                }),
-                                ...atribs.map(a => new TableRow({
-                                    children: [
-                                        new TableCell({ children: [new Paragraph(a.clave)] }),
-                                        new TableCell({ children: [new Paragraph({ text: a.texto, alignment: AlignmentType.JUSTIFY })] }),
-                                        new TableCell({ children: [new Paragraph(a.gen_clave || 'N/A')] }),
-                                    ],
-                                })),
-                            ],
-                        }),
-                    ];
-                }),
-            ],
-        }],
+            children
+        }]
     });
 
     return await Packer.toBuffer(doc);

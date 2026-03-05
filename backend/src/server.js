@@ -92,6 +92,31 @@ const runEssentialMigrations = async () => {
                 updated_at TIMESTAMPTZ DEFAULT NOW()
             );
 
+            CREATE TABLE IF NOT EXISTS cat_responsables (
+                id SERIAL PRIMARY KEY,
+                nombre VARCHAR(200) NOT NULL UNIQUE,
+                activo BOOLEAN DEFAULT true,
+                created_at TIMESTAMPTZ DEFAULT NOW(),
+                updated_at TIMESTAMPTZ DEFAULT NOW()
+            );
+
+            CREATE TABLE IF NOT EXISTS cat_enlaces (
+                id SERIAL PRIMARY KEY,
+                nombre VARCHAR(200) NOT NULL,
+                email VARCHAR(200) NOT NULL UNIQUE,
+                activo BOOLEAN DEFAULT true,
+                created_at TIMESTAMPTZ DEFAULT NOW(),
+                updated_at TIMESTAMPTZ DEFAULT NOW()
+            );
+
+            CREATE TABLE IF NOT EXISTS cat_avances (
+                id SERIAL PRIMARY KEY,
+                nombre VARCHAR(100) NOT NULL UNIQUE,
+                activo BOOLEAN DEFAULT true,
+                created_at TIMESTAMPTZ DEFAULT NOW(),
+                updated_at TIMESTAMPTZ DEFAULT NOW()
+            );
+
             CREATE TABLE IF NOT EXISTS actividades (
                 id SERIAL PRIMARY KEY,
                 tipo VARCHAR(50) NOT NULL,
@@ -156,6 +181,28 @@ const runEssentialMigrations = async () => {
                 ('Cerrado por inactividad', '#ef4444'),
                 ('Dictaminado', '#3b82f6'),
                 ('Borrador', '#64748b')
+                ON CONFLICT (nombre) DO NOTHING;
+            `);
+        }
+
+        // Insertar avances por defecto si la tabla está vacía
+        const cntAv = await pool.query('SELECT count(*) FROM cat_avances');
+        if (parseInt(cntAv.rows[0].count) === 0) {
+            await pool.query(`
+                INSERT INTO cat_avances (nombre) VALUES
+                ('Iniciado'), ('En Proceso'), ('En Revisión'), ('Finalizado')
+                ON CONFLICT (nombre) DO NOTHING;
+            `);
+        }
+
+        // Insertar dependencias de ejemplo si la tabla está vacía
+        const cntDep = await pool.query('SELECT count(*) FROM dependencias');
+        if (parseInt(cntDep.rows[0].count) === 0) {
+            await pool.query(`
+                INSERT INTO dependencias (nombre, tipo) VALUES
+                ('Secretaría de Función Pública', 'centralizada'),
+                ('Secretaría de Hacienda', 'centralizada'),
+                ('Instituto de Innovación', 'paraestatal')
                 ON CONFLICT (nombre) DO NOTHING;
             `);
         }
