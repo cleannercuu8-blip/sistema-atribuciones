@@ -90,7 +90,7 @@ function TarjetaCambio({ c, onToggle }) {
 }
 
 // ── Historial de versiones Excel ──────────────────────────────────────────────
-function HistorialVersiones({ proyectoId }) {
+function HistorialVersiones({ proyectoId, handleEliminarHistorial, handleEditarHistorial }) {
     const [historial, setHistorial] = useState([]);
     const [cargando, setCargando] = useState(false);
     const [expandido, setExpandido] = useState(null);
@@ -135,7 +135,22 @@ function HistorialVersiones({ proyectoId }) {
                                         {new Date(h.created_at).toLocaleString('es-MX', { dateStyle: 'short', timeStyle: 'short' })}
                                     </td>
                                     <td style={{ maxWidth: 200, fontSize: 13 }}>
-                                        <span title={h.nombre_archivo}>📄 {h.nombre_archivo || 'archivo.xlsx'}</span>
+                                        <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                                            <span
+                                                title={h.nombre_archivo}
+                                                style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}
+                                            >
+                                                📄 {h.nombre_archivo || 'archivo.xlsx'}
+                                            </span>
+                                            <button
+                                                className="btn btn-ghost btn-xs"
+                                                onClick={() => handleEditarHistorial(h)}
+                                                style={{ padding: '0 4px', fontSize: 10 }}
+                                                title="Renombrar esta versión"
+                                            >
+                                                ✏️
+                                            </button>
+                                        </div>
                                     </td>
                                     <td style={{ textAlign: 'center' }}>
                                         <span style={{ background: '#e2e8f0', color: '#475569', borderRadius: 12, padding: '2px 10px', fontWeight: 700, fontSize: 12 }}>{h.total_cambios}</span>
@@ -163,6 +178,14 @@ function HistorialVersiones({ proyectoId }) {
                                             style={{ fontSize: 11 }}
                                         >
                                             {expandido === h.id ? '▲ Ocultar' : '👁 Ver resumen'}
+                                        </button>
+                                        <button
+                                            className="btn btn-ghost btn-sm"
+                                            onClick={() => handleEliminarHistorial(h.id)}
+                                            style={{ fontSize: 11, color: '#ef4444', marginLeft: 6 }}
+                                            title="Eliminar este registro del historial"
+                                        >
+                                            🗑️
                                         </button>
                                     </td>
                                 </tr>
@@ -251,6 +274,8 @@ export default function Revisiones() {
             .finally(() => setCargandoProyectos(false));
     }, []);
 
+    const [refreshHistorial, setRefreshHistorial] = useState(0);
+
     // Cuando cambia el selector
     const handleSelectProyecto = (e) => {
         const id = e.target.value;
@@ -259,6 +284,34 @@ export default function Revisiones() {
         setCambiosDetectados([]);
         setArchivoSubido(null);
         setArchivoUrlTemporal(null);
+        setRefreshHistorial(0);
+    };
+
+    const handleEliminarHistorial = async (historialId) => {
+        if (!window.confirm('¿Estás seguro de eliminar este registro del historial? Esta acción quedará registrada en las actividades.')) return;
+
+        try {
+            await api.delete(`/proyectos/${proyectoId}/revision-excel/historial/${historialId}`);
+            alert('Registro eliminado correctamente.');
+            setRefreshHistorial(prev => prev + 1);
+        } catch (err) {
+            console.error('Error eliminando historial:', err);
+            alert(err.response?.data?.error || 'No se pudo eliminar el registro.');
+        }
+    };
+
+    const handleEditarHistorial = async (h) => {
+        const nuevoNombre = window.prompt('Nuevo nombre para esta versión:', h.nombre_archivo);
+        if (!nuevoNombre || nuevoNombre === h.nombre_archivo) return;
+
+        try {
+            await api.put(`/proyectos/${proyectoId}/revision-excel/historial/${h.id}`, { nombre_archivo: nuevoNombre });
+            alert('Nombre actualizado.');
+            setRefreshHistorial(prev => prev + 1);
+        } catch (err) {
+            console.error('Error editando historial:', err);
+            alert('No se pudo actualizar el nombre.');
+        }
     };
 
     // Descargar Excel de revisión
@@ -333,7 +386,7 @@ export default function Revisiones() {
             setArchivoSubido(null);
             setArchivoUrlTemporal(null);
             // Recargar historial
-            setProyectoId(prev => prev + '');
+            setRefreshHistorial(prev => prev + 1);
             // Opcional: Recargar lista de proyectos para ver el cambio de estado 'en_revision'
             api.get('/proyectos').then(r => setProyectos(r.data));
         } catch (err) {
@@ -497,7 +550,12 @@ export default function Revisiones() {
                             <span className="card-title">📋 Historial de Revisiones Excel</span>
                             <span style={{ fontSize: 12, color: '#64748b' }}>Versiones subidas — solo consulta</span>
                         </div>
-                        <HistorialVersiones key={proyectoId} proyectoId={proyectoId} />
+                        <HistorialVersiones
+                            key={`${proyectoId}-${refreshHistorial}`}
+                            proyectoId={proyectoId}
+                            handleEliminarHistorial={handleEliminarHistorial}
+                            handleEditarHistorial={handleEditarHistorial}
+                        />
                     </div>
                 </>
             )}

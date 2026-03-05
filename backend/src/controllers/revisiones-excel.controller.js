@@ -243,3 +243,99 @@ exports.listarHistorial = async (req, res) => {
         res.status(500).json({ error: 'Error al obtener el historial' });
     }
 };
+
+exports.eliminarHistorial = async (req, res) => {
+    const client = await pool.connect();
+    try {
+        const { proyectoId, id } = req.params;
+        const usuarioNombre = req.usuario?.nombre || 'Usuario';
+
+        await client.query('BEGIN');
+
+        // 1. Obtener info para el log
+        const infoRes = await client.query(
+            'SELECT nombre_archivo, created_at FROM historial_revisiones_excel WHERE id = $1 AND proyecto_id = $2',
+            [id, proyectoId]
+        );
+
+        if (infoRes.rowCount === 0) {
+            await client.query('ROLLBACK');
+            return res.status(404).json({ error: 'Registro no encontrado' });
+        }
+
+        const info = infoRes.rows[0];
+        const fechaStr = new Date(info.created_at).toLocaleString();
+
+        // 2. Eliminar registro
+        await client.query(
+            'DELETE FROM historial_revisiones_excel WHERE id = $1 AND proyecto_id = $2',
+            [id, proyectoId]
+        );
+
+        // 3. Registrar actividad
+        await client.query(
+            `INSERT INTO actividades (tipo, entidad, entidad_id, proyecto_id, mensaje, autor)
+             VALUES ($1, $2, $3, $4, $5, $6)`,
+            [
+                'eliminacion',
+                'historial_excel',
+                id,
+                proyectoId,
+                `Eliminó registro de historial Excel: "${info.nombre_archivo}" del ${fechaStr}`,
+                usuarioNombre
+            ]
+        );
+
+        await client.query('COMMIT');
+        res.json({ mensaje: 'Registro de historial eliminado correctamente' });
+    } catch (error) {
+        await client.query('ROLLBACK');
+        console.error('Error eliminando historial:', error);
+        res.status(500).json({ error: 'Error al eliminar el registro del historial' });
+    } finally {
+        client.release();
+    }
+};
+
+exports.actualizarHistorial = async (req, res) => {
+    try {
+        const { proyectoId, id } = req.params;
+        const { nombre_archivo } = req.body;
+        const usuarioNombre = req.usuario?.nombre || 'Usuario';
+
+        if (!nombre_archivo) return res.status(400).json({ error: 'Nombre de archivo requerido' });
+
+        const prevRes = await pool.query(
+            'SELECT nombre_archivo FROM historial_revisiones_excel WHERE id = $1 AND proyecto_id = $2',
+            [id, proyectoId]
+        );
+
+        if (prevRes.rowCount === 0) return res.status(404).json({ error: 'Registro no encontrado' });
+
+        const nombreAnterior = prevRes.rows[0].nombre_archivo;
+
+        await pool.query(
+            'UPDATE historial_revisiones_excel SET nombre_archivo = $1 WHERE id = $2 AND proyecto_id = $3',
+            [nombre_archivo, id, proyectoId]
+        );
+
+        // Registrar actividad
+        await pool.query(
+            `INSERT INTO actividades (tipo, entidad, entidad_id, proyecto_id, mensaje, autor)
+             VALUES ($1, $2, $3, $4, $5, $6)`,
+            [
+                'actualizacion',
+                'historial_excel',
+                id,
+                proyectoId,
+                `Renombró Versión Excel de "${nombreAnterior}" a "${nombre_archivo}"`,
+                usuarioNombre
+            ]
+        );
+
+        res.json({ mensaje: 'Registro actualizado correctamente' });
+    } catch (error) {
+        console.error('Error actualizando historial:', error);
+        res.status(500).json({ error: 'Error al actualizar el registro del historial' });
+    }
+};
