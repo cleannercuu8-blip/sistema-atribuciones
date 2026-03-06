@@ -16,7 +16,7 @@ api.interceptors.request.use(config => {
     return config;
 });
 
-// Manejar respuestas 401 - redirigir al login
+// Manejar respuestas de error
 api.interceptors.response.use(
     res => res,
     err => {
@@ -25,6 +25,14 @@ api.interceptors.response.use(
             localStorage.removeItem('usuario');
             window.location.href = '/login';
         }
+
+        console.error('❌ Error de API:', {
+            url: err.config?.url,
+            status: err.response?.status,
+            data: err.response?.data,
+            message: err.message
+        });
+
         return Promise.reject(err);
     }
 );

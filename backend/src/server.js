@@ -260,11 +260,22 @@ const { authMiddleware, requireRole } = require('./middleware/auth');
 app.get('/api/admin/email-config', authMiddleware, requireRole('admin'), emailService.obtenerConfig);
 app.put('/api/admin/email-config', authMiddleware, requireRole('admin'), emailService.actualizarConfig);
 
+// DB Check para diagnóstico
+app.get('/api/db-check', async (req, res) => {
+    try {
+        const result = await pool.query('SELECT NOW() as time');
+        res.json({ status: 'ok', time: result.rows[0].time });
+    } catch (err) {
+        console.error('❌ Error de conexión DB en /api/db-check:', err);
+        res.status(500).json({ status: 'error', message: err.message, stack: process.env.NODE_ENV === 'development' ? err.stack : undefined });
+    }
+});
+
 // Health check para Render
 app.get('/api/health', (req, res) => {
     res.json({
         status: 'ok',
-        version: '1.1-debug',
+        version: '1.2-resilience',
         timestamp: new Date().toISOString()
     });
 });
@@ -282,8 +293,12 @@ app.use((req, res) => {
 
 // Manejo de errores global
 app.use((err, req, res, next) => {
-    console.error(err.stack);
-    res.status(500).json({ error: 'Error interno del servidor', detalle: err.message });
+    console.error('❌ ERROR GLOBAL:', err);
+    res.status(err.status || 500).json({
+        error: 'Error interno del servidor',
+        detalle: err.message,
+        path: req.url
+    });
 });
 
 // ============================================
