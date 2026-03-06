@@ -27,20 +27,32 @@ export default function Catalogos() {
     const cargarDatos = async () => {
         setCargando(true);
         try {
-            const [rRes, eRes, dRes, aRes, stRes] = await Promise.all([
+            const promises = [
                 api.get('/catalogos/responsables'),
                 api.get('/catalogos/enlaces'),
                 api.get('/catalogos/dependencias'),
                 api.get('/catalogos/avances'),
                 api.get('/catalogos/estados-proyecto')
-            ]);
-            setResponsables(rRes.data);
-            setEnlaces(eRes.data);
-            setDependencias(dRes.data);
-            setAvances(aRes.data);
-            setEstadosProyecto(stRes.data);
+            ];
+
+            const results = await Promise.allSettled(promises);
+
+            if (results[0].status === 'fulfilled') setResponsables(results[0].value.data);
+            else console.error('Error cargando responsables:', results[0].reason);
+
+            if (results[1].status === 'fulfilled') setEnlaces(results[1].value.data);
+            else console.error('Error cargando enlaces:', results[1].reason);
+
+            if (results[2].status === 'fulfilled') setDependencias(results[2].value.data);
+            else console.error('Error cargando dependencias:', results[2].reason);
+
+            if (results[3].status === 'fulfilled') setAvances(results[3].value.data);
+            else console.error('Error cargando avances:', results[3].reason);
+
+            if (results[4].status === 'fulfilled') setEstadosProyecto(results[4].value.data);
+            else console.error('Error cargando estados-proyecto:', results[4].reason);
         } catch (err) {
-            console.error('Error al cargar catálogos', err);
+            console.error('Error crítico en cargarDatos de catálogos', err);
         }
         setCargando(false);
     };

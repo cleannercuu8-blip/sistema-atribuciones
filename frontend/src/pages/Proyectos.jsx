@@ -37,26 +37,45 @@ export default function Proyectos() {
 
     const cargarDatos = async () => {
         try {
-            const [pRes, dRes, rRes, eRes, aRes, stRes] = await Promise.all([
+            const promises = [
                 api.get('/proyectos'),
                 api.get('/catalogos/dependencias'),
                 api.get('/catalogos/responsables'),
                 api.get('/catalogos/enlaces'),
                 api.get('/catalogos/avances'),
                 api.get('/catalogos/estados-proyecto')
-            ]);
-            setProyectos(pRes.data);
-            setDependencias(dRes.data);
-            setCatResponsables(rRes.data);
-            setCatEnlaces(eRes.data);
-            setCatAvances(aRes.data);
-            setCatEstados(stRes.data);
+            ];
+
+            const results = await Promise.allSettled(promises);
+
+            if (results[0].status === 'fulfilled') setProyectos(results[0].value.data);
+            else console.error('Error cargando proyectos:', results[0].reason);
+
+            if (results[1].status === 'fulfilled') setDependencias(results[1].value.data);
+            else console.error('Error cargando dependencias:', results[1].reason);
+
+            if (results[2].status === 'fulfilled') setCatResponsables(results[2].value.data);
+            else console.error('Error cargando responsables:', results[2].reason);
+
+            if (results[3].status === 'fulfilled') setCatEnlaces(results[3].value.data);
+            else console.error('Error cargando enlaces:', results[3].reason);
+
+            if (results[4].status === 'fulfilled') setCatAvances(results[4].value.data);
+            else console.error('Error cargando avances:', results[4].reason);
+
+            if (results[5].status === 'fulfilled') setCatEstados(results[5].value.data);
+            else console.error('Error cargando estados-proyecto:', results[5].reason);
+
             if (usuario.rol === 'admin') {
-                const uRes = await api.get('/usuarios');
-                setUsuarios(uRes.data.filter(u => u.activo && u.rol !== 'admin'));
+                try {
+                    const uRes = await api.get('/usuarios');
+                    setUsuarios(uRes.data.filter(u => u.activo && u.rol !== 'admin'));
+                } catch (userErr) {
+                    console.error('Error cargando usuarios:', userErr);
+                }
             }
         } catch (err) {
-            console.error('Error cargando datos de proyectos:', err);
+            console.error('Error crítico en cargarDatos:', err);
         }
         setCargando(false);
     };
