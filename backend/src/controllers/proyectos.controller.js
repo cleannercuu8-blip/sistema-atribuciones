@@ -59,8 +59,8 @@ const listar = async (req, res) => {
         const result = await pool.query(query, params);
         res.json(result.rows);
     } catch (err) {
-        console.error(err);
-        res.status(500).json({ error: 'Error del servidor' });
+        console.error('Error en GET /proyectos:', err);
+        res.status(500).json({ error: 'Error del servidor en listar proyectos', detalle: err.message });
     }
 };
 
@@ -101,8 +101,8 @@ const obtener = async (req, res) => {
 
         res.json(proyecto);
     } catch (err) {
-        console.error(err);
-        res.status(500).json({ error: 'Error del servidor' });
+        console.error('Error en GET /proyectos/:id:', err);
+        res.status(500).json({ error: 'Error del servidor al obtener proyecto', detalle: err.message });
     }
 };
 
@@ -164,8 +164,8 @@ const crear = async (req, res) => {
         res.status(201).json(proyecto);
     } catch (err) {
         await client.query('ROLLBACK');
-        console.error(err);
-        res.status(500).json({ error: 'Error del servidor' });
+        console.error('Error en POST /proyectos:', err);
+        res.status(500).json({ error: 'Error del servidor al crear proyecto', detalle: err.message });
     } finally {
         client.release();
     }
@@ -241,8 +241,8 @@ const actualizar = async (req, res) => {
         res.json(result.rows[0]);
     } catch (err) {
         await client.query('ROLLBACK');
-        console.error(err);
-        res.status(500).json({ error: 'Error del servidor' });
+        console.error('Error en PUT /proyectos/:id:', err);
+        res.status(500).json({ error: 'Error del servidor al actualizar proyecto', detalle: err.message });
     } finally {
         client.release();
     }
@@ -283,8 +283,8 @@ const eliminar = async (req, res) => {
         await pool.query('DELETE FROM proyectos WHERE id = $1', [id]);
         res.json({ mensaje: 'Proyecto eliminado correctamente' });
     } catch (err) {
-        console.error(err);
-        res.status(500).json({ error: 'Error del servidor al eliminar proyecto' });
+        console.error('Error en DELETE /proyectos/:id:', err);
+        res.status(500).json({ error: 'Error del servidor al eliminar proyecto', detalle: err.message });
     }
 };
 
@@ -298,7 +298,8 @@ const subirOrganigrama = async (req, res) => {
         await pool.query('UPDATE proyectos SET organigrama_url = $1 WHERE id = $2', [url, id]);
         res.json({ url, mensaje: 'Organigrama subido correctamente' });
     } catch (err) {
-        res.status(500).json({ error: 'Error al guardar el organigrama' });
+        console.error('Error en POST /proyectos/:id/organigrama:', err);
+        res.status(500).json({ error: 'Error al guardar el organigrama', detalle: err.message });
     }
 };
 
@@ -312,8 +313,8 @@ const exportarWord = async (req, res) => {
         res.setHeader('Content-Disposition', `attachment; filename="Proyecto-${nombre.replace(/\s/g, '-')}.docx"`);
         res.send(buffer);
     } catch (err) {
-        console.error(err);
-        res.status(500).json({ error: 'Error al generar el Word' });
+        console.error('Error al exportar Word:', err);
+        res.status(500).json({ error: 'Error al generar el Word', detalle: err.message });
     }
 };
 
