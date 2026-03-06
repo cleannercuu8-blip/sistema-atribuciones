@@ -207,6 +207,30 @@ const runEssentialMigrations = async () => {
             `);
         }
 
+        // Insertar responsables por defecto si la tabla está vacía
+        const cntResp = await pool.query('SELECT count(*) FROM cat_responsables');
+        if (parseInt(cntResp.rows[0].count) === 0) {
+            await pool.query(`
+                INSERT INTO cat_responsables (nombre) VALUES
+                ('Coordinación de Atribuciones'),
+                ('Dirección de Innovación'),
+                ('Subsecretaría Jurídica'),
+                ('Administrador del Sistema')
+                ON CONFLICT (nombre) DO NOTHING;
+            `);
+        }
+
+        // Insertar enlaces por defecto si la tabla está vacía
+        const cntEn = await pool.query('SELECT count(*) FROM cat_enlaces');
+        if (parseInt(cntEn.rows[0].count) === 0) {
+            await pool.query(`
+                INSERT INTO cat_enlaces (nombre, email) VALUES
+                ('Admin Sistema', 'admin@atribuciones.gob'),
+                ('Enlace Institucional', 'enlace@ejemplo.com')
+                ON CONFLICT (email) DO NOTHING;
+            `);
+        }
+
         console.log('✅ Esquema y migraciones verificadas.');
     } catch (err) {
         console.error('⚠️ Error en verificación de BD:', err.message);
