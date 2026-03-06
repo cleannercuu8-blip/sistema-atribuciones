@@ -143,6 +143,10 @@ const runEssentialMigrations = async () => {
             -- 3. Migraciones de Columnas Existentes
             ALTER TABLE proyectos ADD COLUMN IF NOT EXISTS estado_id INTEGER REFERENCES cat_estados_proyecto(id);
             ALTER TABLE proyectos ADD COLUMN IF NOT EXISTS responsable_apoyo TEXT;
+            ALTER TABLE proyectos ADD COLUMN IF NOT EXISTS avance_id INTEGER REFERENCES cat_avances(id);
+            ALTER TABLE proyectos ADD COLUMN IF NOT EXISTS enlaces TEXT;
+            ALTER TABLE proyectos ADD COLUMN IF NOT EXISTS fecha_expediente DATE;
+            ALTER TABLE proyectos ADD COLUMN IF NOT EXISTS responsable VARCHAR(200);
             
             ALTER TABLE usuarios ADD COLUMN IF NOT EXISTS rol VARCHAR(50) DEFAULT 'revisor';
             
