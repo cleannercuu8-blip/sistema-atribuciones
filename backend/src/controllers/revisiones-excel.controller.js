@@ -74,6 +74,7 @@ exports.importarExcel = async (req, res) => {
         fs.renameSync(file.path, destino);
 
         let guardadoEnHistorial = false;
+        let mensajeExito = null;
 
         // Si es enlace, auto-guardamos directamente en el historial porque no tienen botón "Aplicar"
         if (rol === 'enlace') {
@@ -96,9 +97,40 @@ exports.importarExcel = async (req, res) => {
             );
 
             guardadoEnHistorial = true;
+            mensajeExito = '✅ El archivo ha sido enviado correctamente a su Responsable. Lo podrá revisar en el Historial.';
+        } else {
+            // Si es Responsable/Admin y sube un archivo, vamos a ver si tiene cambios de texto o solo obs.
+            // Si el usuario solo quiere subir observaciones, lo guardamos directo para evitar que 
+            // le aparezca el verificador de cambios como si él tuviera que subsanar.
+            const tienePropuestasDeTexto = cambios.some(c => 
+                (c.texto_propuesto && c.texto_propuesto !== c.texto_original) || 
+                (c.clave_propuesta && c.clave_propuesta !== c.clave_actual)
+            );
+
+            if (!tienePropuestasDeTexto) {
+                const usuarioId = req.user?.id || null;
+                const usuarioNombre = req.user?.nombre || req.user?.username || 'Responsable';
+                const resumenJson = JSON.stringify(cambios);
+                
+                await pool.query(
+                    `INSERT INTO historial_revisiones_excel 
+                     (proyecto_id, nombre_archivo, archivo_url, usuario_id, usuario_nombre, resumen_cambios, total_cambios, cambios_aplicados)
+                     VALUES ($1, $2, $3, $4, $5, $6, $7, $8)`,
+                    [proyectoId, file.originalname, nuevoNombre, usuarioId, usuarioNombre, resumenJson, cambios.length, 0]
+                );
+
+                await pool.query(
+                    `INSERT INTO actividades (tipo, entidad_tipo, entidad_id, proyecto_id, mensaje, usuario_nombre)
+                     VALUES ($1, $2, $3, $4, $5, $6)`,
+                    ['actualizacion', 'revision_excel', proyectoId, proyectoId, `Responsable subió observaciones: ${file.originalname}`, usuarioNombre]
+                );
+
+                guardadoEnHistorial = true;
+                mensajeExito = '✅ Observaciones guardadas y enviadas al historial. El enlace ya puede descargar este archivo.';
+            }
         }
 
-        res.json({ cambios, archivoUrl: nuevoNombre, guardadoEnHistorial });
+        res.json({ cambios, archivoUrl: nuevoNombre, guardadoEnHistorial, mensajeExito });
     } catch (error) {
         console.error('Error importando Excel:', error);
         res.status(500).json({ error: 'Error al procesar el documento Excel' });

@@ -397,7 +397,7 @@ export default function Revisiones() {
             setArchivoUrlTemporal(res.data.archivoUrl); // Nuevo campo del backend
 
             if (res.data.guardadoEnHistorial) {
-                alert('✅ El archivo ha sido enviado correctamente a su Responsable. Lo podrá revisar en el Historial.');
+                alert(res.data.mensajeExito || '✅ Archivo procesado correctamente.');
                 setCambiosDetectados([]);
                 setArchivoSubido(null);
                 setArchivoUrlTemporal(null);
