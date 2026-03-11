@@ -507,7 +507,12 @@ export default function Revisiones() {
                                         <span style={{ background: '#e2e8f0', color: '#475569', padding: '4px 12px', borderRadius: 20, fontWeight: 700, fontSize: 13 }}>{total} total</span>
                                     </div>
                                 </div>
-                                {total > 1 && (
+                                {usuario.rol === 'enlace' && (
+                                    <div style={{ background: '#e0f2fe', color: '#0369a1', padding: '10px 14px', borderRadius: 8, fontSize: 13, fontWeight: 500, marginBottom: 16, border: '1px solid #bae6fd' }}>
+                                        ℹ️ Como <strong>enlace</strong>, puedes subir el documento subsanado para registrar el historial, pero solo el responsable o el administrador pueden aplicar los cambios a la base de datos.
+                                    </div>
+                                )}
+                                {total > 1 && usuario.rol !== 'enlace' && (
                                     <div style={{ display: 'flex', gap: 8, marginTop: 14 }}>
                                         <button className="btn btn-outline btn-sm" onClick={aceptarTodos} style={{ fontSize: 12 }}>✅ Aceptar todos</button>
                                         <button className="btn btn-outline btn-sm" onClick={rechazarTodos} style={{ fontSize: 12, borderColor: '#f87171', color: '#ef4444' }}>❌ Rechazar todos</button>
@@ -525,17 +530,22 @@ export default function Revisiones() {
                                 <>
                                     <div style={{ display: 'flex', flexDirection: 'column', gap: 14, maxHeight: '50vh', overflowY: 'auto', paddingRight: 6, marginBottom: 20 }}>
                                         {cambiosDetectados.map(c => (
-                                            <TarjetaCambio key={c._idx} c={c} onToggle={toggleCambio} />
+                                            <TarjetaCambio key={c._idx} c={c} onToggle={usuario.rol !== 'enlace' ? toggleCambio : () => {}} />
                                         ))}
                                     </div>
                                     <div style={{ borderTop: '1px solid #e2e8f0', paddingTop: 16, display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 12 }}>
                                         <span style={{ fontSize: 13, color: '#64748b' }}>
-                                            Se guardarán <strong style={{ color: '#16a34a' }}>{aceptados}</strong> de {total} cambios.
+                                            Se guardarán <strong style={{ color: '#16a34a' }}>{aceptados}</strong> de {total} cambios en tu Excel.
                                         </span>
                                         <div style={{ display: 'flex', gap: 12 }}>
                                             <button className="btn btn-outline" onClick={() => { setCambiosDetectados([]); setArchivoSubido(null); }}>❌ Descartar</button>
-                                            <button className="btn btn-primary" onClick={aplicarCambios} disabled={cargando || aceptados === 0}>
-                                                {cargando ? '⏳ Guardando...' : `✅ Aplicar ${aceptados} Cambio${aceptados !== 1 ? 's' : ''}`}
+                                            <button 
+                                                className="btn btn-primary" 
+                                                onClick={aplicarCambios} 
+                                                disabled={cargando || aceptados === 0 || usuario.rol === 'enlace'}
+                                                title={usuario.rol === 'enlace' ? 'No tienes permiso para aplicar' : ''}
+                                            >
+                                                {cargando ? '⏳ Guardando...' : usuario.rol === 'enlace' ? '🔒 Aplicación Restringida' : `✅ Aplicar ${aceptados} Cambio${aceptados !== 1 ? 's' : ''}`}
                                             </button>
                                         </div>
                                     </div>

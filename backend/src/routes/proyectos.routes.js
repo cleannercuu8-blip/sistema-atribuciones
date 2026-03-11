@@ -126,7 +126,7 @@ router.get('/:proyectoId/revision-excel/historial', excelRevCtrl.listarHistorial
 router.delete('/:proyectoId/revision-excel/historial/:id', excelRevCtrl.eliminarHistorial);
 router.put('/:proyectoId/revision-excel/historial/:id', excelRevCtrl.actualizarHistorial);
 router.post('/:proyectoId/revision-excel/importar', uploadExcel.single('archivo'), excelRevCtrl.importarExcel);
-router.post('/:proyectoId/revision-excel/aplicar', excelRevCtrl.aplicarCambios);
+router.post('/:proyectoId/revision-excel/aplicar', requireRole('admin', 'revisor'), excelRevCtrl.aplicarCambios);
 
 // === EXPORTAR WORD ===
 router.get('/:id/exportar-word', ctrl.exportarWord);
