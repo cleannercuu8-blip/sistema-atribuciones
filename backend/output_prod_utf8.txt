@@ -1,0 +1,18 @@
+﻿--- Iniciando Pruebas E2E del Backend ---
+
+1. Probando Login...
+Ô£à Login exitoso. Token obtenido.
+
+2. Probando Creaci├│n de Proyecto...
+Usando dependencia_id: 23, estado_id: 1
+Ô£à Proyecto creado exitosamente. ID: 12
+
+3. Probando Listado de Proyectos...
+Ô£à Listado exitoso. Total de proyectos: 2
+Ô£à El proyecto reci├®n creado aparece en el listado.
+
+4. Probando Eliminaci├│n de Proyecto (ID: 12)...
+Ô£à Proyecto eliminado exitosamente.
+Ô£à Verificaci├│n exitosa: El proyecto ya no existe en la base de datos.
+
+--- Todas las pruebas pasaron exitosamente ---

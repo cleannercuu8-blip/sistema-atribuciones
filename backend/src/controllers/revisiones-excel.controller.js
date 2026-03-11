@@ -248,7 +248,7 @@ exports.eliminarHistorial = async (req, res) => {
     const client = await pool.connect();
     try {
         const { proyectoId, id } = req.params;
-        const usuarioNombre = req.usuario?.nombre || 'Usuario';
+        const usuarioNombre = req.user?.nombre || 'Usuario';
 
         await client.query('BEGIN');
 
@@ -301,7 +301,7 @@ exports.actualizarHistorial = async (req, res) => {
     try {
         const { proyectoId, id } = req.params;
         const { nombre_archivo } = req.body;
-        const usuarioNombre = req.usuario?.nombre || 'Usuario';
+        const usuarioNombre = req.user?.nombre || 'Usuario';
 
         if (!nombre_archivo) return res.status(400).json({ error: 'Nombre de archivo requerido' });
 

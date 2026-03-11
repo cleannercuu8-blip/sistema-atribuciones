@@ -1,0 +1,6 @@
+﻿--- Iniciando Pruebas E2E del Backend ---
+
+1. Probando Login...
+Ô£à Login exitoso. Token obtenido.
+
+2. Probando Creaci├│n de Proyecto...

@@ -38,7 +38,7 @@ router.use(authMiddleware);
 
 // === PROYECTOS ===
 router.get('/', ctrl.listar);
-router.post('/', requireRole('admin'), ctrl.crear);
+router.post('/', requireRole('admin', 'revisor'), ctrl.crear);
 router.get('/:id', ctrl.obtener);
 router.put('/:id', ctrl.actualizar);
 router.delete('/:id', ctrl.eliminar);
@@ -71,7 +71,7 @@ router.post('/:proyectoId/glosario', async (req, res) => {
     }
 });
 
-router.post('/:proyectoId/glosario/masivo', requireRole('admin', 'dependencia'), async (req, res) => {
+router.post('/:proyectoId/glosario/masivo', requireRole('admin', 'revisor'), async (req, res) => {
     const catalogosCtrl = require('../controllers/catalogos.controller');
     return catalogosCtrl.cargarMasivoGlosario(req, res);
 });
