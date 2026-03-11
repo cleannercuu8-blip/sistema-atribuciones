@@ -5,7 +5,7 @@ import { useAuth } from '../context/AuthContext';
 const navItems = [
     { to: '/', label: 'Reporte General', icon: '📊', roles: ['admin', 'revisor', 'visualizador'], exact: true },
     { to: '/proyectos', label: 'Proyectos', icon: '📁', roles: ['admin', 'revisor', 'visualizador', 'enlace'] },
-    { to: '/revisiones', label: 'Revisiones', icon: '🔍', roles: ['admin', 'revisor', 'visualizador'] },
+    { to: '/revisiones', label: 'Revisiones', icon: '🔍', roles: ['admin', 'revisor', 'visualizador', 'enlace'] },
     { to: '/proyecto-word', label: 'Proyecto de Word', icon: '📝', roles: ['admin', 'revisor', 'visualizador'] },
     { to: '/carga-trabajo', label: 'Carga de Trabajo', icon: '⚖️', roles: ['admin', 'revisor', 'visualizador'] },
     { to: '/catalogos', label: 'Catálogos', icon: '📚', roles: ['admin', 'revisor'] },

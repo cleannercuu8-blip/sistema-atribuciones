@@ -46,7 +46,7 @@ const AppRoutes = () => {
                     </RutaProtegida>
                 } />
                 <Route path="revisiones" element={
-                    <RutaProtegida roles={['admin', 'revisor', 'visualizador']}>
+                    <RutaProtegida roles={['admin', 'revisor', 'visualizador', 'enlace']}>
                         <Revisiones />
                     </RutaProtegida>
                 } />
