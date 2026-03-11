@@ -90,7 +90,7 @@ function TarjetaCambio({ c, onToggle }) {
 }
 
 // ── Historial de versiones Excel ──────────────────────────────────────────────
-function HistorialVersiones({ proyectoId, handleEliminarHistorial, handleEditarHistorial }) {
+function HistorialVersiones({ proyectoId, handleEliminarHistorial, handleEditarHistorial, usuario }) {
     const [historial, setHistorial] = useState([]);
     const [cargando, setCargando] = useState(false);
     const [expandido, setExpandido] = useState(null);
@@ -616,6 +616,7 @@ export default function Revisiones() {
                             proyectoId={proyectoId}
                             handleEliminarHistorial={handleEliminarHistorial}
                             handleEditarHistorial={handleEditarHistorial}
+                            usuario={usuario}
                         />
                     </div>
                 </>
