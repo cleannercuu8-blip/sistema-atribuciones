@@ -495,6 +495,34 @@ const obtenerEstadoProyecto = async (req, res) => {
     }
 };
 
+const cargarMasivoEstadosProyecto = async (req, res) => {
+    const { items } = req.body; // [{nombre, color}]
+    if (!Array.isArray(items)) return res.status(400).json({ error: 'Formato inválido' });
+
+    const client = await pool.connect();
+    try {
+        await client.query('BEGIN');
+        for (const item of items) {
+            if (!item.nombre) continue;
+            
+            await client.query(
+                `INSERT INTO cat_estados_proyecto (nombre, color) 
+                 VALUES ($1, $2) 
+                 ON CONFLICT (nombre) DO UPDATE SET color = EXCLUDED.color`,
+                [item.nombre, item.color || '#475569']
+            );
+        }
+        await client.query('COMMIT');
+        res.json({ mensaje: 'Carga masiva completada' });
+    } catch (err) {
+        await client.query('ROLLBACK');
+        console.error('Error en cargarMasivoEstadosProyecto:', err);
+        res.status(500).json({ error: 'Error en la carga masiva' });
+    } finally {
+        client.release();
+    }
+};
+
 const cargarMasivoGlosario = async (req, res) => {
     const { proyectoId } = req.params;
     const { items } = req.body; // [{acronimo, significado}]
