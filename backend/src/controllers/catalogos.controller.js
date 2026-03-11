@@ -555,5 +555,6 @@ module.exports = {
     obtenerDependencia,
     obtenerEstadoProyecto,
     limpiarCatalogo,
-    descargarPlantilla
+    descargarPlantilla,
+    cargarMasivoEstadosProyecto
 };
