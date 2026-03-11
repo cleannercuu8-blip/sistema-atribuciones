@@ -130,7 +130,7 @@ const crear = async (req, res) => {
         const proyResult = await client.query(
             `INSERT INTO proyectos (nombre, dependencia_id, responsable, responsable_apoyo, enlaces, fecha_expediente, created_by, estado_id, avance_id)
        VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9) RETURNING *`,
-            [nombre, dependencia_id, responsable, responsable_apoyo || null, enlaces, fecha_expediente, req.user.id, resolvedEstadoId, avance_id || null]
+            [nombre, dependencia_id, responsable, responsable_apoyo || null, enlaces || null, fecha_expediente || null, req.user.id, resolvedEstadoId, avance_id || null]
         );
         const proyecto = proyResult.rows[0];
 
@@ -207,7 +207,7 @@ const actualizar = async (req, res) => {
             `UPDATE proyectos 
              SET nombre=$1, dependencia_id=$2, responsable=$3, responsable_apoyo=$4, enlaces=$5, fecha_expediente=$6, estado_id=$7, avance_id=$8, updated_at=NOW() 
              WHERE id=$9`,
-            [nombre, dependencia_id, responsable, responsable_apoyo || null, enlaces, fecha_expediente, estado_id || null, avance_id || null, id]
+            [nombre, dependencia_id, responsable, responsable_apoyo || null, enlaces || null, fecha_expediente || null, estado_id || null, avance_id || null, id]
         );
 
         // LOG ACTIVIDAD: Actualización
