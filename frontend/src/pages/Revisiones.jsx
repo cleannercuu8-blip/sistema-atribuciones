@@ -277,6 +277,7 @@ export default function Revisiones() {
     const [cambiosDetectados, setCambiosDetectados] = useState([]);
     const [archivoSubido, setArchivoSubido] = useState(null);
     const [archivoUrlTemporal, setArchivoUrlTemporal] = useState(null);
+    const [revisandoDesdeHistorial, setRevisandoDesdeHistorial] = useState(false);
 
     // Estado del historial rápido para el Paso 1
     const [ultimoHistorial, setUltimoHistorial] = useState(null);
