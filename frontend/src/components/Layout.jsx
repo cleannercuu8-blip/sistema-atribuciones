@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { Outlet, NavLink, useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 
@@ -15,11 +15,15 @@ const navItems = [
 export default function Layout() {
     const { usuario, logout } = useAuth();
     const navigate = useNavigate();
+    const [isSidebarOpen, setIsSidebarOpen] = useState(false);
 
     const handleLogout = () => {
         logout();
         navigate('/login');
     };
+
+    const toggleSidebar = () => setIsSidebarOpen(!isSidebarOpen);
+    const closeSidebar = () => setIsSidebarOpen(false);
 
     const userInitials = usuario?.nombre?.split(' ').map(w => w[0]).join('').substring(0, 2).toUpperCase() || '?';
 
@@ -32,15 +36,20 @@ export default function Layout() {
     };
 
     return (
-        <div className="layout">
+        <div className={`layout ${isSidebarOpen ? 'sidebar-open' : ''}`}>
+            {/* OVERLAY for Mobile */}
+            {isSidebarOpen && <div className="sidebar-overlay" onClick={closeSidebar}></div>}
+
             {/* SIDEBAR */}
-            <aside className="sidebar">
+            <aside className={`sidebar ${isSidebarOpen ? 'active' : ''}`}>
                 <div className="sidebar-logo">
                     <span className="logo-icon">🌳</span>
                     <div>
                         <h1>Árbol de Atribuciones</h1>
                         <p>Plataforma de Gestión</p>
                     </div>
+                    {/* Botón para cerrar en móvil dentro del sidebar opcional */}
+                    <button className="sidebar-close-btn mobile-only" onClick={closeSidebar}>✕</button>
                 </div>
 
                 <nav className="sidebar-nav">
@@ -52,6 +61,7 @@ export default function Layout() {
                                 key={item.to}
                                 to={item.to}
                                 end={item.exact}
+                                onClick={closeSidebar}
                                 className={({ isActive }) => `nav-item ${isActive ? 'active' : ''}`}
                             >
                                 <span className="nav-icon">{item.icon}</span>
@@ -68,7 +78,7 @@ export default function Layout() {
                             <div style={{ fontSize: 13, fontWeight: 600, color: 'white', lineHeight: 1.2 }}>{usuario?.nombre}</div>
                             <div style={{ fontSize: 11, color: 'rgba(255,255,255,0.6)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                                 {getRolLabel(usuario?.rol)}
-                                <NavLink to="/perfil" className="sidebar-perfil-link" title="Ir a mi perfil">👤 Perfil</NavLink>
+                                <NavLink to="/perfil" className="sidebar-perfil-link" title="Ir a mi perfil" onClick={closeSidebar}>👤 Perfil</NavLink>
                             </div>
                         </div>
                     </div>
@@ -81,6 +91,15 @@ export default function Layout() {
 
             {/* MAIN CONTENT */}
             <main className="main-content">
+                {/* Mobile Topbar for Toggle */}
+                <div className="mobile-topbar">
+                    <button className="menu-toggle-btn" onClick={toggleSidebar}>
+                        ☰
+                    </button>
+                    <div className="mobile-logo-text">🌳 Árbol de Atribuciones</div>
+                    <div className="user-avatar-sm">{userInitials}</div>
+                </div>
+
                 <div className="page-content">
                     <Outlet />
                 </div>

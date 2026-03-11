@@ -152,6 +152,7 @@ body {
   display: flex;
   flex-direction: column;
   min-height: 100vh;
+  transition: var(--transicion);
 }
 
 .topbar {
@@ -1216,6 +1217,7 @@ tbody td {
     transform: rotate(360deg);
   }
 }
+
 /* ============================================
    DASHBOARD INNOVATIONS
    ============================================ */
@@ -1265,7 +1267,137 @@ tbody td {
   background: #cbd5e1;
 }
 
-@keyframes progressLoad {
-  from { width: 0; }
-  to { width: var(--final-width); }
+
+/* ============================================
+   RESPONSIVE NAVIGATION ENHANCEMENTS
+   ============================================ */
+.mobile-topbar {
+  display: none;
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 60px;
+  background: var(--color-primario);
+  color: white;
+  align-items: center;
+  padding: 0 16px;
+  z-index: 1000;
+  justify-content: space-between;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.15);
+}
+
+.menu-toggle-btn {
+  background: none;
+  border: none;
+  color: white;
+  font-size: 24px;
+  cursor: pointer;
+  padding: 8px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.mobile-logo-text {
+  font-weight: 700;
+  font-size: 14px;
+}
+
+.user-avatar-sm {
+  width: 32px;
+  height: 32px;
+  border-radius: 50%;
+  background: var(--color-secundario);
+  color: white;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-weight: 600;
+  font-size: 11px;
+}
+
+.sidebar-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.5);
+  backdrop-filter: blur(2px);
+  z-index: 99;
+  animation: fadeIn 0.2s ease;
+}
+
+.sidebar-close-btn {
+  background: rgba(255, 255, 255, 0.1);
+  border: none;
+  color: white;
+  width: 32px;
+  height: 32px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  font-size: 14px;
+  margin-left: auto;
+}
+
+.mobile-only {
+  display: none;
+}
+
+@media (max-width: 768px) {
+  .mobile-only {
+    display: flex;
+  }
+
+  .sidebar {
+    left: -260px;
+    width: 260px;
+    box-shadow: 10px 0 30px rgba(0, 0, 0, 0.2);
+  }
+
+  .sidebar.active {
+    left: 0;
+  }
+
+  .main-content {
+    margin-left: 0 !important;
+    padding-top: 60px;
+    /* Space for mobile topbar */
+  }
+
+  .mobile-topbar {
+    display: flex;
+  }
+
+  .page-content {
+    padding: 16px;
+  }
+
+  .modal {
+    padding: 20px;
+    margin: 10px;
+    width: calc(100% - 20px);
+    max-width: 100%;
+  }
+
+  .form-row {
+    grid-template-columns: 1fr;
+  }
+
+  .folder-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .explorer-container {
+    flex-direction: column;
+    max-height: none;
+  }
+
+  .explorer-sidebar {
+    width: 100%;
+    border-right: none;
+    border-bottom: 1px solid var(--color-borde);
+    max-height: 200px;
+  }
 }
