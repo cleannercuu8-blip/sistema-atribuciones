@@ -266,6 +266,9 @@ export default function Revisiones() {
     const [archivoSubido, setArchivoSubido] = useState(null);
     const [archivoUrlTemporal, setArchivoUrlTemporal] = useState(null);
 
+    // Estado del historial rápido para el Paso 1
+    const [ultimoHistorial, setUltimoHistorial] = useState(null);
+
     // Cargar lista de proyectos
     useEffect(() => {
         api.get('/proyectos')
@@ -275,6 +278,23 @@ export default function Revisiones() {
     }, []);
 
     const [refreshHistorial, setRefreshHistorial] = useState(0);
+
+    // Fetch último historial al seleccionar proyecto o refrescar
+    useEffect(() => {
+        if (!proyectoId) {
+            setUltimoHistorial(null);
+            return;
+        }
+        api.get(`/proyectos/${proyectoId}/revision-excel/historial`)
+            .then(r => {
+                if (r.data && r.data.length > 0) {
+                    setUltimoHistorial(r.data[0]); // El primero es el más reciente (ORDER BY created_at DESC)
+                } else {
+                    setUltimoHistorial(null);
+                }
+            })
+            .catch(() => setUltimoHistorial(null));
+    }, [proyectoId, refreshHistorial]);
 
     // Cuando cambia el selector
     const handleSelectProyecto = (e) => {
@@ -314,7 +334,7 @@ export default function Revisiones() {
         }
     };
 
-    // Descargar Excel de revisión
+    // Descargar Excel de revisión (Original de BD)
     const descargarExcel = async () => {
         if (!proyectoId) return;
         setCargando(true);
@@ -460,20 +480,47 @@ export default function Revisiones() {
                                 Genera un Excel con el árbol completo: atribuciones, glosario, ley y corresponsabilidades.
                                 Las columnas <strong>Observaciones</strong> y <strong>Nueva Propuesta</strong> son editables en todas las hojas.
                             </p>
-                            <button className="btn btn-primary" onClick={descargarExcel} disabled={cargando} style={{ width: '100%' }}>
-                                {cargando ? '⏳ Generando...' : '📤 Exportar Excel para Revisión'}
-                            </button>
+                            
+                            {ultimoHistorial && ultimoHistorial.archivo_url ? (
+                                <div style={{ marginBottom: 14, background: '#f0fdf4', padding: '12px', borderRadius: '8px', border: '1px solid #bbf7d0' }}>
+                                    <p style={{ fontSize: 12, color: '#166534', margin: '0 0 8px 0', fontWeight: 600 }}>
+                                        🌟 Último archivo subido disponible:
+                                    </p>
+                                    <a
+                                        href={`${api.defaults.baseURL.replace('/api', '')}/uploads/revisiones/${ultimoHistorial.archivo_url}`}
+                                        target="_blank"
+                                        rel="noopener noreferrer"
+                                        className="btn btn-success"
+                                        style={{ width: '100%', display: 'block', textAlign: 'center', marginBottom: 8 }}
+                                    >
+                                        📥 Bajar {ultimoHistorial.nombre_archivo}
+                                    </a>
+                                    <button 
+                                        className="btn btn-outline btn-sm" 
+                                        onClick={descargarExcel} 
+                                        disabled={cargando} 
+                                        style={{ width: '100%' }}
+                                        title="Generar uno nuevo en blanco con la BD Actual"
+                                    >
+                                        {cargando ? '⏳ Generando original...' : '📄 Generar Nuevo en Blanco'}
+                                    </button>
+                                </div>
+                            ) : (
+                                <button className="btn btn-primary" onClick={descargarExcel} disabled={cargando} style={{ width: '100%' }}>
+                                    {cargando ? '⏳ Generando original...' : '📤 Generar Nuevo Excel (BBDD)'}
+                                </button>
+                            )}
                         </div>
 
                         <div className="card" style={{ borderTop: '4px solid var(--color-exito)' }}>
                             <h4 style={{ fontSize: 15, fontWeight: 700, marginBottom: 10 }}>2. Subir Subsanaciones</h4>
                             <p style={{ fontSize: 13, color: '#64748b', marginBottom: 18, lineHeight: 1.5 }}>
                                 Sube el Excel modificado. El sistema detectará cambios en atribuciones, glosario, ley y
-                                <strong> corresponsabilidad</strong> para que los aceptes o rechaces uno a uno.
+                                <strong> corresponsabilidad</strong> para que se evalúen y apliquen.
                             </p>
                             <label className={`btn btn-success ${cargando ? 'disabled' : ''}`}
                                 style={{ width: '100%', cursor: cargando ? 'not-allowed' : 'pointer', textAlign: 'center', display: 'block' }}>
-                                {cargando ? '⏳ Leyendo Excel...' : '📥 Subir Excel Modificado'}
+                                {cargando ? '⏳ Leyendo Excel...' : '📤 Subir Archivo a Revisión'}
                                 <input type="file" accept=".xlsx" style={{ display: 'none' }} onChange={handleSubirExcel} disabled={cargando} />
                             </label>
                         </div>

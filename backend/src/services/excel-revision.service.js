@@ -379,14 +379,15 @@ class ExcelRevisionService {
                     if (!original) return;
 
                     const newSignificado = row.getCell(colPropG).value?.toString()?.trim() || '';
-                    if (original.significado.trim() !== newSignificado) {
+                    const obsVal = colObsG ? (row.getCell(colObsG).value?.toString()?.trim() || '') : '';
+                    if (original.significado.trim() !== newSignificado || obsVal !== '') {
                         cambios.push({
                             tipo: 'glosario',
                             id: parseInt(idStr),
                             acronimo: original.acronimo,
                             texto_original: original.significado,
-                            texto_propuesto: newSignificado,
-                            observacion: colObsG ? (row.getCell(colObsG).value?.toString()?.trim() || '') : '',
+                            texto_propuesto: newSignificado || original.significado, // Si está vacío, conservar original para aplicar
+                            observacion: obsVal,
                             hoja: 'GLOSARIOS',
                         });
                     }
@@ -419,14 +420,15 @@ class ExcelRevisionService {
                     if (!original) return;
 
                     const newTexto = row.getCell(colPropAG).value?.toString()?.trim() || '';
-                    if (original.texto.trim() !== newTexto) {
+                    const obsValAG = colObsAG ? (row.getCell(colObsAG).value?.toString()?.trim() || '') : '';
+                    if (original.texto.trim() !== newTexto || obsValAG !== '') {
                         cambios.push({
                             tipo: 'atribucion_general',
                             id: parseInt(idStr),
                             clave: original.clave,
                             texto_original: original.texto,
-                            texto_propuesto: newTexto,
-                            observacion: colObsAG ? (row.getCell(colObsAG).value?.toString()?.trim() || '') : '',
+                            texto_propuesto: newTexto || original.texto,
+                            observacion: obsValAG,
                             hoja: 'ATRIBUCIONES GENERALES',
                         });
                     }
@@ -490,13 +492,14 @@ class ExcelRevisionService {
                         }
                     }
                 }
-
-                if (textoPropuesto !== '' && dbRow.texto.trim() !== textoPropuesto) {
+                
+                // --- DETECCIÓN UNIFICADA (Texto u Observación) ---
+                if ((textoPropuesto !== '' && dbRow.texto.trim() !== textoPropuesto) || obs !== '') {
                     cambios.push({
                         tipo: 'atribucion_especifica',
                         id: parseInt(idStr),
                         texto_original: dbRow.texto,
-                        texto_propuesto: textoPropuesto,
+                        texto_propuesto: textoPropuesto || dbRow.texto,
                         observacion: obs,
                         hoja: sheet.name,
                     });
