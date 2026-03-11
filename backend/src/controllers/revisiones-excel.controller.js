@@ -4,13 +4,42 @@ const pool = require('../config/db');
 exports.exportarExcel = async (req, res) => {
     try {
         const { proyectoId } = req.params;
-        const workbook = await excelRevService.generarExcelRevision(proyectoId);
+        const rol = req.user?.rol;
+        let incluirPropuestas = false; // Por defecto responsable/apoyo/admin (solo obs)
+        let obsMap = {};
+
+        if (rol === 'enlace') {
+            incluirPropuestas = true;
+            // Para el enlace, recuperar el dictamen/observaciones del revisor
+            // desde el último registro del historial.
+            const histRes = await pool.query(
+                `SELECT resumen_cambios FROM historial_revisiones_excel 
+                 WHERE proyecto_id = $1 ORDER BY created_at DESC LIMIT 1`,
+                [proyectoId]
+            );
+            if (histRes.rows.length > 0 && histRes.rows[0].resumen_cambios) {
+                const cambios = typeof histRes.rows[0].resumen_cambios === 'string' 
+                    ? JSON.parse(histRes.rows[0].resumen_cambios) 
+                    : histRes.rows[0].resumen_cambios;
+                    
+                obsMap = { glosario: {}, atribucion_general: {}, atribucion_especifica: {} };
+                cambios.forEach(c => {
+                    const tipo = c.tipo || 'atribucion_especifica';
+                    if (c.observacion && obsMap[tipo]) {
+                        obsMap[tipo][c.id] = c.observacion;
+                    }
+                });
+            }
+        }
+
+        const workbook = await excelRevService.generarExcelRevision(proyectoId, incluirPropuestas, obsMap);
 
         const proyResult = await pool.query('SELECT nombre FROM proyectos WHERE id = $1', [proyectoId]);
         const nombre = proyResult.rows[0]?.nombre || 'proyecto';
+        const tipoArchivo = incluirPropuestas ? 'PARA-SUBSANAR' : 'REVISION';
 
         res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
-        res.setHeader('Content-Disposition', `attachment; filename="REVISION-${nombre.replace(/\s/g, '-')}.xlsx"`);
+        res.setHeader('Content-Disposition', `attachment; filename="${tipoArchivo}-${nombre.replace(/\s/g, '-')}.xlsx"`);
 
         await workbook.xlsx.write(res);
         res.end();
@@ -24,6 +53,7 @@ exports.importarExcel = async (req, res) => {
     try {
         const { proyectoId } = req.params;
         const file = req.file;
+        const rol = req.user?.rol;
 
         if (!file) {
             return res.status(400).json({ error: 'No se subió ningún archivo' });
@@ -43,7 +73,32 @@ exports.importarExcel = async (req, res) => {
 
         fs.renameSync(file.path, destino);
 
-        res.json({ cambios, archivoUrl: nuevoNombre });
+        let guardadoEnHistorial = false;
+
+        // Si es enlace, auto-guardamos directamente en el historial porque no tienen botón "Aplicar"
+        if (rol === 'enlace') {
+            const usuarioId = req.user?.id || null;
+            const usuarioNombre = req.user?.nombre || req.user?.username || 'Enlace';
+            const resumenJson = JSON.stringify(cambios);
+            
+            await pool.query(
+                `INSERT INTO historial_revisiones_excel 
+                 (proyecto_id, nombre_archivo, archivo_url, usuario_id, usuario_nombre, resumen_cambios, total_cambios, cambios_aplicados)
+                 VALUES ($1, $2, $3, $4, $5, $6, $7, $8)`,
+                [proyectoId, file.originalname, nuevoNombre, usuarioId, usuarioNombre, resumenJson, cambios.length, 0]
+            );
+
+            // Registrar en actividades
+            await pool.query(
+                `INSERT INTO actividades (tipo, entidad_tipo, entidad_id, proyecto_id, mensaje, usuario_nombre)
+                 VALUES ($1, $2, $3, $4, $5, $6)`,
+                ['actualizacion', 'revision_excel', proyectoId, proyectoId, `Enlace subió Excel de subsanación: ${file.originalname}`, usuarioNombre]
+            );
+
+            guardadoEnHistorial = true;
+        }
+
+        res.json({ cambios, archivoUrl: nuevoNombre, guardadoEnHistorial });
     } catch (error) {
         console.error('Error importando Excel:', error);
         res.status(500).json({ error: 'Error al procesar el documento Excel' });
@@ -337,5 +392,26 @@ exports.actualizarHistorial = async (req, res) => {
     } catch (error) {
         console.error('Error actualizando historial:', error);
         res.status(500).json({ error: 'Error al actualizar el registro del historial' });
+    }
+};
+
+exports.descargarArchivo = async (req, res) => {
+    try {
+        const { archivoUrl } = req.params;
+        const path = require('path');
+        const fs = require('fs');
+        
+        // sanitizar para evitar directory traversal
+        const nombreSeguro = path.basename(archivoUrl);
+        const fileRuta = path.join(__dirname, '../../uploads/revisiones', nombreSeguro);
+
+        if (!fs.existsSync(fileRuta)) {
+            return res.status(404).json({ error: 'El archivo Excel no fue encontrado en el servidor (posiblemente borrado por limpieza del proveedor)' });
+        }
+
+        res.download(fileRuta, nombreSeguro);
+    } catch (error) {
+        console.error('Error enviando archivo excel:', error);
+        res.status(500).json({ error: 'Error interno al intentar enviar el archivo' });
     }
 };

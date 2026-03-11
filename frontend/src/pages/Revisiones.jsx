@@ -90,7 +90,7 @@ function TarjetaCambio({ c, onToggle }) {
 }
 
 // ── Historial de versiones Excel ──────────────────────────────────────────────
-function HistorialVersiones({ proyectoId, handleEliminarHistorial, handleEditarHistorial, usuario }) {
+function HistorialVersiones({ proyectoId, handleEliminarHistorial, handleEditarHistorial, usuario, descargarExcelHistorial, handleCargarParaRevision }) {
     const [historial, setHistorial] = useState([]);
     const [cargando, setCargando] = useState(false);
     const [expandido, setExpandido] = useState(null);
@@ -163,16 +163,24 @@ function HistorialVersiones({ proyectoId, handleEliminarHistorial, handleEditarH
                                     <td style={{ fontSize: 12, color: '#475569' }}>{h.usuario_nombre || '-'}</td>
                                     <td style={{ whiteSpace: 'nowrap' }}>
                                         {h.archivo_url && (
-                                            <a
-                                                href={`${api.defaults.baseURL.replace('/api', '')}/uploads/revisiones/${h.archivo_url}`}
-                                                target="_blank"
-                                                rel="noopener noreferrer"
+                                            <button
+                                                onClick={() => descargarExcelHistorial(h.archivo_url, h.nombre_archivo)}
                                                 className="btn btn-outline btn-sm"
                                                 style={{ fontSize: 11, marginRight: 6, color: '#1d4ed8', borderColor: '#bfdbfe' }}
                                                 title="Descargar el Excel original subpuesto"
                                             >
                                                 📥 Excel
-                                            </a>
+                                            </button>
+                                        )}
+                                        {usuario?.rol !== 'enlace' && h.resumen_cambios?.length > 0 && (
+                                            <button
+                                                onClick={() => handleCargarParaRevision(h)}
+                                                className="btn btn-outline btn-sm"
+                                                style={{ fontSize: 11, marginRight: 6, color: '#059669', borderColor: '#a7f3d0' }}
+                                                title="Cargar estos cambios en la previsualización para aplicarlos a la BD"
+                                            >
+                                                ⚙️ Revisar
+                                            </button>
                                         )}
                                         <button
                                             className="btn btn-outline btn-sm"
@@ -353,6 +361,24 @@ export default function Revisiones() {
         setCargando(false);
     };
 
+    // Descargar Excel de historial con Auth
+    const descargarExcelHistorial = async (archivoUrl, nombreSugerido) => {
+        if (!proyectoId || !archivoUrl) return;
+        setCargando(true);
+        try {
+            const res = await api.get(`/proyectos/${proyectoId}/revision-excel/descargar/${archivoUrl}`, { responseType: 'blob' });
+            const url = window.URL.createObjectURL(new Blob([res.data]));
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = nombreSugerido || archivoUrl;
+            a.click();
+        } catch (err) {
+            console.error(err);
+            alert('Error al descargar el archivo del historial. Puede que haya sido limpiado por el servidor.');
+        }
+        setCargando(false);
+    };
+
     // Subir Excel modificado
     const handleSubirExcel = async (e) => {
         const file = e.target.files[0];
@@ -368,7 +394,17 @@ export default function Revisiones() {
             setCambiosDetectados(cambios.map((c, i) => ({ ...c, _idx: i, _aceptado: true })));
             setArchivoSubido(file.name);
             setArchivoUrlTemporal(res.data.archivoUrl); // Nuevo campo del backend
-            if (cambios.length === 0) alert('No se detectaron diferencias en el archivo subido.');
+
+            if (res.data.guardadoEnHistorial) {
+                alert('✅ El archivo ha sido enviado correctamente a su Responsable. Lo podrá revisar en el Historial.');
+                setCambiosDetectados([]);
+                setArchivoSubido(null);
+                setArchivoUrlTemporal(null);
+                setRefreshHistorial(prev => prev + 1);
+            } else {
+                if (cambios.length === 0) alert('No se detectaron diferencias en el archivo subido.');
+                setRevisandoDesdeHistorial(false);
+            }
         } catch (err) {
             alert(err.response?.data?.error || 'Error procesando el Excel.');
         }
@@ -382,6 +418,16 @@ export default function Revisiones() {
 
     const aceptarTodos = () => setCambiosDetectados(prev => prev.map(c => ({ ...c, _aceptado: true })));
     const rechazarTodos = () => setCambiosDetectados(prev => prev.map(c => ({ ...c, _aceptado: false })));
+
+    // Función para "Revisar y Aplicar" desde el historial
+    const handleCargarParaRevision = (h) => {
+        if (!h.resumen_cambios) return;
+        setCambiosDetectados(h.resumen_cambios.map((c, i) => ({ ...c, _idx: i, _aceptado: true })));
+        setArchivoSubido(h.nombre_archivo);
+        setArchivoUrlTemporal(h.archivo_url);
+        setRevisandoDesdeHistorial(true);
+        window.scrollTo({ top: 300, behavior: 'smooth' }); // Scrollear a la previsualización
+    };
 
     // Aplicar cambios y guardar en historial
     const aplicarCambios = async () => {
@@ -409,6 +455,7 @@ export default function Revisiones() {
             setCambiosDetectados([]);
             setArchivoSubido(null);
             setArchivoUrlTemporal(null);
+            setRevisandoDesdeHistorial(false);
             // Recargar historial
             setRefreshHistorial(prev => prev + 1);
             // Opcional: Recargar lista de proyectos para ver el cambio de estado 'en_revision'
@@ -481,8 +528,9 @@ export default function Revisiones() {
                         <div className="card" style={{ borderTop: '4px solid var(--color-primario)' }}>
                             <h4 style={{ fontSize: 15, fontWeight: 700, marginBottom: 10 }}>1. Descargar Documento</h4>
                             <p style={{ fontSize: 13, color: '#64748b', marginBottom: 18, lineHeight: 1.5 }}>
-                                Genera un Excel con el árbol completo: atribuciones, glosario, ley y corresponsabilidades.
-                                Las columnas <strong>Observaciones</strong> y <strong>Nueva Propuesta</strong> son editables en todas las hojas.
+                                {usuario?.rol === 'enlace' 
+                                    ? 'Descarga el último archivo con las observaciones del Responsable. El sistema le añadirá las columnas para que captures tus subsanaciones.'
+                                    : 'Genera un Excel con el árbol completo. Podrás agregar observaciones en la columna amarilla para cada registro.'}
                             </p>
                             
                             {ultimoHistorial && ultimoHistorial.archivo_url ? (
@@ -490,15 +538,13 @@ export default function Revisiones() {
                                     <p style={{ fontSize: 12, color: '#166534', margin: '0 0 8px 0', fontWeight: 600 }}>
                                         🌟 Último archivo subido disponible:
                                     </p>
-                                    <a
-                                        href={`${api.defaults.baseURL.replace('/api', '')}/uploads/revisiones/${ultimoHistorial.archivo_url}`}
-                                        target="_blank"
-                                        rel="noopener noreferrer"
+                                    <button
+                                        onClick={() => descargarExcelHistorial(ultimoHistorial.archivo_url, ultimoHistorial.nombre_archivo)}
                                         className="btn btn-success"
                                         style={{ width: '100%', display: 'block', textAlign: 'center', marginBottom: 8 }}
                                     >
                                         📥 Bajar {ultimoHistorial.nombre_archivo}
-                                    </a>
+                                    </button>
                                     <button 
                                         className="btn btn-outline btn-sm" 
                                         onClick={descargarExcel} 
@@ -517,10 +563,11 @@ export default function Revisiones() {
                         </div>
 
                         <div className="card" style={{ borderTop: '4px solid var(--color-exito)' }}>
-                            <h4 style={{ fontSize: 15, fontWeight: 700, marginBottom: 10 }}>2. Subir Subsanaciones</h4>
+                            <h4 style={{ fontSize: 15, fontWeight: 700, marginBottom: 10 }}>2. {usuario?.rol === 'enlace' ? 'Enviar Subsanaciones' : 'Subir Observaciones'}</h4>
                             <p style={{ fontSize: 13, color: '#64748b', marginBottom: 18, lineHeight: 1.5 }}>
-                                Sube el Excel modificado. El sistema detectará cambios en atribuciones, glosario, ley y
-                                <strong> corresponsabilidad</strong> para que se evalúen y apliquen.
+                                {usuario?.rol === 'enlace' 
+                                    ? 'Sube tu Excel con las nuevas propuestas y corresponsalías llenas. Se enviará directamente al historial para que el Responsable lo valide.'
+                                    : 'Sube el Excel con tus observaciones. El sistema detectará los cambios para que los revises antes de aplicarlos definitivamente.'}
                             </p>
                             <label className={`btn btn-success ${cargando ? 'disabled' : ''}`}
                                 style={{ width: '100%', cursor: cargando ? 'not-allowed' : 'pointer', textAlign: 'center', display: 'block' }}>
@@ -546,7 +593,7 @@ export default function Revisiones() {
                                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', flexWrap: 'wrap', gap: 12 }}>
                                     <div>
                                         <h4 style={{ fontSize: 16, fontWeight: 700, color: 'var(--color-primario)', marginBottom: 6 }}>
-                                            📑 Verificador de Cambios
+                                            📑 Verificador de Cambios {revisandoDesdeHistorial && <span style={{ color: '#059669', fontSize: 12 }}>(Cargado desde Historial)</span>}
                                         </h4>
                                         <p style={{ fontSize: 13, color: '#475569' }}>
                                             Archivo: <strong>{archivoSubido}</strong>
@@ -617,6 +664,8 @@ export default function Revisiones() {
                             handleEliminarHistorial={handleEliminarHistorial}
                             handleEditarHistorial={handleEditarHistorial}
                             usuario={usuario}
+                            descargarExcelHistorial={descargarExcelHistorial}
+                            handleCargarParaRevision={handleCargarParaRevision}
                         />
                     </div>
                 </>

@@ -285,6 +285,21 @@ app.get('/', (req, res) => {
     res.json({ mensaje: 'Sistema de Atribuciones API v1.0', status: 'activo' });
 });
 
+app.get('/api/check-file', (req, res) => {
+    const filename = req.query.name;
+    if (!filename) return res.json({ error: 'Falta name' });
+    const fullPath = path.join(__dirname, '../uploads/revisiones', filename);
+    const exists = fs.existsSync(fullPath);
+    let size = 0;
+    if (exists) {
+        size = fs.statSync(fullPath).size;
+    }
+    const dirList = fs.existsSync(path.join(__dirname, '../uploads/revisiones')) 
+        ? fs.readdirSync(path.join(__dirname, '../uploads/revisiones')) 
+        : [];
+    res.json({ filename, exists, size, dirList });
+});
+
 // Manejador de rutas no encontradas (404)
 app.use((req, res) => {
     console.log(`⚠️ Ruta no encontrada: ${req.method} ${req.url}`);

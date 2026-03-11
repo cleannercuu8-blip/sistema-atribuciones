@@ -73,12 +73,11 @@ class ExcelRevisionService {
 
     /**
      * Genera el Excel COMPLETO igual que el export general, pero con columnas de revisión
-     * añadidas a:
-     *  - Cada hoja de unidad: ID (oculto), OBSERVACIONES, NUEVA PROPUESTA, NUEVA CORRESPONSABILIDAD
-     *  - Hoja GLOSARIOS: ID (oculto), OBSERVACIONES, NUEVA PROPUESTA
-     *  - Hoja ATRIBUCIONES GENERALES: ID (oculto), OBSERVACIONES, NUEVA PROPUESTA
+     * Si incluirPropuestas es falso (Responsable), solo se imprime Observaciones.
+     * Si es verdadero (Enlace), se imprimen todas las columnas verdes/azules para subsanar.
+     * obsMap es un mapa opcional { glosario: { id: obs }, atribucion_general: {}, atribucion_especifica: {} }
      */
-    async generarExcelRevision(proyectoId) {
+    async generarExcelRevision(proyectoId, incluirPropuestas = true, obsMap = {}) {
         // Generar el workbook base (que tiene todas las pestañas)
         const workbook = await exportarExcel(proyectoId);
 
@@ -127,11 +126,14 @@ class ExcelRevisionService {
             wsGlos.getColumn(3).width = 5;
             wsGlos.getColumn(3).hidden = true;
             wsGlos.getColumn(4).width = 38;
-            wsGlos.getColumn(5).width = 45;
-
+            
             estiloEncabezadoRev(wsGlos.getCell('C2'), 'ID');
             estiloEncabezadoRev(wsGlos.getCell('D2'), 'OBSERVACIONES DEL REVISOR');
-            estiloEncabezadoRev(wsGlos.getCell('E2'), 'NUEVA PROPUESTA');
+
+            if (incluirPropuestas) {
+                wsGlos.getColumn(5).width = 45;
+                estiloEncabezadoRev(wsGlos.getCell('E2'), 'NUEVA PROPUESTA');
+            }
 
             // Obtener glosario con IDs
             const glosResult = await pool.query(
@@ -146,11 +148,14 @@ class ExcelRevisionService {
                 celId.value = g.id;
                 celId.protection = { locked: true };
 
-                // Observaciones
-                estiloEditable(wsGlos.getCell(`D${filaG}`), '', 'FFFFF2CC');
+                // Observaciones pre-llenadas si existen
+                const obsGlosario = obsMap?.glosario?.[g.id] || '';
+                estiloEditable(wsGlos.getCell(`D${filaG}`), obsGlosario, 'FFFFF2CC');
 
-                // Nueva Propuesta (por defecto = significado actual)
-                estiloEditable(wsGlos.getCell(`E${filaG}`), g.significado, 'FFE2EFDA');
+                if (incluirPropuestas) {
+                    // Nueva Propuesta (por defecto = significado actual)
+                    estiloEditable(wsGlos.getCell(`E${filaG}`), g.significado, 'FFE2EFDA');
+                }
 
                 filaG++;
             }
@@ -166,13 +171,14 @@ class ExcelRevisionService {
             wsAG.getColumn(6).width = 5;
             wsAG.getColumn(6).hidden = true;
             wsAG.getColumn(7).width = 38;
-            wsAG.getColumn(8).width = 50;
 
             estiloEncabezadoRev(wsAG.getCell('F3'), 'ID');
             estiloEncabezadoRev(wsAG.getCell('G3'), 'OBSERVACIONES DEL REVISOR');
-            estiloEncabezadoRev(wsAG.getCell('H3'), 'NUEVA PROPUESTA (Texto)');
 
-            estiloEncabezadoRev(wsAG.getCell('H3'), 'NUEVA PROPUESTA (Texto)');
+            if (incluirPropuestas) {
+                wsAG.getColumn(8).width = 50;
+                estiloEncabezadoRev(wsAG.getCell('H3'), 'NUEVA PROPUESTA (Texto)');
+            }
 
             let filaAG = 4;
             for (const ag of agResult.rows) {
@@ -180,8 +186,11 @@ class ExcelRevisionService {
                 celId.value = ag.id;
                 celId.protection = { locked: true };
 
-                estiloEditable(wsAG.getCell(`G${filaAG}`), '', 'FFFFF2CC');
-                estiloEditable(wsAG.getCell(`H${filaAG}`), ag.texto, 'FFE2EFDA');
+                const obsAG = obsMap?.atribucion_general?.[ag.id] || '';
+                estiloEditable(wsAG.getCell(`G${filaAG}`), obsAG, 'FFFFF2CC');
+                if (incluirPropuestas) {
+                    estiloEditable(wsAG.getCell(`H${filaAG}`), ag.texto, 'FFE2EFDA');
+                }
 
                 filaAG++;
             }
@@ -224,13 +233,15 @@ class ExcelRevisionService {
             ws.getColumn(colObsNum).width = 38;
             estiloEncabezadoRev(ws.getCell(`${colObs}3`), 'OBSERVACIONES DEL REVISOR');
 
-            // Col Nueva Propuesta de Texto
-            ws.getColumn(colPropNum).width = 50;
-            estiloEncabezadoRev(ws.getCell(`${colProp}3`), 'NUEVA PROPUESTA (TEXTO)');
+            if (incluirPropuestas) {
+                // Col Nueva Propuesta de Texto
+                ws.getColumn(colPropNum).width = 50;
+                estiloEncabezadoRev(ws.getCell(`${colProp}3`), 'NUEVA PROPUESTA (TEXTO)');
 
-            // Col Nueva Corresponsabilidad (clave del padre en unidad superior)
-            ws.getColumn(colCorrClaveNum).width = 28;
-            estiloEncabezadoRev(ws.getCell(`${colCorrClave}3`), 'NUEVA CORRESP. (CLAVE SUPERIOR)');
+                // Col Nueva Corresponsabilidad (clave del padre en unidad superior)
+                ws.getColumn(colCorrClaveNum).width = 28;
+                estiloEncabezadoRev(ws.getCell(`${colCorrClave}3`), 'NUEVA CORRESP. (CLAVE SUPERIOR)');
+            }
 
             // Obtener claves del nivel superior para el comentario/nota de referencia y lista desplegable
             let clavesSuperioresArray = [];
@@ -251,55 +262,58 @@ class ExcelRevisionService {
                 celId.value = atr.id;
                 celId.protection = { locked: true };
 
-                // Observaciones (editable, amarillo)
-                estiloEditable(ws.getCell(`${colObs}${fila}`), '', 'FFFFF2CC');
+                // Observaciones (editable, amarillo), pre-llenada si existe
+                const obsAE = obsMap?.atribucion_especifica?.[atr.id] || '';
+                estiloEditable(ws.getCell(`${colObs}${fila}`), obsAE, 'FFFFF2CC');
 
-                // Nueva Propuesta de Texto (editable, verde claro)
-                estiloEditable(ws.getCell(`${colProp}${fila}`), atr.texto, 'FFE2EFDA');
+                if (incluirPropuestas) {
+                    // Nueva Propuesta de Texto (editable, verde claro)
+                    estiloEditable(ws.getCell(`${colProp}${fila}`), atr.texto, 'FFE2EFDA');
 
-                // Nueva Corresponsabilidad por Clave (editable, azul claro)
-                // Valor por defecto: clave actual del padre (si existe) o de la Ley (si es Nivel 1)
-                let claveActualPadre = '';
-                if (atr.padre_atribucion_id && atriMap[String(atr.padre_atribucion_id)]) {
-                    claveActualPadre = atriMap[String(atr.padre_atribucion_id)].clave || '';
-                } else if (atr.atribucion_general_id) {
-                    const agObj = agResult.rows.find(ag => ag.id === atr.atribucion_general_id);
-                    if (agObj) claveActualPadre = agObj.clave || '';
-                }
+                    // Nueva Corresponsabilidad por Clave (editable, azul claro)
+                    // Valor por defecto: clave actual del padre (si existe) o de la Ley (si es Nivel 1)
+                    let claveActualPadre = '';
+                    if (atr.padre_atribucion_id && atriMap[String(atr.padre_atribucion_id)]) {
+                        claveActualPadre = atriMap[String(atr.padre_atribucion_id)].clave || '';
+                    } else if (atr.atribucion_general_id) {
+                        const agObj = agResult.rows.find(ag => ag.id === atr.atribucion_general_id);
+                        if (agObj) claveActualPadre = agObj.clave || '';
+                    }
 
-                const celCorrClave = ws.getCell(`${colCorrClave}${fila}`);
-                celCorrClave.value = claveActualPadre;
-                celCorrClave.protection = { locked: false };
-                celCorrClave.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFDBEAFE' } }; // Azul claro
-                celCorrClave.alignment = { vertical: 'top', wrapText: false };
+                    const celCorrClave = ws.getCell(`${colCorrClave}${fila}`);
+                    celCorrClave.value = claveActualPadre;
+                    celCorrClave.protection = { locked: false };
+                    celCorrClave.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFDBEAFE' } }; // Azul claro
+                    celCorrClave.alignment = { vertical: 'top', wrapText: false };
 
-                if (clavesSuperioresArray.length > 0) {
-                    const listString = `"${clavesSuperioresArray.join(',')}"`;
-                    if (listString.length < 255) {
-                        celCorrClave.dataValidation = {
-                            type: 'list',
-                            allowBlank: true,
-                            showErrorMessage: true,
-                            errorStyle: 'warning',
-                            errorTitle: 'Clave recomendada',
-                            error: 'La clave ingresada no es común para el nivel superior.',
-                            formulae: [listString]
+                    if (clavesSuperioresArray.length > 0) {
+                        const listString = `"${clavesSuperioresArray.join(',')}"`;
+                        if (listString.length < 255) {
+                            celCorrClave.dataValidation = {
+                                type: 'list',
+                                allowBlank: true,
+                                showErrorMessage: true,
+                                errorStyle: 'warning',
+                                errorTitle: 'Clave recomendada',
+                                error: 'La clave ingresada no es común para el nivel superior.',
+                                formulae: [listString]
+                            };
+                        }
+                    }
+                    celCorrClave.border = {
+                        top: { style: 'hair', color: { argb: 'cccccc' } },
+                        bottom: { style: 'hair', color: { argb: 'cccccc' } },
+                        left: { style: 'hair', color: { argb: 'cccccc' } },
+                        right: { style: 'hair', color: { argb: 'cccccc' } },
+                    };
+
+                    // Añadir nota con las claves disponibles del superior
+                    if (clavesSuperioresArray.length > 0) {
+                        celCorrClave.note = {
+                            texts: [{ text: `Claves disponibles del superior:\n${clavesSuperioresArray.join(', ')}` }],
+                            editAs: 'oneCells',
                         };
                     }
-                }
-                celCorrClave.border = {
-                    top: { style: 'hair', color: { argb: 'cccccc' } },
-                    bottom: { style: 'hair', color: { argb: 'cccccc' } },
-                    left: { style: 'hair', color: { argb: 'cccccc' } },
-                    right: { style: 'hair', color: { argb: 'cccccc' } },
-                };
-
-                // Añadir nota con las claves disponibles del superior
-                if (clavesSuperioresArray.length > 0) {
-                    celCorrClave.note = {
-                        texts: [{ text: `Claves disponibles del superior:\n${clavesSuperioresArray.join(', ')}` }],
-                        editAs: 'oneCells',
-                    };
                 }
 
                 fila++;
