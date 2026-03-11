@@ -1,4 +1,4 @@
-﻿import React, { useEffect, useState, useRef } from 'react';
+import React, { useEffect, useState, useRef } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import api from '../services/api';
 import { useAuth } from '../context/AuthContext';
@@ -414,43 +414,6 @@ const TabAtribuciones = ({ proyectoId, unidad, setUnidad, arbol, atribGenerales,
                                         </select>
                                     </div>
                                 )}
-                            </div>
-                            <div className="form-row">
-                                <div className="form-group">
-                                    <label className="form-label">🛡️ Corresponsabilidad (Glosario)</label>
-                                    <select className="form-control" value={form.corresponsabilidad} onChange={e => setForm({ ...form, corresponsabilidad: e.target.value })}>
-                                        <option value="">-- Ninguna --</option>
-                                        {glosario?.map(g => <option key={g.id} value={g.acronimo}>{g.acronimo} - {g.significado.substring(0, 40)}...</option>)}
-                                    </select>
-                                </div>
-                                <div className="form-group">
-                                    <label className="form-label">👤 Responsable</label>
-                                    <select className="form-control" value={form.responsable_id} onChange={e => setForm({ ...form, responsable_id: e.target.value })}>
-                                        <option value="">-- Sin asignar --</option>
-                                        {usuarios.map(u => <option key={u.id} value={u.id}>{u.nombre} ({u.rol})</option>)}
-                                    </select>
-                                </div>
-                            </div>
-
-                            <div className="form-group">
-                                <label className="form-label">🤝 Apoyo (Selección múltiple)</label>
-                                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(200px, 1fr))', gap: 8, maxHeight: 120, overflowY: 'auto', padding: 12, border: '1px solid #e2e8f0', borderRadius: 8 }}>
-                                    {usuarios.map(u => (
-                                        <label key={u.id} style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 12 }}>
-                                            <input
-                                                type="checkbox"
-                                                checked={form.apoyo_ids?.includes(u.id)}
-                                                onChange={e => {
-                                                    const ids = e.target.checked
-                                                        ? [...(form.apoyo_ids || []), u.id]
-                                                        : (form.apoyo_ids || []).filter(id => id !== u.id);
-                                                    setForm({ ...form, apoyo_ids: ids });
-                                                }}
-                                            />
-                                            {u.nombre}
-                                        </label>
-                                    ))}
-                                </div>
                             </div>
 
                             <div style={{ display: 'flex', gap: 12, justifyContent: 'flex-end', marginTop: 24 }}>
