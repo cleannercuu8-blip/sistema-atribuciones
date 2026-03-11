@@ -134,6 +134,7 @@ const runEssentialMigrations = async () => {
                 nombre_archivo VARCHAR(255),
                 total_cambios INTEGER DEFAULT 0,
                 cambios_aplicados INTEGER DEFAULT 0,
+                usuario_id INTEGER,
                 usuario_nombre VARCHAR(200),
                 resumen_cambios JSONB,
                 archivo_url TEXT,
@@ -160,6 +161,9 @@ const runEssentialMigrations = async () => {
             ADD COLUMN IF NOT EXISTS corresponsabilidad TEXT,
             ADD COLUMN IF NOT EXISTS responsable_id INTEGER,
             ADD COLUMN IF NOT EXISTS apoyo_ids INTEGER[];
+
+            ALTER TABLE historial_revisiones_excel
+            ADD COLUMN IF NOT EXISTS usuario_id INTEGER;
 
             -- 4. Restricciones de Unicidad
             DO $$ BEGIN

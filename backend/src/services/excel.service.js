@@ -69,6 +69,8 @@ const exportarExcel = async (proyectoId) => {
         [proyectoId]
     );
     const atriGenerales = atGenResult.rows;
+    // Mapa de atribuciones generales para búsqueda rápida
+    const atriGeneralesMap = new Map(atriGenerales.map(g => [String(g.id), g]));
 
     // Obtener atribuciones específicas con cadena completa
     const atEspResult = await pool.query(
@@ -110,8 +112,9 @@ const exportarExcel = async (proyectoId) => {
     wsOrg.getRow(3).height = 25;
 
     let fOrg = 4;
+    const unidadesMapInternal = new Map(unidades.map(u => [u.id, u]));
     for (const u of unidades) {
-        const padre = unidades.find(x => x.id === u.padre_id);
+        const padre = u.padre_id ? unidadesMapInternal.get(u.padre_id) : null;
         wsOrg.getCell(`A${fOrg}`).value = u.nivel_numero;
         estiloCelda(wsOrg.getCell(`B${fOrg}`), u.nombre);
         estiloCelda(wsOrg.getCell(`C${fOrg}`), u.siglas);
@@ -264,7 +267,7 @@ const exportarExcel = async (proyectoId) => {
                 }
 
                 if (idLey) {
-                    const gen = atriGenerales.find(g => String(g.id) === String(idLey));
+                    const gen = atriGeneralesMap.get(String(idLey));
                     if (gen) atribsPorNivel[0] = { clave: gen.clave, texto: gen.texto };
                 }
 

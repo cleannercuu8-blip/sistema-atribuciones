@@ -19,6 +19,7 @@ async function migrate() {
                 nombre_archivo VARCHAR(255),
                 total_cambios INTEGER DEFAULT 0,
                 cambios_aplicados INTEGER DEFAULT 0,
+                usuario_id INTEGER,
                 usuario_nombre VARCHAR(200),
                 resumen_cambios JSONB,
                 created_at TIMESTAMPTZ DEFAULT NOW()

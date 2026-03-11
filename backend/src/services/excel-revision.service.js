@@ -276,7 +276,8 @@ class ExcelRevisionService {
                     if (atr.padre_atribucion_id && atriMap[String(atr.padre_atribucion_id)]) {
                         claveActualPadre = atriMap[String(atr.padre_atribucion_id)].clave || '';
                     } else if (atr.atribucion_general_id) {
-                        const agObj = agResult.rows.find(ag => ag.id === atr.atribucion_general_id);
+                        const agIdStr = String(atr.atribucion_general_id);
+                        const agObj = agResult.rows.find(ag => String(ag.id) === agIdStr);
                         if (agObj) claveActualPadre = agObj.clave || '';
                     }
 

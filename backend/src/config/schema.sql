@@ -253,6 +253,7 @@ CREATE TABLE IF NOT EXISTS historial_revisiones_excel (
   nombre_archivo VARCHAR(255),
   total_cambios INTEGER DEFAULT 0,
   cambios_aplicados INTEGER DEFAULT 0,
+  usuario_id INTEGER,
   usuario_nombre VARCHAR(200),
   resumen_cambios JSONB,
   archivo_url TEXT,
