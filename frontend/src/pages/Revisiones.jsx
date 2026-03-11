@@ -142,14 +142,16 @@ function HistorialVersiones({ proyectoId, handleEliminarHistorial, handleEditarH
                                             >
                                                 📄 {h.nombre_archivo || 'archivo.xlsx'}
                                             </span>
-                                            <button
-                                                className="btn btn-ghost btn-xs"
-                                                onClick={() => handleEditarHistorial(h)}
-                                                style={{ padding: '0 4px', fontSize: 10 }}
-                                                title="Renombrar esta versión"
-                                            >
-                                                ✏️
-                                            </button>
+                                            {usuario?.rol !== 'enlace' && (
+                                                <button
+                                                    className="btn btn-ghost btn-xs"
+                                                    onClick={() => handleEditarHistorial(h)}
+                                                    style={{ padding: '0 4px', fontSize: 10 }}
+                                                    title="Renombrar esta versión"
+                                                >
+                                                    ✏️
+                                                </button>
+                                            )}
                                         </div>
                                     </td>
                                     <td style={{ textAlign: 'center' }}>
@@ -179,14 +181,16 @@ function HistorialVersiones({ proyectoId, handleEliminarHistorial, handleEditarH
                                         >
                                             {expandido === h.id ? '▲ Ocultar' : '👁 Ver resumen'}
                                         </button>
-                                        <button
-                                            className="btn btn-ghost btn-sm"
-                                            onClick={() => handleEliminarHistorial(h.id)}
-                                            style={{ fontSize: 11, color: '#ef4444', marginLeft: 6 }}
-                                            title="Eliminar este registro del historial"
-                                        >
-                                            🗑️
-                                        </button>
+                                        {usuario?.rol !== 'enlace' && (
+                                            <button
+                                                className="btn btn-ghost btn-sm"
+                                                onClick={() => handleEliminarHistorial(h.id)}
+                                                style={{ fontSize: 11, color: '#ef4444', marginLeft: 6 }}
+                                                title="Eliminar este registro del historial"
+                                            >
+                                                🗑️
+                                            </button>
+                                        )}
                                     </td>
                                 </tr>
                                 {expandido === h.id && (

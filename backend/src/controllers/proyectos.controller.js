@@ -37,7 +37,7 @@ const listar = async (req, res) => {
         WHERE 
             p.responsable = $1 OR p.responsable = $2 OR
             p.responsable_apoyo LIKE '%' || $1 || '%' OR p.responsable_apoyo LIKE '%' || $2 || '%' OR
-            p.enlaces = $1 OR p.enlaces = $2
+            p.enlaces LIKE '%' || $1 || '%' OR p.enlaces LIKE '%' || $2 || '%'
         ORDER BY p.created_at DESC`;
             params = [req.user.nombre, req.user.email];
         } else {
