@@ -254,9 +254,16 @@ const eliminar = async (req, res) => {
         return res.status(403).json({ error: 'No tienes permiso para eliminar' });
     }
     const { id } = req.params;
+    
+    const client = await pool.connect();
     try {
-        const proyCheck = await pool.query('SELECT created_by, responsable, responsable_apoyo, nombre FROM proyectos WHERE id = $1', [id]);
-        if (proyCheck.rows.length === 0) return res.status(404).json({ error: 'Proyecto no encontrado' });
+        await client.query('BEGIN');
+        
+        const proyCheck = await client.query('SELECT created_by, responsable, responsable_apoyo, nombre FROM proyectos WHERE id = $1', [id]);
+        if (proyCheck.rows.length === 0) {
+            await client.query('ROLLBACK');
+            return res.status(404).json({ error: 'Proyecto no encontrado' });
+        }
 
         // Para enlace, verificar si es su proyecto
         if (req.user.rol !== 'admin') {
@@ -267,25 +274,57 @@ const eliminar = async (req, res) => {
 
             if (req.user.rol === 'enlace') {
                 if (!isLead && !isSupport) {
+                    await client.query('ROLLBACK');
                     return res.status(403).json({ error: 'Solo puedes eliminar tus proyectos asignados' });
                 }
-            } else if (!isCreator && !isLead) { // For other roles that might have delete permissions (e.g., creator)
+            } else if (!isCreator && !isLead) { 
+                await client.query('ROLLBACK');
                 return res.status(403).json({ error: 'No tienes permiso para eliminar este proyecto' });
             }
         }
 
-        // LOG ACTIVIDAD: Eliminación (Mensaje antes de borrar)
-        await pool.query(
+        // LOG ACTIVIDAD: Eliminación
+        await client.query(
             `INSERT INTO actividades (tipo, entidad, entidad_id, proyecto_id, mensaje, autor)
              VALUES ($1, $2, $3, $4, $5, $6)`,
             ['eliminacion', 'proyecto', id, null, `Proyecto "${proyCheck.rows[0].nombre}" eliminado`, req.user.nombre]
         );
 
-        await pool.query('DELETE FROM proyectos WHERE id = $1', [id]);
-        res.json({ mensaje: 'Proyecto eliminado correctamente' });
+        // BORRADO MANUAL EN CASCADA (para asegurar que funcione aunque falte ON DELETE CASCADE en la BD de Producción)
+        
+        // 1. Quitar referencias cíclicas
+        await client.query('UPDATE atribuciones_especificas SET padre_atribucion_id = NULL WHERE proyecto_id = $1', [id]);
+        await client.query('UPDATE unidades_administrativas SET padre_id = NULL WHERE proyecto_id = $1', [id]);
+        
+        // 2. Borrar hijos profundos
+        await client.query('DELETE FROM observaciones WHERE revision_id IN (SELECT id FROM revisiones WHERE proyecto_id = $1)', [id]);
+        
+        // 3. Borrar dependencias directas del proyecto
+        await client.query('DELETE FROM revisiones WHERE proyecto_id = $1', [id]);
+        await client.query('DELETE FROM historial_revisiones_excel WHERE proyecto_id = $1', [id]);
+        await client.query('DELETE FROM actividades WHERE proyecto_id = $1 AND entidad != $2', [id, 'proyecto']); // Preservar el log de que se eliminó
+        await client.query('DELETE FROM glosario WHERE proyecto_id = $1', [id]);
+        
+        // 4. Borrar atribuciones y unidades
+        await client.query('DELETE FROM atribuciones_especificas WHERE proyecto_id = $1', [id]);
+        await client.query('DELETE FROM atribuciones_generales WHERE proyecto_id = $1', [id]);
+        await client.query('DELETE FROM unidades_administrativas WHERE proyecto_id = $1', [id]);
+        
+        // 5. Borrar asignaciones de roles
+        await client.query('DELETE FROM proyecto_usuarios WHERE proyecto_id = $1', [id]);
+        await client.query('DELETE FROM proyecto_revisores WHERE proyecto_id = $1', [id]);
+
+        // 6. Finalmente, borrar el proyecto
+        await client.query('DELETE FROM proyectos WHERE id = $1', [id]);
+        
+        await client.query('COMMIT');
+        res.json({ mensaje: 'Proyecto y todas sus dependencias eliminados correctamente' });
     } catch (err) {
+        await client.query('ROLLBACK');
         console.error('Error en DELETE /proyectos/:id:', err);
         res.status(500).json({ error: 'Error del servidor al eliminar proyecto', detalle: err.message });
+    } finally {
+        client.release();
     }
 };
 
