@@ -117,6 +117,118 @@ const runEssentialMigrations = async () => {
                 updated_at TIMESTAMPTZ DEFAULT NOW()
             );
 
+            CREATE TABLE IF NOT EXISTS usuarios (
+                id SERIAL PRIMARY KEY,
+                nombre VARCHAR(200) NOT NULL,
+                email VARCHAR(200) UNIQUE NOT NULL,
+                password_hash VARCHAR(255) NOT NULL,
+                rol VARCHAR(50) DEFAULT 'dependencia',
+                activo BOOLEAN DEFAULT true,
+                created_at TIMESTAMPTZ DEFAULT NOW(),
+                updated_at TIMESTAMPTZ DEFAULT NOW()
+            );
+
+            CREATE TABLE IF NOT EXISTS dependencias (
+                id SERIAL PRIMARY KEY,
+                nombre VARCHAR(300) NOT NULL UNIQUE,
+                siglas VARCHAR(50),
+                tipo VARCHAR(50) NOT NULL,
+                descripcion TEXT,
+                activo BOOLEAN DEFAULT true,
+                created_at TIMESTAMPTZ DEFAULT NOW()
+            );
+
+            CREATE TABLE IF NOT EXISTS proyectos (
+                id SERIAL PRIMARY KEY,
+                nombre VARCHAR(300) NOT NULL,
+                dependencia_id INTEGER NOT NULL REFERENCES dependencias(id),
+                estado VARCHAR(50) DEFAULT 'borrador',
+                organigrama_url TEXT,
+                created_by INTEGER REFERENCES usuarios(id),
+                responsable VARCHAR(200),
+                responsable_apoyo VARCHAR(200),
+                enlaces TEXT,
+                fecha_expediente DATE,
+                created_at TIMESTAMPTZ DEFAULT NOW(),
+                updated_at TIMESTAMPTZ DEFAULT NOW()
+            );
+
+            CREATE TABLE IF NOT EXISTS unidades_administrativas (
+                id SERIAL PRIMARY KEY,
+                proyecto_id INTEGER NOT NULL REFERENCES proyectos(id) ON DELETE CASCADE,
+                nombre VARCHAR(300) NOT NULL,
+                siglas VARCHAR(50) NOT NULL,
+                nivel_numero INTEGER NOT NULL,
+                padre_id INTEGER REFERENCES unidades_administrativas(id),
+                orden INTEGER DEFAULT 0,
+                created_at TIMESTAMPTZ DEFAULT NOW(),
+                UNIQUE(proyecto_id, siglas)
+            );
+
+            CREATE TABLE IF NOT EXISTS atribuciones_generales (
+                id SERIAL PRIMARY KEY,
+                proyecto_id INTEGER NOT NULL REFERENCES proyectos(id) ON DELETE CASCADE,
+                clave VARCHAR(20) NOT NULL,
+                norma VARCHAR(100),
+                articulo VARCHAR(50),
+                fraccion_parrafo VARCHAR(100),
+                texto TEXT NOT NULL,
+                activo BOOLEAN DEFAULT true,
+                created_at TIMESTAMPTZ DEFAULT NOW()
+            );
+
+            CREATE TABLE IF NOT EXISTS atribuciones_especificas (
+                id SERIAL PRIMARY KEY,
+                proyecto_id INTEGER NOT NULL REFERENCES proyectos(id) ON DELETE CASCADE,
+                unidad_id INTEGER NOT NULL REFERENCES unidades_administrativas(id) ON DELETE CASCADE,
+                clave VARCHAR(30) NOT NULL,
+                texto TEXT NOT NULL,
+                tipo VARCHAR(50) DEFAULT 'normal',
+                padre_atribucion_id INTEGER REFERENCES atribuciones_especificas(id),
+                atribucion_general_id INTEGER REFERENCES atribuciones_generales(id),
+                corresponsabilidad TEXT,
+                responsable_id INTEGER REFERENCES usuarios(id),
+                apoyo_ids INTEGER[],
+                activo BOOLEAN DEFAULT true,
+                created_at TIMESTAMPTZ DEFAULT NOW(),
+                updated_at TIMESTAMPTZ DEFAULT NOW()
+            );
+
+            CREATE TABLE IF NOT EXISTS glosario (
+                id SERIAL PRIMARY KEY,
+                proyecto_id INTEGER NOT NULL REFERENCES proyectos(id) ON DELETE CASCADE,
+                acronimo VARCHAR(50) NOT NULL,
+                significado TEXT NOT NULL,
+                created_at TIMESTAMPTZ DEFAULT NOW(),
+                UNIQUE(proyecto_id, acronimo)
+            );
+
+            CREATE TABLE IF NOT EXISTS revisiones (
+                id SERIAL PRIMARY KEY,
+                proyecto_id INTEGER NOT NULL REFERENCES proyectos(id) ON DELETE CASCADE,
+                numero_revision INTEGER NOT NULL,
+                revisor_id INTEGER NOT NULL REFERENCES usuarios(id),
+                dias_habiles_plazo INTEGER DEFAULT 10,
+                fecha_inicio TIMESTAMPTZ DEFAULT NOW(),
+                fecha_limite TIMESTAMPTZ,
+                fecha_cierre TIMESTAMPTZ,
+                estado VARCHAR(50) DEFAULT 'abierta',
+                notas TEXT,
+                created_at TIMESTAMPTZ DEFAULT NOW()
+            );
+
+            CREATE TABLE IF NOT EXISTS observaciones (
+                id SERIAL PRIMARY KEY,
+                revision_id INTEGER NOT NULL REFERENCES revisiones(id) ON DELETE CASCADE,
+                atribucion_especifica_id INTEGER REFERENCES atribuciones_especificas(id),
+                unidad_id INTEGER REFERENCES unidades_administrativas(id),
+                texto_observacion TEXT NOT NULL,
+                estado VARCHAR(50) DEFAULT 'pendiente',
+                respuesta TEXT,
+                created_at TIMESTAMPTZ DEFAULT NOW(),
+                updated_at TIMESTAMPTZ DEFAULT NOW()
+            );
+
             CREATE TABLE IF NOT EXISTS actividades (
                 id SERIAL PRIMARY KEY,
                 tipo VARCHAR(50) NOT NULL,
