@@ -79,7 +79,8 @@ exports.importarExcel = async (req, res) => {
         // Si es enlace, auto-guardamos directamente en el historial porque no tienen botón "Aplicar"
         if (rol === 'enlace') {
             const usuarioId = req.user?.id || null;
-            const usuarioNombre = req.user?.nombre || req.user?.username || 'Enlace';
+            const nombreBase = req.user?.nombre || req.user?.username || 'Usuario';
+            const usuarioNombre = `${nombreBase} (Enlace)`;
             const resumenJson = JSON.stringify(cambios);
             
             await pool.query(
@@ -109,7 +110,9 @@ exports.importarExcel = async (req, res) => {
 
             if (!tienePropuestasDeTexto) {
                 const usuarioId = req.user?.id || null;
-                const usuarioNombre = req.user?.nombre || req.user?.username || 'Responsable';
+                const nombreBase = req.user?.nombre || req.user?.username || 'Usuario';
+                const nombreRol = rol === 'admin' ? 'Administrador' : 'Responsable';
+                const usuarioNombre = `${nombreBase} (${nombreRol})`;
                 const resumenJson = JSON.stringify(cambios);
                 
                 await pool.query(
