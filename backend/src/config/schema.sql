@@ -4,7 +4,7 @@ CREATE EXTENSION IF NOT EXISTS "pgcrypto";
 -- TIPOS ENUMERADOS (Idempotentes)
 DO $$ BEGIN
     IF NOT EXISTS (SELECT 1 FROM pg_type WHERE typname = 'rol_usuario') THEN
-        CREATE TYPE rol_usuario AS ENUM ('admin', 'dependencia', 'revisor');
+        CREATE TYPE rol_usuario AS ENUM ('admin', 'dependencia', 'revisor', 'enlace');
     END IF;
     IF NOT EXISTS (SELECT 1 FROM pg_type WHERE typname = 'tipo_dependencia') THEN
         CREATE TYPE tipo_dependencia AS ENUM ('centralizada', 'paraestatal', 'organismo_autonomo', 'otro');
