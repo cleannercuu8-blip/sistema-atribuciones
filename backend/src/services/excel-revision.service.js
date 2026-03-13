@@ -422,7 +422,7 @@ class ExcelRevisionService {
                     const original = !esNuevo ? glosMap.get(idStr) : null;
                     if (!esNuevo && !original) return;
 
-                    const newSignificado = colPropG ? (row.getCell(colPropG).value?.toString()?.trim() || '') : '';
+                    let newSignificado = colPropG ? (row.getCell(colPropG).value?.toString()?.trim() || '') : '';
                     const obsVal = colObsG ? (row.getCell(colObsG).value?.toString()?.trim() || '') : '';
                     
                     if (esNuevo) {
@@ -442,16 +442,26 @@ class ExcelRevisionService {
                             observacion: obsVal,
                             hoja: 'GLOSARIOS',
                         });
-                    } else if ((newSignificado !== '' && original.significado.trim() !== newSignificado) || obsVal !== '') {
-                        cambios.push({
-                            tipo: 'glosario',
-                            id: parseInt(idStr),
-                            acronimo: original.acronimo,
-                            texto_original: original.significado,
-                            texto_propuesto: newSignificado || original.significado, // Si está vacío, conservar original para aplicar
-                            observacion: obsVal,
-                            hoja: 'GLOSARIOS',
-                        });
+                    } else {
+                        // Lógica para detectar sobreescritura directa en la celda de Significado
+                        if (newSignificado === '' || newSignificado === original.significado.trim()) {
+                            const valOrig = row.getCell(2).value?.toString()?.trim();
+                            if (valOrig && valOrig !== '-' && valOrig !== original.significado.trim()) {
+                                newSignificado = valOrig;
+                            }
+                        }
+
+                        if ((newSignificado !== '' && original.significado.trim() !== newSignificado) || obsVal !== '') {
+                            cambios.push({
+                                tipo: 'glosario',
+                                id: parseInt(idStr),
+                                acronimo: original.acronimo,
+                                texto_original: original.significado,
+                                texto_propuesto: newSignificado || original.significado,
+                                observacion: obsVal,
+                                hoja: 'GLOSARIOS',
+                            });
+                        }
                     }
                 });
             }
@@ -485,7 +495,7 @@ class ExcelRevisionService {
                     const original = !esNuevo ? agMap.get(idStr) : null;
                     if (!esNuevo && !original) return;
 
-                    const newTexto = colPropAG ? (row.getCell(colPropAG).value?.toString()?.trim() || '') : '';
+                    let newTexto = colPropAG ? (row.getCell(colPropAG).value?.toString()?.trim() || '') : '';
                     const obsValAG = colObsAG ? (row.getCell(colObsAG).value?.toString()?.trim() || '') : '';
                     
                     if (esNuevo) {
@@ -508,16 +518,29 @@ class ExcelRevisionService {
                             observacion: obsValAG,
                             hoja: 'ATRIBUCIONES GENERALES',
                         });
-                    } else if ((newTexto !== '' && original.texto.trim() !== newTexto) || obsValAG !== '') {
-                        cambios.push({
-                            tipo: 'atribucion_general',
-                            id: parseInt(idStr),
-                            clave: original.clave,
-                            texto_original: original.texto,
-                            texto_propuesto: newTexto || original.texto,
-                            observacion: obsValAG,
-                            hoja: 'ATRIBUCIONES GENERALES',
-                        });
+                    } else {
+                        // Lógica para detectar sobreescritura directa en la celda de Texto Original (penúltima o antes del ID)
+                        if (newTexto === '' || newTexto === original.texto.trim()) {
+                            const colTextoOrigIdx = colIdAG - 1; // o colIdAG - 2 si hay despistes
+                            if (colTextoOrigIdx > 0) {
+                                const valOrig = row.getCell(colTextoOrigIdx).value?.toString()?.trim();
+                                if (valOrig && valOrig !== '-' && valOrig !== original.texto.trim()) {
+                                    newTexto = valOrig;
+                                }
+                            }
+                        }
+
+                        if ((newTexto !== '' && original.texto.trim() !== newTexto) || obsValAG !== '') {
+                            cambios.push({
+                                tipo: 'atribucion_general',
+                                id: parseInt(idStr),
+                                clave: original.clave,
+                                texto_original: original.texto,
+                                texto_propuesto: newTexto || original.texto,
+                                observacion: obsValAG,
+                                hoja: 'ATRIBUCIONES GENERALES',
+                            });
+                        }
                     }
                 });
             }
