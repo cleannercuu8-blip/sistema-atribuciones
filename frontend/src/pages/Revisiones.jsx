@@ -28,14 +28,14 @@ function TarjetaCambio({ c, onToggle }) {
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12, flexWrap: 'wrap', gap: 8 }}>
                 <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
                     <span style={{ background: cfg.color, color: cfg.colorHeader, border: `1px solid ${cfg.colorBorde}`, borderRadius: 20, padding: '2px 10px', fontSize: 11, fontWeight: 800 }}>
-                        {cfg.icono} {cfg.etiqueta}
+                        {cfg.icono} {cfg.etiqueta} {c.hoja && c.hoja !== 'GLOSARIOS' && c.hoja !== 'ATRIBUCIONES GENERALES' ? ` (${c.hoja})` : ''}
                     </span>
                     {esCorrsp && (
                         <span style={{ background: '#fef9c3', color: '#92400e', border: '1px solid #fde047', borderRadius: 20, padding: '2px 10px', fontSize: 11, fontWeight: 700 }}>
                             ⚠️ Cambia jerarquía
                         </span>
                     )}
-                    <span style={{ fontSize: 12, color: '#64748b' }}>Cambio #{c._idx + 1} · ID: {c.id} · {c.hoja}</span>
+                    <span style={{ fontSize: 12, color: '#64748b' }}>Cambio #{c._idx + 1} · ID: {c.id}</span>
                 </div>
                 <button onClick={() => onToggle(c._idx)} style={{
                     padding: '5px 18px', borderRadius: 8, border: 'none', cursor: 'pointer',
@@ -172,15 +172,20 @@ function HistorialVersiones({ proyectoId, handleEliminarHistorial, handleEditarH
                                                 📥 Excel
                                             </button>
                                         )}
-                                        {usuario?.rol !== 'enlace' && h.resumen_cambios?.length > 0 && (
+                                        {usuario?.rol !== 'enlace' && h.resumen_cambios?.length > 0 && usuario?.nombre !== h.usuario_nombre && h.cambios_aplicados === 0 && (
                                             <button
                                                 onClick={() => handleCargarParaRevision(h)}
                                                 className="btn btn-outline btn-sm"
                                                 style={{ fontSize: 11, marginRight: 6, color: '#059669', borderColor: '#a7f3d0' }}
-                                                title="Cargar estos cambios en la previsualización para aplicarlos a la BD"
+                                                title="Revisar observaciones o subsanaciones mandadas por el Enlace"
                                             >
                                                 ⚙️ Revisar
                                             </button>
+                                        )}
+                                        {h.cambios_aplicados > 0 && (
+                                            <span style={{ fontSize: 11, color: '#166534', marginRight: 6, padding: '4px 8px', background: '#dcfce7', borderRadius: '4px' }}>
+                                                ✅ Ya aplicado
+                                            </span>
                                         )}
                                         <button
                                             className="btn btn-outline btn-sm"
