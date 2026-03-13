@@ -375,6 +375,10 @@ class ExcelRevisionService {
         );
         resAE.rows.forEach(r => atriEspMap.set(r.id.toString(), r));
 
+        const unidadesRes = await pool.query('SELECT id, siglas FROM unidades_administrativas WHERE proyecto_id = $1', [proyectoId]);
+        const mapUnidades = {};
+        unidadesRes.rows.forEach(u => mapUnidades[u.siglas.substring(0, 31)] = u);
+
         const glosMap = new Map();
         const resGlos = await pool.query(
             'SELECT id, acronimo, significado FROM glosario WHERE proyecto_id = $1',
@@ -408,19 +412,37 @@ class ExcelRevisionService {
                 wsGlos.eachRow((row, rowNumber) => {
                     if (rowNumber <= 2) return;
                     const idVal = row.getCell(colIdG).value;
-                    if (!idVal) return;
                     
-                    let idStr = idVal.toString().trim();
-                    if (isNaN(parseInt(idStr))) return;
-                    idStr = Math.floor(Number(idStr)).toString();
+                    let idStr = idVal ? idVal.toString().trim() : '';
+                    const esNuevo = (idStr === '');
+                    
+                    if (!esNuevo && isNaN(parseInt(idStr))) return;
+                    if (!esNuevo) idStr = Math.floor(Number(idStr)).toString();
 
-                    const original = glosMap.get(idStr);
-                    if (!original) return;
+                    const original = !esNuevo ? glosMap.get(idStr) : null;
+                    if (!esNuevo && !original) return;
 
                     const newSignificado = colPropG ? (row.getCell(colPropG).value?.toString()?.trim() || '') : '';
                     const obsVal = colObsG ? (row.getCell(colObsG).value?.toString()?.trim() || '') : '';
                     
-                    if ((newSignificado !== '' && original.significado.trim() !== newSignificado) || obsVal !== '') {
+                    if (esNuevo) {
+                        const acronimo = row.getCell(1).value?.toString()?.trim() || '';
+                        const fallbackSig = row.getCell(2).value?.toString()?.trim() || '';
+                        const propFinal = newSignificado || fallbackSig;
+                        
+                        if (acronimo === '' && propFinal === '' && obsVal === '') return;
+                        
+                        cambios.push({
+                            tipo: 'glosario',
+                            id: null,
+                            _esNuevo: true,
+                            acronimo: acronimo || '(Desconocido)',
+                            texto_original: '✨ NUEVA FILA INSERTADA',
+                            texto_propuesto: propFinal || '(Solo observación)',
+                            observacion: obsVal,
+                            hoja: 'GLOSARIOS',
+                        });
+                    } else if ((newSignificado !== '' && original.significado.trim() !== newSignificado) || obsVal !== '') {
                         cambios.push({
                             tipo: 'glosario',
                             id: parseInt(idStr),
@@ -453,19 +475,40 @@ class ExcelRevisionService {
                 wsAG.eachRow((row, rowNumber) => {
                     if (rowNumber <= 3) return; // Header es fila 3
                     const idVal = row.getCell(colIdAG).value;
-                    if (!idVal) return;
                     
-                    let idStr = idVal.toString().trim();
-                    if (isNaN(parseInt(idStr))) return;
-                    idStr = Math.floor(Number(idStr)).toString();
+                    let idStr = idVal ? idVal.toString().trim() : '';
+                    const esNuevo = (idStr === '');
+                    
+                    if (!esNuevo && isNaN(parseInt(idStr))) return;
+                    if (!esNuevo) idStr = Math.floor(Number(idStr)).toString();
 
-                    const original = agMap.get(idStr);
-                    if (!original) return;
+                    const original = !esNuevo ? agMap.get(idStr) : null;
+                    if (!esNuevo && !original) return;
 
                     const newTexto = colPropAG ? (row.getCell(colPropAG).value?.toString()?.trim() || '') : '';
                     const obsValAG = colObsAG ? (row.getCell(colObsAG).value?.toString()?.trim() || '') : '';
                     
-                    if ((newTexto !== '' && original.texto.trim() !== newTexto) || obsValAG !== '') {
+                    if (esNuevo) {
+                        const claveAG = row.getCell(1).value?.toString()?.trim() || '';
+                        const fallbackText = row.getCell(colIdAG - 1).value?.toString()?.trim() || '';
+                        const textoPropFinal = newTexto || fallbackText;
+                        
+                        if (claveAG === '' && textoPropFinal === '' && obsValAG === '') return;
+                        
+                        cambios.push({
+                            tipo: 'atribucion_general',
+                            id: null,
+                            _esNuevo: true,
+                            clave: claveAG || '(Desconocida)',
+                            norma: row.getCell(2).value?.toString()?.trim() || '',
+                            articulo: row.getCell(3).value?.toString()?.trim() || '',
+                            fraccion_parrafo: row.getCell(4).value?.toString()?.trim() || '',
+                            texto_original: '✨ NUEVA FILA INSERTADA',
+                            texto_propuesto: textoPropFinal || '(Solo observación)',
+                            observacion: obsValAG,
+                            hoja: 'ATRIBUCIONES GENERALES',
+                        });
+                    } else if ((newTexto !== '' && original.texto.trim() !== newTexto) || obsValAG !== '') {
                         cambios.push({
                             tipo: 'atribucion_general',
                             id: parseInt(idStr),
@@ -503,41 +546,70 @@ class ExcelRevisionService {
 
             if (!colIdNum) return;
 
+            const unidadIdSheet = mapUnidades[sheet.name]?.id;
+
             sheet.eachRow((row, rowNumber) => {
                 if (rowNumber <= 3) return;
 
                 const idVal = row.getCell(colIdNum).value;
-                if (idVal === undefined || idVal === null) return;
+                let idStr = idVal ? idVal.toString().trim() : '';
+                const esNuevo = (idStr === '');
 
-                // Limpieza de ID: soporta "101", 101, 101.0
-                const idStr = String(Math.floor(Number(idVal.toString().trim())));
-                if (isNaN(parseInt(idStr))) return;
+                // Limpieza de ID
+                if (!esNuevo && isNaN(parseInt(idStr))) return;
+                if (!esNuevo) idStr = String(Math.floor(Number(idStr)));
 
-                const dbRow = atriEspMap.get(idStr);
-                if (!dbRow) return;
+                const dbRow = !esNuevo ? atriEspMap.get(idStr) : null;
+                if (!esNuevo && !dbRow) return;
 
                 const obs = colObsNum ? (row.getCell(colObsNum).value?.toString()?.trim() || '') : '';
+                let textoPropuesto = colPropNum ? (row.getCell(colPropNum).value?.toString()?.trim() || '') : '';
 
-                // -- Cambio de TEXTO --
-                let textoPropuesto = '';
-                if (colPropNum) {
-                    textoPropuesto = row.getCell(colPropNum).value?.toString()?.trim() || '';
+                if (esNuevo) {
+                     const colTextoOrigIdx = colIdNum - 2;
+                     const fallbackText = colTextoOrigIdx > 0 ? row.getCell(colTextoOrigIdx).value?.toString()?.trim() || '' : '';
+                     const finalTex = textoPropuesto || fallbackText;
+                     
+                     let ccorr = '';
+                     if (colCorrClaveNum) {
+                         ccorr = row.getCell(colCorrClaveNum).value?.toString()?.trim() || '';
+                     }
+                     if (!ccorr) {
+                         const colCorrOrigIdx = colIdNum - 1;
+                         ccorr = colCorrOrigIdx > 0 ? row.getCell(colCorrOrigIdx).value?.toString()?.trim() || '' : '';
+                     }
+                     
+                     if (finalTex === '' && ccorr === '' && obs === '') return;
+                     
+                     const colClave = colTextoOrigIdx - 1;
+                     const clavePropia = colClave > 0 ? row.getCell(colClave).value?.toString()?.trim() || '' : '';
+                     
+                     cambios.push({
+                          tipo: 'atribucion_especifica',
+                          id: null,
+                          _esNuevo: true,
+                          unidad_id: unidadIdSheet,
+                          clave: clavePropia || '(Desconocida)',
+                          clave_propuesta: ccorr,
+                          texto_original: '✨ NUEVA FILA INSERTADA',
+                          texto_propuesto: finalTex || '(Solo observación)',
+                          observacion: obs,
+                          hoja: sheet.name,
+                     });
+                     return;
                 }
 
                 // Fallback: Si no hay propuesta en la columna verde, ver si el usuario editó la original
-                // La columna de texto de esta unidad es: [ID] - 2
                 if (dbRow.texto.trim() === textoPropuesto || textoPropuesto === '') {
                     const colTextoOrigIdx = colIdNum - 2;
                     if (colTextoOrigIdx > 0) {
                         const valOrig = row.getCell(colTextoOrigIdx).value?.toString()?.trim();
-                        // Solo aceptamos el fallback si tiene contenido real y es diferente
                         if (valOrig && valOrig !== '-' && valOrig !== dbRow.texto.trim()) {
                             textoPropuesto = valOrig;
                         }
                     }
                 }
                 
-                // --- DETECCIÓN UNIFICADA (Texto u Observación) ---
                 if ((textoPropuesto !== '' && dbRow.texto.trim() !== textoPropuesto) || obs !== '') {
                     cambios.push({
                         tipo: 'atribucion_especifica',
@@ -554,7 +626,6 @@ class ExcelRevisionService {
                     let nuevaClave = row.getCell(colCorrClaveNum).value?.toString()?.trim() || '';
                     const claveActual = dbRow?.padre_clave?.trim() || dbRow?.ag_clave?.trim() || '';
 
-                    // Fallback: Si no hay cambio en la columna azul, ver la columna original (ID - 1)
                     if (nuevaClave === claveActual || nuevaClave === '') {
                         const colCorrOrigIdx = colIdNum - 1;
                         if (colCorrOrigIdx > 0) {

@@ -35,7 +35,7 @@ function TarjetaCambio({ c, onToggle }) {
                             ⚠️ Cambia jerarquía
                         </span>
                     )}
-                    <span style={{ fontSize: 12, color: '#64748b' }}>Cambio #{c._idx + 1} · ID: {c.id}</span>
+                    <span style={{ fontSize: 12, color: '#64748b' }}>Cambio #{c._idx + 1} · {c._esNuevo ? <strong style={{color:'#16a34a'}}>NUEVO REGISTRO</strong> : `ID: ${c.id}`}</span>
                 </div>
                 <button onClick={() => onToggle(c._idx)} style={{
                     padding: '5px 18px', borderRadius: 8, border: 'none', cursor: 'pointer',
@@ -283,6 +283,7 @@ export default function Revisiones() {
     const [archivoSubido, setArchivoSubido] = useState(null);
     const [archivoUrlTemporal, setArchivoUrlTemporal] = useState(null);
     const [revisandoDesdeHistorial, setRevisandoDesdeHistorial] = useState(false);
+    const [historialEnRevisionId, setHistorialEnRevisionId] = useState(null);
 
     // Estado del historial rápido para el Paso 1
     const [ultimoHistorial, setUltimoHistorial] = useState(null);
@@ -322,6 +323,7 @@ export default function Revisiones() {
         setCambiosDetectados([]);
         setArchivoSubido(null);
         setArchivoUrlTemporal(null);
+        setHistorialEnRevisionId(null);
         setRefreshHistorial(0);
     };
 
@@ -406,6 +408,7 @@ export default function Revisiones() {
                 setCambiosDetectados([]);
                 setArchivoSubido(null);
                 setArchivoUrlTemporal(null);
+                setHistorialEnRevisionId(null);
                 setRefreshHistorial(prev => prev + 1);
             } else {
                 if (cambios.length === 0) alert('No se detectaron diferencias en el archivo subido.');
@@ -432,6 +435,7 @@ export default function Revisiones() {
         setArchivoSubido(h.nombre_archivo);
         setArchivoUrlTemporal(h.archivo_url);
         setRevisandoDesdeHistorial(true);
+        setHistorialEnRevisionId(h.id);
         window.scrollTo({ top: 300, behavior: 'smooth' }); // Scrollear a la previsualización
     };
 
@@ -443,12 +447,13 @@ export default function Revisiones() {
         setCargando(true);
         try {
             const res = await api.post(`/proyectos/${proyectoId}/revision-excel/aplicar`, {
-                cambios: seleccionados.map(({ tipo, id, texto_propuesto, observacion, clave_propuesta, clave_actual, acronimo, clave }) => ({
-                    tipo: tipo || 'atribucion_especifica', id, texto_propuesto, observacion, clave_propuesta, clave_actual, acronimo, clave
+                cambios: seleccionados.map(({ tipo, id, texto_propuesto, observacion, clave_propuesta, clave_actual, acronimo, clave, _esNuevo, unidad_id, norma, articulo, fraccion_parrafo }) => ({
+                    tipo: tipo || 'atribucion_especifica', id, texto_propuesto, observacion, clave_propuesta, clave_actual, acronimo, clave, _esNuevo, unidad_id, norma, articulo, fraccion_parrafo
                 })),
                 nombreArchivo: archivoSubido,
                 usuarioNombre: usuario?.nombre || 'Sistema',
                 archivoUrl: archivoUrlTemporal,
+                historialId: historialEnRevisionId,
             });
 
             const realAplicados = res.data.aplicados || 0;
@@ -462,6 +467,7 @@ export default function Revisiones() {
             setArchivoSubido(null);
             setArchivoUrlTemporal(null);
             setRevisandoDesdeHistorial(false);
+            setHistorialEnRevisionId(null);
             // Recargar historial
             setRefreshHistorial(prev => prev + 1);
             // Opcional: Recargar lista de proyectos para ver el cambio de estado 'en_revision'

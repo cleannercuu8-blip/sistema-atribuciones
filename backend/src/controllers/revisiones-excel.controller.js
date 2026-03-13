@@ -168,7 +168,7 @@ exports.aplicarCambios = async (req, res) => {
     const client = await pool.connect();
     try {
         const { proyectoId } = req.params;
-        const { cambios, nombreArchivo, usuarioNombre, archivoUrl } = req.body;
+        const { cambios, nombreArchivo, usuarioNombre, archivoUrl, historialId } = req.body;
 
         if (!cambios || !Array.isArray(cambios)) {
             return res.status(400).json({ error: 'Formato de cambios inválido' });
@@ -181,9 +181,56 @@ exports.aplicarCambios = async (req, res) => {
         for (const cambio of cambios) {
             const tipo = cambio.tipo || 'atribucion_especifica';
             let mensajeActividad = '';
+            let nuevoId = cambio.id;
 
-            if (tipo === 'atribucion_especifica') {
-                const updateRes = await client.query(
+            if (cambio._esNuevo) {
+                // ── MODO INSERTAR (Filas Nuevas) ──
+                if (tipo === 'atribucion_especifica') {
+                    let padre_id = null;
+                    let ag_id = null;
+                    if (cambio.clave_propuesta) {
+                        const resPadre = await client.query(`SELECT id FROM atribuciones_especificas WHERE proyecto_id = $1 AND clave = $2 LIMIT 1`, [proyectoId, cambio.clave_propuesta]);
+                        if (resPadre.rows.length > 0) padre_id = resPadre.rows[0].id;
+                        else {
+                            const resAG = await client.query(`SELECT id FROM atribuciones_generales WHERE proyecto_id = $1 AND clave = $2 LIMIT 1`, [proyectoId, cambio.clave_propuesta]);
+                            if (resAG.rows.length > 0) ag_id = resAG.rows[0].id;
+                        }
+                    }
+                    const insertRes = await client.query(
+                        `INSERT INTO atribuciones_especificas (proyecto_id, unidad_id, clave, texto, corresponsabilidad, padre_atribucion_id, atribucion_general_id, activo) 
+                         VALUES ($1, $2, $3, $4, $5, $6, $7, true) RETURNING id`,
+                        [proyectoId, cambio.unidad_id, cambio.clave || '', cambio.texto_propuesto || '', cambio.clave_propuesta || null, padre_id, ag_id]
+                    );
+                    if (insertRes.rowCount > 0) {
+                        nuevoId = insertRes.rows[0].id;
+                        mensajeActividad = `Agregó nueva atribución específica (ID ${nuevoId}) vía Excel`;
+                        aplicados++;
+                    }
+                } else if (tipo === 'glosario') {
+                    const insertRes = await client.query(
+                        `INSERT INTO glosario (proyecto_id, acronimo, significado) VALUES ($1, $2, $3) RETURNING id`,
+                        [proyectoId, cambio.acronimo || '(Desconocido)', cambio.texto_propuesto || '']
+                    );
+                    if (insertRes.rowCount > 0) {
+                        nuevoId = insertRes.rows[0].id;
+                        mensajeActividad = `Agregó nuevo término al glosario (ID ${nuevoId}) vía Excel`;
+                        aplicados++;
+                    }
+                } else if (tipo === 'atribucion_general') {
+                    const insertRes = await client.query(
+                        `INSERT INTO atribuciones_generales (proyecto_id, clave, texto, activo) VALUES ($1, $2, $3, true) RETURNING id`,
+                        [proyectoId, cambio.clave || '(Desconocida)', cambio.texto_propuesto || '']
+                    );
+                    if (insertRes.rowCount > 0) {
+                        nuevoId = insertRes.rows[0].id;
+                        mensajeActividad = `Agregó nueva atribución de Ley (ID ${nuevoId}) vía Excel`;
+                        aplicados++;
+                    }
+                }
+            } else {
+                // ── MODO ACTUALIZAR (Filas Existentes) ──
+                if (tipo === 'atribucion_especifica') {
+                    const updateRes = await client.query(
                     `UPDATE atribuciones_especificas
                      SET texto = $1, updated_at = NOW()
                      WHERE id = $2 AND proyecto_id = $3`,
@@ -274,13 +321,14 @@ exports.aplicarCambios = async (req, res) => {
                     aplicados++;
                 }
             }
+            } // Fin esNuevo else
 
             // Registrar en tabla de actividades (Movimientos del proyecto)
             if (mensajeActividad) {
                 await client.query(
                     `INSERT INTO actividades (tipo, entidad, entidad_id, proyecto_id, mensaje, autor)
                      VALUES ($1, $2, $3, $4, $5, $6)`,
-                    ['actualizacion', 'atribucion_especifica', cambio.id, proyectoId, mensajeActividad, usuarioNombre || 'Sistema']
+                    ['actualizacion', 'atribucion_especifica', nuevoId || 0, proyectoId, mensajeActividad, usuarioNombre || 'Sistema']
                 );
             }
         }
@@ -292,12 +340,23 @@ exports.aplicarCambios = async (req, res) => {
 
         // Guardar en historial de revisiones excel
         try {
-            await client.query(
-                `INSERT INTO historial_revisiones_excel
-                    (proyecto_id, nombre_archivo, total_cambios, cambios_aplicados, usuario_nombre, resumen_cambios, archivo_url)
-                 VALUES ($1, $2, $3, $4, $5, $6, $7)`,
-                [proyectoId, nombreArchivo || 'archivo.xlsx', cambios.length, aplicados, usuarioNombre || 'Sistema', JSON.stringify(cambios), archivoUrl || null]
-            );
+            if (historialId) { // Es una revisión de enlace
+                await client.query(
+                    `UPDATE historial_revisiones_excel 
+                     SET cambios_aplicados = cambios_aplicados + $1, updated_at = NOW() 
+                     WHERE id = $2 AND proyecto_id = $3`,
+                    [aplicados, historialId, proyectoId]
+                );
+            } else {
+                if (aplicados > 0 || cambios.length > 0) {
+                    await client.query(
+                        `INSERT INTO historial_revisiones_excel
+                            (proyecto_id, nombre_archivo, total_cambios, cambios_aplicados, usuario_nombre, resumen_cambios, archivo_url)
+                         VALUES ($1, $2, $3, $4, $5, $6, $7)`,
+                        [proyectoId, nombreArchivo || 'archivo.xlsx', cambios.length, aplicados, usuarioNombre || 'Sistema', JSON.stringify(cambios), archivoUrl || null]
+                    );
+                }
+            }
         } catch (histErr) {
             console.warn('[historial] No se pudo guardar historial:', histErr.message);
         }
