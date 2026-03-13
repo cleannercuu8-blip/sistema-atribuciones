@@ -380,22 +380,26 @@ class ExcelRevisionService {
                     if (v?.includes('OBSERVACIONES')) colObsG = col;
                     if (v?.includes('NUEVA PROPUESTA')) colPropG = col;
                 });
-                if (colIdG && colPropG) break;
+                if (colIdG && (colPropG || colObsG)) break;
             }
 
-            if (colIdG && colPropG) {
+            if (colIdG) {
                 wsGlos.eachRow((row, rowNumber) => {
-                    if (rowNumber < 2) return;
+                    if (rowNumber <= 2) return;
                     const idVal = row.getCell(colIdG).value;
                     if (!idVal) return;
-                    const idStr = Math.floor(Number(idVal.toString())).toString();
+                    
+                    let idStr = idVal.toString().trim();
+                    if (isNaN(parseInt(idStr))) return;
+                    idStr = Math.floor(Number(idStr)).toString();
 
                     const original = glosMap.get(idStr);
                     if (!original) return;
 
-                    const newSignificado = row.getCell(colPropG).value?.toString()?.trim() || '';
+                    const newSignificado = colPropG ? (row.getCell(colPropG).value?.toString()?.trim() || '') : '';
                     const obsVal = colObsG ? (row.getCell(colObsG).value?.toString()?.trim() || '') : '';
-                    if (original.significado.trim() !== newSignificado || obsVal !== '') {
+                    
+                    if ((newSignificado !== '' && original.significado.trim() !== newSignificado) || obsVal !== '') {
                         cambios.push({
                             tipo: 'glosario',
                             id: parseInt(idStr),
@@ -421,22 +425,26 @@ class ExcelRevisionService {
                     if (v?.includes('OBSERVACIONES')) colObsAG = col;
                     if (v?.includes('NUEVA PROPUESTA')) colPropAG = col;
                 });
-                if (colIdAG && colPropAG) break;
+                if (colIdAG && (colPropAG || colObsAG)) break;
             }
 
-            if (colIdAG && colPropAG) {
+            if (colIdAG) {
                 wsAG.eachRow((row, rowNumber) => {
-                    if (rowNumber < 3) return;
+                    if (rowNumber <= 3) return; // Header es fila 3
                     const idVal = row.getCell(colIdAG).value;
                     if (!idVal) return;
-                    const idStr = Math.floor(Number(idVal.toString())).toString();
+                    
+                    let idStr = idVal.toString().trim();
+                    if (isNaN(parseInt(idStr))) return;
+                    idStr = Math.floor(Number(idStr)).toString();
 
                     const original = agMap.get(idStr);
                     if (!original) return;
 
-                    const newTexto = row.getCell(colPropAG).value?.toString()?.trim() || '';
+                    const newTexto = colPropAG ? (row.getCell(colPropAG).value?.toString()?.trim() || '') : '';
                     const obsValAG = colObsAG ? (row.getCell(colObsAG).value?.toString()?.trim() || '') : '';
-                    if (original.texto.trim() !== newTexto || obsValAG !== '') {
+                    
+                    if ((newTexto !== '' && original.texto.trim() !== newTexto) || obsValAG !== '') {
                         cambios.push({
                             tipo: 'atribucion_general',
                             id: parseInt(idStr),
