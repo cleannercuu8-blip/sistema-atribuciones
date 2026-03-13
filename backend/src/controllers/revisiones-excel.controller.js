@@ -91,7 +91,7 @@ exports.importarExcel = async (req, res) => {
 
             // Registrar en actividades
             await pool.query(
-                `INSERT INTO actividades (tipo, entidad_tipo, entidad_id, proyecto_id, mensaje, usuario_nombre)
+                `INSERT INTO actividades (tipo, entidad, entidad_id, proyecto_id, mensaje, autor)
                  VALUES ($1, $2, $3, $4, $5, $6)`,
                 ['actualizacion', 'revision_excel', proyectoId, proyectoId, `Enlace subió Excel de subsanación: ${file.originalname}`, usuarioNombre]
             );
@@ -120,7 +120,7 @@ exports.importarExcel = async (req, res) => {
                 );
 
                 await pool.query(
-                    `INSERT INTO actividades (tipo, entidad_tipo, entidad_id, proyecto_id, mensaje, usuario_nombre)
+                    `INSERT INTO actividades (tipo, entidad, entidad_id, proyecto_id, mensaje, autor)
                      VALUES ($1, $2, $3, $4, $5, $6)`,
                     ['actualizacion', 'revision_excel', proyectoId, proyectoId, `Responsable subió observaciones: ${file.originalname}`, usuarioNombre]
                 );
