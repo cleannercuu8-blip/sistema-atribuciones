@@ -160,6 +160,12 @@ class ExcelRevisionService {
                 filaG++;
             }
 
+            // Desbloquear columnas insertables
+            wsGlos.getColumn(1).protection = { locked: false }; // Acronimo
+            wsGlos.getColumn(2).protection = { locked: false }; // Significado
+            wsGlos.getColumn(4).protection = { locked: false }; // Observaciones
+            if (incluirPropuestas) wsGlos.getColumn(5).protection = { locked: false }; // Nueva Propuesta
+
             await protegerHoja(wsGlos);
         }
 
@@ -194,6 +200,10 @@ class ExcelRevisionService {
 
                 filaAG++;
             }
+
+            // Desbloquear columnas insertables (A-E, G, H)
+            [1, 2, 3, 4, 5, 7].forEach(c => wsAG.getColumn(c).protection = { locked: false });
+            if (incluirPropuestas) wsAG.getColumn(8).protection = { locked: false }; // Nueva Propuesta
 
             await protegerHoja(wsAG);
         }
@@ -318,6 +328,17 @@ class ExcelRevisionService {
                 }
 
                 fila++;
+            }
+
+            // Desbloquear columnas para inserción/edición libre en celdas nuevas
+            // A=Clave1, B=Clave2... hasta Texto Original, más las columnas nuevas (Observacion, etc.)
+            for (let c = 1; c < colIdNum; c++) {
+                ws.getColumn(c).protection = { locked: false };
+            }
+            ws.getColumn(colObsNum).protection = { locked: false };
+            if (incluirPropuestas) {
+                ws.getColumn(colPropNum).protection = { locked: false };
+                ws.getColumn(colCorrClaveNum).protection = { locked: false };
             }
 
             // Proteger hoja con columnas editables

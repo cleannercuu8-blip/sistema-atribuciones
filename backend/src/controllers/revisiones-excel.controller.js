@@ -321,7 +321,7 @@ exports.listarHistorial = async (req, res) => {
     try {
         const { proyectoId } = req.params;
         const result = await pool.query(
-            `SELECT id, nombre_archivo, total_cambios, cambios_aplicados, usuario_nombre, resumen_cambios, created_at, archivo_url
+            `SELECT id, nombre_archivo, total_cambios, cambios_aplicados, usuario_nombre, resumen_cambios, created_at, archivo_url, usuario_id
              FROM historial_revisiones_excel
              WHERE proyecto_id = $1
              ORDER BY created_at DESC`,

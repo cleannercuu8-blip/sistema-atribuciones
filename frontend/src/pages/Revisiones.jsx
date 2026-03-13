@@ -172,7 +172,7 @@ function HistorialVersiones({ proyectoId, handleEliminarHistorial, handleEditarH
                                                 📥 Excel
                                             </button>
                                         )}
-                                        {usuario?.rol !== 'enlace' && h.resumen_cambios?.length > 0 && usuario?.nombre !== h.usuario_nombre && h.cambios_aplicados === 0 && (
+                                        {usuario?.rol !== 'enlace' && h.resumen_cambios?.length > 0 && usuario?.id !== h.usuario_id && h.cambios_aplicados === 0 && (
                                             <button
                                                 onClick={() => handleCargarParaRevision(h)}
                                                 className="btn btn-outline btn-sm"
