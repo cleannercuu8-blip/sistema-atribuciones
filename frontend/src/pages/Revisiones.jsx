@@ -537,24 +537,49 @@ export default function Revisiones() {
                             {ultimoHistorial && ultimoHistorial.archivo_url ? (
                                 <div style={{ marginBottom: 14, background: '#f0fdf4', padding: '12px', borderRadius: '8px', border: '1px solid #bbf7d0' }}>
                                     <p style={{ fontSize: 12, color: '#166534', margin: '0 0 8px 0', fontWeight: 600 }}>
-                                        🌟 Último archivo subido disponible:
+                                        🌟 {usuario?.rol === 'enlace' ? 'Hay observaciones pendientes de subsanar:' : 'Último archivo subido disponible:'}
                                     </p>
-                                    <button
-                                        onClick={() => descargarExcelHistorial(ultimoHistorial.archivo_url, ultimoHistorial.nombre_archivo)}
-                                        className="btn btn-success"
-                                        style={{ width: '100%', display: 'block', textAlign: 'center', marginBottom: 8 }}
-                                    >
-                                        📥 Bajar {ultimoHistorial.nombre_archivo}
-                                    </button>
-                                    <button 
-                                        className="btn btn-outline btn-sm" 
-                                        onClick={descargarExcel} 
-                                        disabled={cargando} 
-                                        style={{ width: '100%' }}
-                                        title="Generar uno nuevo en blanco con la BD Actual"
-                                    >
-                                        {cargando ? '⏳ Generando original...' : '📄 Generar Nuevo en Blanco'}
-                                    </button>
+                                    
+                                    {usuario?.rol === 'enlace' ? (
+                                        <>
+                                            <button
+                                                onClick={descargarExcel}
+                                                className="btn btn-success"
+                                                disabled={cargando}
+                                                style={{ width: '100%', display: 'block', textAlign: 'center', marginBottom: 8 }}
+                                                title="Generar Excel con columnas verdes para capturar propuestas"
+                                            >
+                                                {cargando ? '⏳ Generando formato...' : '📝 Descargar Formato de Subsanación'}
+                                            </button>
+                                            <button 
+                                                className="btn btn-outline btn-sm" 
+                                                onClick={() => descargarExcelHistorial(ultimoHistorial.archivo_url, ultimoHistorial.nombre_archivo)} 
+                                                style={{ width: '100%' }}
+                                                title="Descargar el Excel amarillo original que subió el Revisor"
+                                            >
+                                                Ver archivo original ({ultimoHistorial.nombre_archivo})
+                                            </button>
+                                        </>
+                                    ) : (
+                                        <>
+                                            <button
+                                                onClick={() => descargarExcelHistorial(ultimoHistorial.archivo_url, ultimoHistorial.nombre_archivo)}
+                                                className="btn btn-success"
+                                                style={{ width: '100%', display: 'block', textAlign: 'center', marginBottom: 8 }}
+                                            >
+                                                📥 Bajar {ultimoHistorial.nombre_archivo}
+                                            </button>
+                                            <button 
+                                                className="btn btn-outline btn-sm" 
+                                                onClick={descargarExcel} 
+                                                disabled={cargando} 
+                                                style={{ width: '100%' }}
+                                                title="Generar uno nuevo en blanco con la BD Actual"
+                                            >
+                                                {cargando ? '⏳ Generando original...' : '📄 Generar Nuevo en Blanco'}
+                                            </button>
+                                        </>
+                                    )}
                                 </div>
                             ) : (
                                 <button className="btn btn-primary" onClick={descargarExcel} disabled={cargando} style={{ width: '100%' }}>
