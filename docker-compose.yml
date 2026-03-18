@@ -1,0 +1,49 @@
+version: '3.8'
+
+services:
+  db:
+    image: postgres:16-alpine
+    container_name: atribuciones-db
+    environment:
+      POSTGRES_USER: atribuciones_user
+      POSTGRES_PASSWORD: atribuciones_pass
+      POSTGRES_DB: sistema_atribuciones
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    ports:
+      - "5432:5432"
+    restart: unless-stopped
+
+  backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    container_name: atribuciones-backend
+    environment:
+      - NODE_ENV=development
+      - PORT=3001
+      - DATABASE_URL=postgresql://atribuciones_user:atribuciones_pass@db:5432/sistema_atribuciones
+      - FRONTEND_URL=http://localhost:5173
+      - JWT_SECRET=supersecretkey
+      - DB_INIT=true
+    ports:
+      - "3001:3001"
+    volumes:
+      - ./backend/uploads:/app/uploads
+    depends_on:
+      - db
+    restart: unless-stopped
+
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+    container_name: atribuciones-frontend
+    ports:
+      - "5173:80"
+    depends_on:
+      - backend
+    restart: unless-stopped
+
+volumes:
+  pgdata:

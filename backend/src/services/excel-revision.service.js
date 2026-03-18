@@ -425,6 +425,8 @@ class ExcelRevisionService {
                     let newSignificado = colPropG ? (row.getCell(colPropG).value?.toString()?.trim() || '') : '';
                     const obsVal = colObsG ? (row.getCell(colObsG).value?.toString()?.trim() || '') : '';
                     
+                    const significadoOriginal = (original?.significado || '').trim();
+
                     if (esNuevo) {
                         const acronimo = row.getCell(1).value?.toString()?.trim() || '';
                         const fallbackSig = row.getCell(2).value?.toString()?.trim() || '';
@@ -444,14 +446,14 @@ class ExcelRevisionService {
                         });
                     } else {
                         // Lógica para detectar sobreescritura directa en la celda de Significado
-                        if (newSignificado === '' || newSignificado === original.significado.trim()) {
+                        if (newSignificado === '' || newSignificado === significadoOriginal) {
                             const valOrig = row.getCell(2).value?.toString()?.trim();
-                            if (valOrig && valOrig !== '-' && valOrig !== original.significado.trim()) {
+                            if (valOrig && valOrig !== '-' && valOrig !== significadoOriginal) {
                                 newSignificado = valOrig;
                             }
                         }
 
-                        if ((newSignificado !== '' && original.significado.trim() !== newSignificado) || obsVal !== '') {
+                        if ((newSignificado !== '' && significadoOriginal !== newSignificado) || obsVal !== '') {
                             cambios.push({
                                 tipo: 'glosario',
                                 id: parseInt(idStr),
@@ -492,56 +494,58 @@ class ExcelRevisionService {
                     if (!esNuevo && isNaN(parseInt(idStr))) return;
                     if (!esNuevo) idStr = Math.floor(Number(idStr)).toString();
 
-                    const original = !esNuevo ? agMap.get(idStr) : null;
-                    if (!esNuevo && !original) return;
+                        const original = !esNuevo ? agMap.get(idStr) : null;
+                        if (!esNuevo && !original) return;
 
-                    let newTexto = colPropAG ? (row.getCell(colPropAG).value?.toString()?.trim() || '') : '';
-                    const obsValAG = colObsAG ? (row.getCell(colObsAG).value?.toString()?.trim() || '') : '';
-                    
-                    if (esNuevo) {
-                        const claveAG = row.getCell(1).value?.toString()?.trim() || '';
-                        const fallbackText = row.getCell(colIdAG - 1).value?.toString()?.trim() || '';
-                        const textoPropFinal = newTexto || fallbackText;
+                        let newTexto = colPropAG ? (row.getCell(colPropAG).value?.toString()?.trim() || '') : '';
+                        const obsValAG = colObsAG ? (row.getCell(colObsAG).value?.toString()?.trim() || '') : '';
                         
-                        if (claveAG === '' && textoPropFinal === '' && obsValAG === '') return;
-                        
-                        cambios.push({
-                            tipo: 'atribucion_general',
-                            id: null,
-                            _esNuevo: true,
-                            clave: claveAG || '(Desconocida)',
-                            norma: row.getCell(2).value?.toString()?.trim() || '',
-                            articulo: row.getCell(3).value?.toString()?.trim() || '',
-                            fraccion_parrafo: row.getCell(4).value?.toString()?.trim() || '',
-                            texto_original: '✨ NUEVA FILA INSERTADA',
-                            texto_propuesto: textoPropFinal || '(Solo observación)',
-                            observacion: obsValAG,
-                            hoja: 'ATRIBUCIONES GENERALES',
-                        });
-                    } else {
-                        // Lógica para detectar sobreescritura directa en la celda de Texto Original (penúltima o antes del ID)
-                        if (newTexto === '' || newTexto === original.texto.trim()) {
-                            const colTextoOrigIdx = colIdAG - 1; // o colIdAG - 2 si hay despistes
-                            if (colTextoOrigIdx > 0) {
-                                const valOrig = row.getCell(colTextoOrigIdx).value?.toString()?.trim();
-                                if (valOrig && valOrig !== '-' && valOrig !== original.texto.trim()) {
-                                    newTexto = valOrig;
-                                }
-                            }
-                        }
+                        const textoOriginalAG = (original?.texto || '').trim();
 
-                        if ((newTexto !== '' && original.texto.trim() !== newTexto) || obsValAG !== '') {
+                        if (esNuevo) {
+                            const claveAG = row.getCell(1).value?.toString()?.trim() || '';
+                            const fallbackText = row.getCell(colIdAG - 1).value?.toString()?.trim() || '';
+                            const textoPropFinal = newTexto || fallbackText;
+                            
+                            if (claveAG === '' && textoPropFinal === '' && obsValAG === '') return;
+                            
                             cambios.push({
                                 tipo: 'atribucion_general',
-                                id: parseInt(idStr),
-                                clave: original.clave,
-                                texto_original: original.texto,
-                                texto_propuesto: newTexto || original.texto,
+                                id: null,
+                                _esNuevo: true,
+                                clave: claveAG || '(Desconocida)',
+                                norma: row.getCell(2).value?.toString()?.trim() || '',
+                                articulo: row.getCell(3).value?.toString()?.trim() || '',
+                                fraccion_parrafo: row.getCell(4).value?.toString()?.trim() || '',
+                                texto_original: '✨ NUEVA FILA INSERTADA',
+                                texto_propuesto: textoPropFinal || '(Solo observación)',
                                 observacion: obsValAG,
                                 hoja: 'ATRIBUCIONES GENERALES',
                             });
+                        } else {
+                            // Lógica para detectar sobreescritura directa en la celda de Texto Original (penúltima o antes del ID)
+                            if (newTexto === '' || newTexto === textoOriginalAG) {
+                                const colTextoOrigIdx = colIdAG - 1; // o colIdAG - 2 si hay despistes
+                                if (colTextoOrigIdx > 0) {
+                                    const valOrig = row.getCell(colTextoOrigIdx).value?.toString()?.trim();
+                                    if (valOrig && valOrig !== '-' && valOrig !== textoOriginalAG) {
+                                        newTexto = valOrig;
+                                    }
+                                }
+                            }
+
+                            if ((newTexto !== '' && textoOriginalAG !== newTexto) || obsValAG !== '') {
+                                cambios.push({
+                                    tipo: 'atribucion_general',
+                                    id: parseInt(idStr),
+                                    clave: original.clave,
+                                    texto_original: original.texto,
+                                    texto_propuesto: newTexto || original.texto,
+                                    observacion: obsValAG,
+                                    hoja: 'ATRIBUCIONES GENERALES',
+                                });
+                            }
                         }
-                    }
                 });
             }
         }
@@ -587,6 +591,7 @@ class ExcelRevisionService {
 
                 const obs = colObsNum ? (row.getCell(colObsNum).value?.toString()?.trim() || '') : '';
                 let textoPropuesto = colPropNum ? (row.getCell(colPropNum).value?.toString()?.trim() || '') : '';
+                const textoOriginalAE = (dbRow?.texto || '').trim();
 
                 if (esNuevo) {
                      const colTextoOrigIdx = colIdNum - 2;
@@ -623,17 +628,17 @@ class ExcelRevisionService {
                 }
 
                 // Fallback: Si no hay propuesta en la columna verde, ver si el usuario editó la original
-                if (dbRow.texto.trim() === textoPropuesto || textoPropuesto === '') {
+                if (textoOriginalAE === textoPropuesto || textoPropuesto === '') {
                     const colTextoOrigIdx = colIdNum - 2;
                     if (colTextoOrigIdx > 0) {
                         const valOrig = row.getCell(colTextoOrigIdx).value?.toString()?.trim();
-                        if (valOrig && valOrig !== '-' && valOrig !== dbRow.texto.trim()) {
+                        if (valOrig && valOrig !== '-' && valOrig !== textoOriginalAE) {
                             textoPropuesto = valOrig;
                         }
                     }
                 }
                 
-                if ((textoPropuesto !== '' && dbRow.texto.trim() !== textoPropuesto) || obs !== '') {
+                if ((textoPropuesto !== '' && textoOriginalAE !== textoPropuesto) || obs !== '') {
                     cambios.push({
                         tipo: 'atribucion_especifica',
                         id: parseInt(idStr),

@@ -103,10 +103,22 @@ exports.importarExcel = async (req, res) => {
             // Si es Responsable/Admin y sube un archivo, vamos a ver si tiene cambios de texto o solo obs.
             // Si el usuario solo quiere subir observaciones, lo guardamos directo para evitar que 
             // le aparezca el verificador de cambios como si él tuviera que subsanar.
-            const tienePropuestasDeTexto = cambios.some(c => 
-                (c.texto_propuesto && c.texto_propuesto !== c.texto_original) || 
-                (c.clave_propuesta && c.clave_propuesta !== c.clave_actual)
-            );
+            const tienePropuestasDeTexto = cambios.some(c => {
+                // Si es una fila nueva, es una propuesta de texto/datos
+                if (c._esNuevo) return true;
+
+                // Si es un cambio de corresponsabilidad, es una propuesta de datos
+                if (c.tipo === 'corresponsabilidad') {
+                    const cp = (c.clave_propuesta || '').trim();
+                    const ca = (c.clave_actual || '').trim();
+                    return cp !== '' && cp !== ca;
+                }
+
+                // Para otros tipos (atribución, glosario), ver si el texto cambió realmente
+                const tp = (c.texto_propuesto || '').trim();
+                const to = (c.texto_original || '').trim();
+                return tp !== '' && tp !== to;
+            });
 
             if (!tienePropuestasDeTexto) {
                 const usuarioId = req.user?.id || null;
